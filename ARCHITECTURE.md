@@ -1,8 +1,19 @@
 # [NAME] — Architecture & Implementation Plan
 
-> An iMessage agent that turns group-chat debates into a plan everyone can afford and reach, and gets the whole group there at the same time.
+> An iMessage agent that turns a group's "where should we go?" into a plan everyone can afford and reach, and gets the whole group there at the same time.
 
-**Status:** v2 — free-API stack. Stage 0 is complete; apply the Stage 0.5 migration (§15) before Stage 1.
+**Status:** v3 — DM-only pivot. Stages 0, 0.5, and 0b are complete. Stage 1 was built against v2; apply the Stage 1.5 migration (§15) next.
+
+### v3 changes (summary) — DM-only "virtual group"
+The Stage 0b spike showed that Photon's free plan (the only plan available to us) uses a **shared line pool**: each person is assigned their own bot number, and **group chats are not supported**. Only the paid Business plan (one dedicated number) supports groups. DMs work both ways. So in v3 there is no iMessage group chat. The bot is the hub of a **virtual group** made of DMs:
+- **Start / join:** a READY user DMs `@plan`; the bot replies with a short **join code**. Friends DM `join <code>` to their own bot line. (§7.1, §7.3)
+- **Collect:** members DM their preferences privately. The bot stores them; nothing is relayed to other members.
+- **"Group" messages fan out:** every group-safe message (join notices, poll, confirmation) is sent to **each member's DM**. They are still built only from `GroupSafe*` types and still pass the PrivacyGuard. (§8, §11)
+- **Voting:** a text poll in each DM; members reply `A`, `B`, or `C`. No native polls. (§7.3)
+- **Interface change:** `MessagingProvider.send_group(chat_id, msg)` → `send_group(handles, msg)` (§8).
+- **Model change:** `Group.chat_id` → `Group.join_code` (§6.1, §6.8).
+- **Location:** typed landmarks only (in the spike, a shared location arrived as `custom` content with no usable coordinates).
+- Unchanged: optimizer, budgets, Nessie, routing, places, Gemini, record/replay, privacy rules.
 
 ### v2 changes (summary)
 v1 used paid Google Maps and xAI Grok APIs. v2 uses only free services plus the team's Gemini key:
@@ -49,7 +60,7 @@ v1 used paid Google Maps and xAI Grok APIs. v2 uses only free services plus the 
 Group chats waste time deciding where to go. Every person has different preferences, a different starting location, and a different budget they may not want to share. Existing tools either ignore money entirely or expose it.
 
 ### Solution
-A bot that joins an iMessage group chat. Each member privately links a (sandbox) bank account and shares where they're starting from. When the group says `@plan`, the bot listens to the discussion, extracts preferences, finds nearby options, routes every person to every option by walking, biking, driving, or ride-share, and picks the plans that are fairest to the worst-off person while staying inside **everyone's** private budget. The group votes in a poll. Then each person gets a **private** DM with their own travel mode, cost, and leave-by time, calculated so the whole group **arrives together**.
+A bot you text on iMessage. Each person privately links a (sandbox) bank account and shares where they're starting from. One person DMs `@plan` and gets a join code; friends DM `join <code>` to form a virtual group. Everyone tells the bot what they want **privately**, in their own DM, so nobody has to say "I'm broke this week" in front of friends. On `@go`, the bot extracts preferences, finds nearby options, routes every person to every option by walking, biking, driving, or ride-share, and picks the plans that are fairest to the worst-off person while staying inside **everyone's** private budget. Everyone gets the same 3 options and votes by replying A, B, or C. Then each person gets a **private** DM with their own travel mode, cost, and leave-by time, calculated so the whole group **arrives together**.
 
 ### Why it fits "Navigation"
 Navigation is the core, not a side feature: multi-origin, multi-modal routing to a shared destination, with departure scheduling so arrivals converge. Money and preferences are constraints on that navigation problem. Ride-share creates a real money-versus-time trade-off per person: fast but costly versus free but slow.
@@ -57,7 +68,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 ### What makes it technically interesting (pitch points)
 - **Fair group optimization:** exact enumeration with a min-max + mean objective, so no one person carries the cost of the plan.
 - **Synchronized arrival:** work backward from a shared target arrival time to compute each person's leave-by time.
-- **Privacy by construction:** budgets never reach the group chat or the LLM. Enforced by module boundaries, types, and an output scanner.
+- **Privacy by construction:** budgets never reach other members or the LLM, and preferences are shared privately, one DM per person. Enforced by module boundaries, types, and an output scanner.
 - **Grounded LLM use:** the LLM extracts preferences and phrases explanations, but every number (time, distance, cost, hours) comes from routing data or deterministic formulas, and explanations are checked against computed facts.
 - **Built on open data:** venues and routing come from OpenStreetMap (Overpass, Nominatim, OpenRouteService).
 
@@ -69,6 +80,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 |---|---|---|
 | Backend | Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, `uv` | Team preference. One async process. |
 | iMessage | Photon `spectrum-ts` in a **thin TypeScript bridge** (`bridge/`) | Photon's SDKs are TypeScript. The bridge only relays; all logic stays in Python. |
+| Group model (v3) | **DMs only**; a virtual group joined by code | Free plan = shared line pool: a different bot number per person and no group chats. |
 | Bridge ↔ backend | Plain JSON over HTTP on **localhost** | Both run on one laptop. No HMAC, no auth. |
 | Database | SQLite via SQLAlchemy | Zero setup. No Postgres or Supabase. |
 | Routing | **OpenRouteService** (matrix + directions; `foot-walking`, `cycling-regular`, `driving-car`) | Free key, no card. Free plan: 2,000 directions/day, 500 matrix/day. |
@@ -89,19 +101,20 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 
 ```
           ┌──────────────────────────── iMessage ────────────────────────────┐
-          │  Group chat (A, B, C, bot)          DMs (A↔bot, B↔bot, C↔bot)      │
+          │  DMs only: A↔bot line 1, B↔bot line 2, C↔bot line 3 (shared pool) │
+          │  Virtual group = members who joined the same join code (v3)       │
           └──────────────┬─────────────────────────────────▲─────────────────┘
                          │ Photon Spectrum (gRPC stream)   │
           ┌──────────────▼─────────────────────────────────┴─────────────────┐
           │ bridge/ (TypeScript, Bun, ~150 LOC, port 3001)                    │
-          │  • on message / poll vote  → POST http://localhost:8000/webhooks  │
-          │  • POST /send, /send_dm, /send_poll, /send_image ← from backend   │
+          │  • on DM message           → POST http://localhost:8000/webhooks  │
+          │  • POST /send_dm ← from backend (/send, /send_poll unused in v3)  │
           └──────────────┬─────────────────────────────────▲─────────────────┘
                          │ JSON over localhost HTTP        │
 ┌────────────────────────▼─────────────────────────────────┴──────────────────────────┐
 │ app/ (FastAPI, port 8000)                                                            │
 │                                                                                      │
-│  api/webhooks.py ─► conversation/router.py (group vs DM, commands, session lookup)   │
+│  api/webhooks.py ─► conversation/router.py (DM commands, join codes, session lookup) │
 │        │                     │                    │                    │             │
 │        ▼                     ▼                    ▼                    ▼             │
 │  onboarding/fsm.py   planning/session.py   decision/poll.py   delivery/itinerary.py │
@@ -123,7 +136,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 2. **`app/private/` is the only package that reads budgets, balances, Nessie IDs, or origins.** The optimizer receives opaque, pseudonymous `PrivateConstraints`. Group-facing code never imports `app.private`.
 3. **The optimizer is pure Python with no I/O.** Input: candidates, route estimates, constraints, preferences. Output: ranked plans.
 4. **The LLM never produces physical-world numbers.** Durations, distances, costs, hours, and coordinates come only from providers. Unknown values are explicitly `None` / `status="unknown"`.
-5. **Webhooks return immediately.** All processing runs as background tasks, serialized per chat with an `asyncio.Lock` so messages in one chat are handled in order.
+5. **Webhooks return immediately.** All processing runs as background tasks. v3: messages from different members of one virtual group arrive on different DMs, so router handling is serialized with **one global `asyncio.Lock`** (traffic is tiny). Long work (pipeline, delivery) runs as its own task, outside the lock.
 
 ---
 
@@ -145,13 +158,13 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   ├── deps.py                   # builds provider instances from settings
 │   │
 │   ├── api/
-│   │   ├── webhooks.py           # POST /webhooks/photon/message, /webhooks/photon/poll_vote
+│   │   ├── webhooks.py           # POST /webhooks/photon/message (v3: poll_vote unused)
 │   │   ├── sim.py                # Simulator endpoints (§14.3)
 │   │   └── health.py             # GET /health
 │   │
 │   ├── conversation/
-│   │   ├── router.py             # Dispatch: group vs DM, command vs free text, state
-│   │   ├── commands.py           # Parse @plan, @go, @cancel, @pick, start, yes/no, numbers
+│   │   ├── router.py             # Dispatch (v3: DMs only): commands, join codes, free text, state
+│   │   ├── commands.py           # Parse @plan, join <code>, @go, @cancel, @pick, A/B/C, start, yes/no, numbers
 │   │   └── copy.py               # ALL user-facing strings and message templates
 │   │
 │   ├── onboarding/
@@ -175,7 +188,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   └── budget.py             # deterministic limit estimator (§12)
 │   │
 │   ├── decision/
-│   │   └── poll.py               # send poll (native or text), tally votes, pick winner
+│   │   └── poll.py               # send text poll to all members, tally DM votes, pick winner
 │   │
 │   ├── delivery/
 │   │   └── itinerary.py          # directions for winner; per-person DMs; map image (stretch, `staticmap` + OSM tiles)
@@ -304,12 +317,14 @@ class User(BaseModel):
     dm_chat_id: str | None          # Photon chat id of the DM with this user
     onboarding_state: OnboardingState
 
-class Group(BaseModel):
+class Group(BaseModel):              # v3: a virtual group, created by one @plan
     id: UUID
-    chat_id: str                    # Photon group chat id
-    member_ids: list[UUID]          # users seen speaking in this group (+ membership events if available)
+    join_code: str                  # v3 (was chat_id): e.g. "K7QP"; 4 chars, uppercase, no 0/O/1/I
+    member_ids: list[UUID]          # creator + users who DMed "join <code>"
     active_session_id: UUID | None
 ```
+
+v3: one `Group` per `@plan`. A user may be in **at most one group with an active session** at a time; the router finds a user's group through `group_members` + `groups.active_session_id`.
 
 ### 6.2 Private data (vault only)
 
@@ -528,15 +543,17 @@ class PrivateMessage(BaseModel):
 
 `send_group()` accepts only `GroupSafeMessage`. `send_private()` accepts only `PrivateMessage` and a `user_id`. The type checker must catch passing the wrong one.
 
+v3: "group" messages are delivered to each member's DM (§8), but the rule is unchanged: anything every member sees must be a `GroupSafeMessage`. Use `PrivateMessage` only for content meant for one person.
+
 ### 6.8 Database tables (SQLAlchemy)
 
 | Table | Columns | Notes |
 |---|---|---|
 | `users` | id, handle (unique), display_name, dm_chat_id, onboarding_state, created_at | |
-| `groups` | id, chat_id (unique), active_session_id, created_at | |
+| `groups` | id, join_code (unique), active_session_id, created_at | v3: `join_code` replaces `chat_id` |
 | `group_members` | group_id, user_id | |
 | `private_profiles` | user_id (PK), nessie_customer_id, spend_limit_usd, limit_source, origin_lat, origin_lng, origin_label, modes_json, updated_at | **Only `app/private/` may query this table.** |
-| `sessions` | id, group_id, state, started_at, target_time, pid_map_json, preferences_json, plans_json, poll_id, winner_plan_id | `plans_json` stores full plans; `pid_map_json` maps pid → user_id |
+| `sessions` | id, group_id, state, started_at, target_time, pid_map_json, preferences_json, plans_json, poll_id, winner_plan_id | `plans_json` stores full plans; `pid_map_json` maps pid → user_id. v3: `poll_id` stays null (text polls only) |
 | `session_messages` | id, session_id, message_id (unique), sender_user_id, text, ts | Only messages during COLLECTING. Deleted when session reaches DONE or CANCELLED. |
 | `votes` | session_id, user_id, option_label, ts | One row per user per session (upsert) |
 | `processed_messages` | message_id (PK) | Idempotency for webhook retries |
@@ -565,17 +582,17 @@ class EventFinding(BaseModel):          # app/models/candidates.py — Stage 7 o
 
 ### 7.1 Message routing (`conversation/router.py`)
 
-For every inbound message:
+v3: **every inbound message is a DM.** (`is_group` is always false; if a group message ever arrives, ignore it.) For every inbound message:
 1. If `message_id` is in `processed_messages`, ignore. Otherwise insert it.
-2. Upsert the `User` by handle. If the chat is a group, upsert the `Group` and membership.
-3. If the message is from a **DM** → onboarding FSM (§7.2), unless the user is READY, in which case handle DM commands (`budget <n>`, `location`, `car yes|no`, `help`).
-4. If the message is from a **group**:
-   - Parse commands: `@plan`, `@go`, `@cancel`, `@pick A|B|C`, poll replies `A`/`B`/`C` (only while POLLING).
-   - Otherwise, if the group's session is COLLECTING, store it in `session_messages`.
-   - Otherwise ignore silently.
-5. First time the bot sees a group → send the intro message (§7.4).
+2. Upsert the `User` by handle.
+3. If the user is **not READY** → onboarding FSM (§7.2). If they sent `join <code>`, reply "Let's get you set up first, then send `join <code>` again." and start onboarding.
+4. If the user is READY, look up their **active group** (the one group with an active session they belong to, if any) and handle, in this order:
+   - **Session commands:** `@plan`, `join <code>`, `@go`, `@cancel`, `@pick A|B|C`, and vote replies `A`/`B`/`C` (only while POLLING). See §7.3.
+   - **Settings commands:** `budget <n>`, `location`, `car yes|no`, `help`.
+   - **Otherwise,** if their group's session is COLLECTING, store the text in `session_messages` (sender = this user). Reply `copy.NOTED` only to that member's **first** stored message in the session, to keep the DM quiet.
+   - **Otherwise** reply with `copy.HELP` (a short list of commands).
 
-Commands are case-insensitive and may appear with surrounding text ("ok @go"). The wake word should also accept the bot's display name if Photon exposes mentions; otherwise plain text matching is enough.
+Commands are case-insensitive and may appear with surrounding text ("ok @go"). Join codes are matched case-insensitively.
 
 ### 7.2 Onboarding FSM (DM only, `onboarding/fsm.py`)
 
@@ -588,46 +605,59 @@ AWAITING_LOCATION ──text──► places.geocode(text, near=demo center) →
                     ──"no"──► ask again
 AWAITING_MODES ──"car" | "bike" | "both" | "neither"──► TravelModes(drive=…, bike=…)  (walk + rideshare always on;
                     user may reply "no rideshare" to turn it off)
-READY ──► DM: "You're set." Group: "✅ Maya is set (2/3)."  (no details)
+READY ──► DM: "You're set! Start a plan with @plan, or join a friend's with join <code>."
 ```
 
 - **Bank code:** a short code per seeded persona (e.g. `MAYA1`), mapped to a Nessie customer id in `fixtures/personas.json` after seeding. This simulates "linking a bank account."
-- If a shared-location attachment arrives and the bridge can parse coordinates, accept it directly. Otherwise the typed-landmark path is the default.
-- Any invalid input re-asks with a short hint. Never echo dollar amounts in group chats.
+- v3: **typed landmarks only.** In the spike, a shared location arrived as `custom` content with no usable coordinates.
+- Any invalid input re-asks with a short hint. Never echo dollar amounts in any group-safe message.
 
 ### 7.3 Planning session FSM (`planning/session.py`)
 
+v3: a session lives in a virtual group created by `@plan`. "Tell the group" means `send_group(member handles, GroupSafeMessage)`, which sends the same message to each member's DM.
+
 ```
-IDLE ──@plan──► COLLECTING ──@go──► RUNNING ──pipeline ok──► POLLING
-                    │                  │                         │
-                 @cancel          pipeline error              votes / @pick / timeout
-                    ▼                  ▼                         ▼
-                  IDLE        "Couldn't finish — say @go     CONFIRMED ──► DELIVERING ──► DONE
-                              to retry" → COLLECTING
-any state ──@cancel──► CANCELLED → IDLE
+(no group) ──@plan──► COLLECTING ──@go──► RUNNING ──pipeline ok──► POLLING
+                        │  ▲  join <code>      │                         │
+                     @cancel             pipeline error         A/B/C replies / @pick / timeout
+                        ▼                      ▼                         ▼
+                    CANCELLED      "Couldn't finish — say @go     CONFIRMED ──► DELIVERING ──► DONE
+                                    to retry" → COLLECTING
+any state ──@cancel (any member)──► CANCELLED
 ```
 
-- **COLLECTING:** the bot only reads messages sent **after** `@plan`. (Photon's adapter cannot fetch chat history, so there is no "read the last 30 messages" behavior.) On entry: "Listening — tell me what you're feeling. Say @go when ready."
-- On `@plan`, if some members aren't READY: "Planning with Maya and Sam. Jordan, DM me 'start' to be included." Proceed with READY members only. Require at least 2.
-- **RUNNING:** send "🔎 Looking at options…" then run the pipeline (§10) as a background task.
-- **POLLING:** native poll if supported, otherwise text poll ("Reply A, B, or C"). Winner = first option to reach ⌈N/2⌉ votes, or `@pick X` by anyone, or the leader after `POLL_TIMEOUT_SEC` (ties → better score).
-- **DELIVERING:** compute detailed routes for the winner, send each person's DM, then the group confirmation.
-- One active session per group. `@plan` during an active session replies "Already planning — say @cancel to start over."
+- **`@plan`** (READY user, not in an active group): create a `Group` with a fresh join code and the sender as its first member, create a session in COLLECTING, and reply with `copy.PLAN_STARTED` (includes the code). If the user is already in an active group: "You're already in a plan (code K7QP). Say @cancel to start over."
+- **`join <code>`** (READY user): if the code matches a group whose session is COLLECTING, add the user and tell the group "✅ Sam joined (2 people)." If the session is past COLLECTING: "That plan already started. Ask them to @plan again." Unknown code: "I don't know that code. Check it and try again." Already in another active group: same reply as for `@plan`. Cap at 6 members.
+- **COLLECTING:** the bot only stores DMs sent **after** the member joined. (Photon cannot fetch chat history.) Nothing is relayed to other members.
+- **`@go`** (any member): require at least 2 members, else "I need at least 2 people. Share code K7QP first." Then tell the group "🔎 Looking at options…" and run the pipeline (§10) as a background task.
+- **POLLING:** text poll only; the same poll message goes to every member. Votes are DM replies `A`, `B`, or `C` (latest vote per user wins; upsert into `votes`). Winner = first option to reach ⌈N/2⌉ votes, or `@pick X` by any member, or the leader after `POLL_TIMEOUT_SEC` (ties → better score). Optionally tell the group "🗳️ 2 of 3 voted" (counts only, never who voted for what).
+- **DELIVERING:** compute detailed routes for the winner, send the group confirmation, then each person's itinerary DM (so the route lands right under the confirmation).
+- **DONE / CANCELLED:** set `groups.active_session_id = null` and delete the session's `session_messages`. The join code is retired. A new `@plan` creates a new group and code.
 
 ### 7.4 Message copy (all in `conversation/copy.py`)
 
-Group intro:
-> Hi! I'm [NAME]. I help this chat pick a plan everyone can afford and reach, and I get you there at the same time. Each of you: DM me "start" to set up privately. I never share anyone's money or location here.
+Welcome (first DM from a new user, before onboarding):
+> Hi! I'm [NAME]. I help friends pick a plan everyone can afford and reach, and I get you there at the same time. Let's set you up. It's private: I never share your money or location with anyone.
 
-Poll message:
+`PLAN_STARTED` (reply to `@plan`):
+> Plan started! 🎉 Tell your friends to text me: **join K7QP**
+> Meanwhile, tell me what you're in the mood for. Only I see it. Say @go when everyone's in.
+
+Join notice (to the group):
+> ✅ Sam joined (2 people).
+
+`NOTED` (first stored message from a member):
+> Got it 👍 Keep going, or say @go when everyone's ready.
+
+Poll message (to the group):
 > Here are 3 plans that fit everyone's constraints:
 > **A** — Koko (Korean) · ≤22 min for everyone · $$ · arrive within 4 min
 > Keeps everyone within budget and the longest trip is 22 min.
 > **B** — …
-> Vote A, B, or C.
+> Reply A, B, or C.
 
-Confirmation:
-> 🎉 Plan A: Koko. Everyone arrives around 6:42. Check your DMs for your route.
+Confirmation (to the group):
+> 🎉 Plan A: Koko. Everyone arrives around 6:42. Your route is below 👇
 
 Personal DM:
 > Your plan for tonight: **Koko**, 123 College Ave.
@@ -642,9 +672,11 @@ Keep copy short, warm, and free of jargon.
 
 Do not change these signatures without asking. Implementations live in `providers/real/` and `providers/mock/`.
 
+**v3 interface change:** `send_group` now takes the members' handles instead of a group chat id, and returns nothing (text polls only, so there is no poll_id).
+
 ```python
 class MessagingProvider(Protocol):
-    async def send_group(self, chat_id: str, msg: GroupSafeMessage) -> str | None: ...  # returns poll_id if poll sent
+    async def send_group(self, handles: list[str], msg: GroupSafeMessage) -> None: ...  # v3: same message to each member's DM
     async def send_private(self, handle: str, msg: PrivateMessage) -> None: ...
 
 class FinanceProvider(Protocol):
@@ -676,6 +708,8 @@ class ContextProvider(Protocol):       # Stage 7 stretch (Gemini + Search ground
 
 `FinancialSnapshot`: `checking_balance: Decimal`, `upcoming_bills_14d: Decimal`, `recent_outing_amounts: list[Decimal]` (dining/entertainment purchases in the last 60 days).
 
+v3 `send_group` implementations: Photon calls the bridge's `POST /send_dm` once per handle (rendering `poll` options into the text); sim appends the message to each handle's outbox. If one handle fails, log it and keep sending to the others.
+
 Every real provider:
 - Uses `httpx.AsyncClient` (or the provider's official SDK) with an explicit timeout (`HTTP_TIMEOUT_SEC`; LLM uses `LLM_TIMEOUT_SEC`).
 - Retries once on network errors or 5xx (`tenacity`, 2 attempts total).
@@ -692,28 +726,34 @@ Every real provider:
 
 ### 9.1 Photon bridge (`bridge/src/index.ts`)
 
+**Status: built in Stage 0b** (`spectrum-ts` 12.10.1). Run it with `cd bridge && bun run src/index.ts`; credentials go in `bridge/.env`.
+
 Responsibilities, and nothing else:
-1. Connect to Photon Spectrum Cloud with `spectrum-ts` and the iMessage provider (`PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET`). Read the `spectrum-ts` README for the exact init and message-handler API.
-2. On every inbound message (group or DM), POST to `BACKEND_URL/webhooks/photon/message`:
+1. Connect to Photon Spectrum Cloud with `spectrum-ts` and the iMessage provider (`PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET`).
+2. On every inbound text message, POST to `BACKEND_URL/webhooks/photon/message`:
    ```json
-   {"message_id": "...", "chat_id": "...", "is_group": true,
-    "sender_handle": "+16075551234", "sender_name": "Maya" , "text": "no sushi pls",
-    "ts": "2026-10-03T18:02:11-04:00",
-    "location": {"lat": 42.44, "lng": -76.48} }
+   {"message_id": "...", "chat_id": "any;-;+16075551234", "is_group": false,
+    "sender_handle": "+16075551234", "text": "no sushi pls",
+    "ts": "2026-10-03T22:02:11.000Z"}
    ```
-   `sender_name` and `location` are optional; include only if the SDK provides them.
-3. On poll votes (if native polls work), POST to `/webhooks/photon/poll_vote`: `{"poll_id", "chat_id", "voter_handle", "option_index"}`.
-4. Expose a tiny HTTP server (Bun's built-in `Bun.serve`) on port 3001:
-   - `POST /send` `{chat_id, text}`
-   - `POST /send_dm` `{handle, text}` — sends to a handle, creating/resolving the DM chat
-   - `POST /send_poll` `{chat_id, title, options: string[]}` → `{poll_id}`; return HTTP 501 if unsupported
-   - `POST /send_image` `{chat_id | handle, path}` (stretch)
+   The SDK provides no sender display name (onboarding asks for it) and no location. `ts` is UTC ISO-8601.
+3. The bridge also forwards native poll votes to `/webhooks/photon/poll_vote`. **Unused in v3** (text polls only); the backend doesn't need this endpoint.
+4. HTTP server (`Bun.serve`) on port 3001:
+   - `POST /send_dm` `{handle, text}`: the only send endpoint v3 uses. **Verified working.**
+   - `POST /send` `{chat_id, text}` and `POST /send_poll`: group-only, **unused in v3**.
+   - `POST /send_image` returns 501 (stretch).
    - `GET /health`
-5. Log every in/out event to the console (handle truncated to last 4 digits).
+5. Log every in/out event to the console (handle truncated to last 4 digits; never log locations).
 
 The bridge holds no state and makes no decisions. If the backend is down, log and drop.
 
-**Spike questions** (answer in Stage 0b, record answers in `README.md`):
+**Spike results (Stage 0b), full notes in `README.md`:**
+- DMs: inbound ✅ and outbound ✅ on real phones.
+- Group chats: ❌ on the free plan. Shared line pool, so each person gets a different bot number; Photon's docs say group chats need the paid Business plan. Our live test received nothing from a group. This is why v3 is DM-only.
+- Allowlist: the bot only talks to phones registered as users in the Photon project, and each person must text their bot line first. Register every demo phone.
+- Shared location: arrived as `custom` content (most likely the SDK's "unsupported message"; not yet confirmed) with no usable coordinates, so typed landmarks only.
+
+Original spike questions (answered above):
 - Do group messages and DMs arrive through the same handler, and how is group vs DM distinguished?
 - Can the bot **initiate** a DM to a handle that has only spoken in a group? If not, onboarding requires users to DM first (already the design: "DM me 'start'").
 - Do native polls work in group chats, and do votes arrive as events?
@@ -787,7 +827,8 @@ Triggered by `@go`. Target end-to-end latency: ≤ 15 s live, ≤ 3 s in replay.
 
 ```
 1. Snapshot
-   - members = READY users in the group
+   - members = the virtual group's members (all READY: enforced at join)
+   - handles = members' handles, used for every send_group(handles, ...) below
    - pid_map = {"p1": user_id, ...}  (random order per session; saved in session)
    - constraints = vault.constraints_for(members, pid_map) -> dict[pid, PrivateConstraints]
    - transcript = session_messages → PseudonymousMessage list
@@ -810,23 +851,23 @@ Triggered by `@go`. Target end-to-end latency: ≤ 15 s live, ≤ 3 s in replay.
 5. Optimize  (optimizer, pure)
    - plans = optimizer.rank(candidates, estimates, constraints, preferences, now, settings)
    - top3 = optimizer.select(plans, k=3)
-   - If 0 feasible: tell the group "Nothing fits everyone right now" + the most binding SOFT constraint suggestion; return to COLLECTING.
+   - If 0 feasible: send_group "Nothing fits everyone right now" + the most binding SOFT constraint suggestion; return to COLLECTING.
 
 6. Explain   (facts → LLMProvider.phrase_explanations → number check → template fallback)
 
 7. Guard + send
    - Build GroupSafeMessage with GroupPlanOption list
    - PrivacyGuard.check(message, members' private values) → send or substitute safe template
-   - MessagingProvider.send_group(...) → poll_id
+   - MessagingProvider.send_group(handles, message)   # v3: each member's DM, text poll, no poll_id
    - session.state = POLLING; schedule timeout task
 ```
 
 After the winner is chosen (`delivery/itinerary.py`):
 ```
+details = {pid: routing.route(origin, venue, mode, depart_at=leave_by)}   # ORS directions for steps
+send_group(handles, confirmation with the shared arrival time, rounded to the minute)   # v3: sent first
 for each person in winner.assignments:
-    detail = routing.route(origin, venue, mode, depart_at=leave_by)   # ORS directions for steps
     send_private(handle, PrivateMessage(text=itinerary text))       # leave_by from the optimizer is exact
-group: confirmation message with the shared arrival time (rounded to the minute)
 ```
 If `route()` fails for someone, fall back to the screening estimate and a generic instruction ("Walk ~12 min via College Ave").
 
@@ -841,9 +882,10 @@ If `route()` fails for someone, fall back to the screening estimate and a generi
 | **Pseudonyms** | Optimizer and LLM see `p1..pN` only. The mapping lives in the session row and is resolved only in delivery. |
 | **LLM minimization** | Extraction receives transcript text + pids, with no budgets, balances, locations, or names. Explanation receives aggregate group-safe facts only. |
 | **Types** | Group messages are built only from `GroupSafeMessage` / `GroupPlanOption`, which have no per-person fields. |
+| **Group-safe fan-out (v3)** | A message sent to every member goes through `send_group(handles, GroupSafeMessage)`, never through a loop of `send_private`. That keeps the type rule and the guard in one place. |
 | **Aggregation** | Group output never shows per-person cost, per-person travel time, limits, or counts of who is constrained. Infeasible plans are hidden. Prices appear as tiers. Travel appears as "≤N min for everyone." |
 | **Output guard** | `messaging/guard.py` scans every outbound group message for: any member's limit (±$1, formats `$25`, `25 dollars`, `25.00`), origin labels, street addresses from profiles, Nessie ids, phone numbers. On match: block, log `privacy_block` (without the value), send a safe template. |
-| **Group input** | If someone types money info in the group, the bot never repeats it. |
+| **Member input** | Preferences DMed during COLLECTING are stored only in `session_messages`. They are never relayed to other members, and the bot never repeats money info from them. Join notices show only display names. |
 | **Data retention** | `session_messages` are deleted when a session ends. |
 
 Unit tests must try to leak each private value through the explanation path and assert the guard blocks it.
@@ -978,19 +1020,18 @@ Do not include `binding_constraint` facts that name a person.
 - Rehearse the exact demo in `record` mode, commit the recordings, and run the stage demo in `replay` mode.
 
 ### 14.2 Mocks (only these)
-- `mock/sim_messaging.py`: appends to an in-memory outbox per `chat_id`/handle; used by the simulator and tests.
+- `mock/sim_messaging.py`: appends to an in-memory outbox per handle (v3); used by the simulator and tests.
 - `mock/routing.py`: haversine × 1.3 detour. Walk 3 mph. Bike 10 mph. Drive 18 mph + 5 min parking. Ride-share = drive speed + pickup wait, fare from the same formula as `ors.py` (share the formula function). Used in tests and as fallback.
 - `mock/places.py`: returns `fixtures/venues.json`, filtered by category and distance; geocodes only from `demo_locations.json`.
 
 There is no mock LLM or mock finance. Tests that need them use recorded responses in replay mode, or stub the provider directly in the test.
 
 ### 14.3 Simulator (`api/sim.py`, enabled only when `PROVIDER_MESSAGING=sim`)
-- `POST /sim/message` `{chat_id, is_group, sender_handle, sender_name, text}` → runs the same router as the real webhook (generates `message_id` and `ts`).
-- `POST /sim/vote` `{chat_id, voter_handle, option_label}`
-- `GET /sim/outbox/{chat_id_or_handle}` → list of sent messages.
+- `POST /sim/message` `{sender_handle, text}` → runs the same router as the real webhook as a DM (generates `message_id`, `chat_id`, and `ts`; `is_group=false`). v3: votes are just DMs (`text: "A"`), so there is no `/sim/vote`.
+- `GET /sim/outbox/{handle}` → list of messages sent to that handle (group-safe and private).
 - `POST /sim/reset` → clears DB and outbox.
 
-`scripts/run_demo_scenario.py` drives the full §18 script through these endpoints and prints each chat's outbox. It doubles as the backup demo if iMessage fails.
+`scripts/run_demo_scenario.py` drives the full §18 script through these endpoints and prints each person's outbox. It doubles as the backup demo if iMessage fails.
 
 ---
 
@@ -1008,17 +1049,32 @@ Suggested clock targets assume Saturday daytime start; adjust to actual time but
 |---|---|---|---|---|
 | **0. Skeleton** ✅ done | `pyproject.toml`, settings, logging, all models (§6), protocols (§8), DB tables, `GET /health`, ruff + pytest set up | — | App boots; models import; empty test suite passes | done |
 | **0.5. v2 migration** | Apply the v2 changes to Stage 0 code: settings (§5), `Mode`, `TravelModes`, `OnboardingState`, `RouteStep`, `RouteEstimate.source`, `Candidate.source`, `Uncertain` source comment, `FinancialSnapshot`/`EventFinding` (§6.9), deps (§20), `.env.example`. Update `test_skeleton.py` | 0 | Tests + ruff pass; no references to `xai`, `grok`, `google_maps`, `transit` remain in `app/` | +0.5 h |
-| **0b. Photon spike** (parallel) | Bridge receives a group message and a DM, sends text to both, tries a poll. Spike answers written in README | — | All §9.1 spike questions answered | +3 h |
+| **0b. Photon spike** ✅ done | Bridge built (`bridge/`); DMs verified both ways; groups not available on the free plan, which led to the v3 pivot. Answers in README / §9.1 | — | All §9.1 spike questions answered | done |
 | **1. Mock vertical slice** | Simulator, sim messaging, mock routing + places, router, onboarding FSM (bank code can be stubbed to a fixed limit), session FSM, phase-1 optimizer, text poll, personal DMs | 0 | `test_end_to_end.py` runs §18 through the simulator with mocks and a stubbed LLM | +6 h |
+| **1.5. v3 DM-only migration** | Apply the Stage 1.5 checklist below to the Stage 1 code | 1 | `test_end_to_end.py` runs the **v3** §18 script (DMs + join code) through the simulator; tests + ruff pass | +1.5 h |
 | **2. Optimizer + privacy** | Full feasibility filters, arrival logic, diversity selection, facts, PrivacyGuard, all §13.7 and privacy tests | 1 | All optimizer and guard tests pass | +8 h |
 | **3. Gemini extraction** | Real extraction + validation; explanation + number check; 3–5 golden transcripts | 1 | ≥ 90% of expected constraints extracted on golden transcripts; template fallback on failure | +8 h |
 | **4. OSM + ORS** | `fetch_venues.py` (Overpass) + hand-checked fixture with price tiers; `osm_places.py` with Nominatim geocoding; `ors.py` matrix + directions + ride-share derivation; record/replay cache | 1 | Real 3-person scenario returns ORS durations for walk/bike/drive and correct ride-share costs | +9 h |
 | **5. Nessie** | `seed_nessie.py`, real FinanceProvider, budget estimator + tests, link-by-bank-code onboarding | 1 | Three personas produce expected limits; override works | +9 h |
-| **6. Photon integration** | Production bridge, real messaging provider, text poll (native poll if spike says it works), DM delivery | 0b, 1 | Full §18 demo on real phones with mock data providers | +12 h |
+| **6. Photon integration** | `providers/real/photon.py` (`send_group` = `/send_dm` per handle; `send_private` = `/send_dm`), webhook wired to the bridge, text poll | 0b, 1.5 | Full v3 §18 demo on real phones with mock data providers | +12 h |
 | **— Full-loop checkpoint** | Everything real, end to end on phones | 2–6 | One complete live run | +13 h |
 | **Phase 2 scoring** | walk/sched burden terms, arrival spread, uncertainty penalty | checkpoint | Tests still pass; demo outcome still sensible | +15 h |
 | **7. Events (stretch)** | `find_events` via Gemini grounding (if tier allows) or `events_fallback.json`; geocode resolution | 3, 4 | At least one event appears as a candidate with a source URL | +16 h |
 | **8. Demo hardening** | Record the rehearsal, replay mode, progress messages, error copy, README, Devpost text, backup video | all | Two clean full rehearsals in a row | **freeze by 3 AM** |
+
+### Stage 1.5 checklist (v3 DM-only migration of the Stage 1 code)
+Where the Stage 1 code depends on group chats (from a scan of `main`): `providers/protocols.py` + `mock/sim_messaging.py` + `messaging/outbound.py` (`send_group(chat_id)`); `db/tables.py` + `db/queries.py` (`chat_id`, `upsert_group`, `group_by_chat` → add `group_by_code` and `active_group_for_user`); `planning/session.py` (poll timer keyed by `chat_id` → key by group id); `planning/pipeline.py`, `delivery/itinerary.py`, `onboarding/fsm.py:138` (each `send_group(group.chat_id, …)`); `conversation/router.py` (per-chat locks, `handle_vote`); `api/sim.py` (`chat_id`, `is_group`, `/vote`); `models/identity.py`. `api/webhooks.py`'s `/poll_vote` can stay; it's harmless and unused.
+
+1. **Protocol (§8):** `MessagingProvider.send_group(self, handles: list[str], msg: GroupSafeMessage) -> None`. Update `providers/mock/sim_messaging.py` to append to each handle's outbox.
+2. **Models + tables (§6.1, §6.8):** `Group.chat_id` → `Group.join_code`; `groups.chat_id` → `groups.join_code` (unique). Delete `app.db` (no migrations; `create_all()` rebuilds it).
+3. **Commands (`conversation/commands.py`):** add `join <code>`. `@plan`, `@go`, `@cancel`, `@pick X`, and `A`/`B`/`C` are now parsed from **DMs**.
+4. **Router (§7.1):** remove the group branch and the group intro. Route READY users' DMs: session commands → settings commands → store in `session_messages` if COLLECTING → help. Use one global `asyncio.Lock`.
+5. **Session FSM (§7.3):** `@plan` creates the group + join code; `join` adds members while COLLECTING (cap 6); `@go` needs ≥ 2 members; any member can `@cancel`; votes are DM replies. Every "tell the group" becomes `send_group(handles, ...)`. On DONE/CANCELLED, clear `active_session_id` and delete `session_messages`.
+6. **Onboarding (§7.2):** the READY message points to `@plan` / `join <code>`; no group announcement. A `join` from a non-READY user starts onboarding.
+7. **Copy (§7.4):** add `PLAN_STARTED`, join notice, `NOTED`, `HELP`; poll ends with "Reply A, B, or C"; confirmation ends with "Your route is below 👇".
+8. **Delivery (§10):** send the group confirmation **before** the personal itineraries.
+9. **Simulator (§14.3):** `/sim/message` takes `{sender_handle, text}`; remove `/sim/vote`; `/sim/outbox/{handle}`.
+10. **Tests:** rewrite `test_end_to_end.py` for the v3 §18 script. Also assert the poll and confirmation reach every member and that no member's DMs contain another member's private values.
 
 **Feature freeze at 3 AM Sunday.** After that: bug fixes, rehearsal, Devpost (draft by 6 AM, submit by 8:00 AM).
 
@@ -1026,7 +1082,9 @@ Suggested clock targets assume Saturday daytime start; adjust to actual time but
 
 ## 16. Out of scope (do not build)
 
-- Reading chat history from before `@plan`.
+- Reading chat history from before `@plan` (or from before a member joined).
+- iMessage group chats (need Photon's paid Business plan), relaying members' messages to each other, and native polls (v3).
+- Find My location sharing via Photon's Advanced iMessage kit (`im.locations`). Real, but outside the plan; typed landmarks instead.
 - Supabase/Postgres, deployment, Docker, CI pipelines.
 - HMAC/auth between bridge and backend.
 - Live re-planning when someone is late; live location tracking.
@@ -1048,7 +1106,7 @@ Priority order (write in this order if time is short):
 1. `test_optimizer.py`, `test_arrival.py` — correctness of the showpiece.
 2. `test_privacy_guard.py` — attempted leaks via explanation, poll title, and error messages; plus the import-boundary test.
 3. `test_budget.py` — persona limits, edge cases.
-4. `test_end_to_end.py` — simulator + mocks + stubbed LLM; asserts: poll sent with ≤3 options, no private values in any group message, each member gets a distinct DM, all `leave_by` times produce the same `T_target`.
+4. `test_end_to_end.py` — simulator + mocks + stubbed LLM, v3 flow (`@plan` → `join <code>` → private DMs → `@go` → `A` replies); asserts: every member receives the same poll with ≤3 options, no private values in any group-safe message, no member's DMs contain another member's private values, each member gets a distinct itinerary, all `leave_by` times produce the same `T_target`.
 5. `test_extraction.py` — golden transcripts in replay mode.
 
 Golden transcript format (`fixtures/transcripts/*.json`):
@@ -1067,23 +1125,25 @@ Match on `(pid, field, value, kind)`; ignore confidence.
 
 ## 18. Demo script
 
-**Cast:** Maya, Sam, Jordan on three real phones. A fourth teammate presents with the laptop (running backend + bridge, `CACHE_MODE=replay`) and the simulator ready as backup.
+**Cast:** Maya, Sam, Jordan on three real phones, each in a DM with their own bot line. A fourth teammate presents with the laptop (running backend + bridge, `CACHE_MODE=replay`) and the simulator ready as backup. Mirror the three phones on screen if possible so judges can follow all three DMs.
 
-**Before judging:** all three already onboarded (shows faster); onboarding is shown live only if judges ask, or via a 20-second pre-recorded clip.
+**Before judging:** all three already onboarded and texted their bot line at least once (shows faster, and the shared lines require it). Onboarding is shown live only if judges ask, or via a 20-second pre-recorded clip.
 
-1. **Setup (10 s):** "This group chat can never decide on dinner. Our bot is in it."
-2. **Group chat:**
-   - Maya: `@plan`
-   - Bot: "Listening — tell me what you're feeling. Say @go when ready."
+1. **Setup (10 s):** "Our group chat can never decide on dinner, and nobody wants to say 'I'm broke' in front of everyone. So you tell our bot privately."
+2. **Form the group:**
+   - Maya → bot: `@plan`
+   - Bot → Maya: "Plan started! 🎉 Tell your friends to text me: join K7QP …"
+   - Sam → bot: `join K7QP`; Jordan → bot: `join K7QP`
+   - Everyone sees: "✅ Sam joined (2 people)." / "✅ Jordan joined (3 people)."
+3. **Say what you want, privately (each in their own DM):**
    - Maya: "I'm starving"
-   - Sam: "no sushi pls"
+   - Sam: "no sushi pls" … later: "something we haven't tried?"
    - Jordan: "I have to be back by 9, and nothing too far"
-   - Sam: "something we haven't tried?"
    - Maya: `@go`
-3. **Bot:** "🔎 Looking at options…" then the 3-option poll with one-line explanations.
-4. **Vote:** two people reply/vote A → bot confirms: "🎉 Plan A: Koko. Everyone arrives around 6:42. Check your DMs."
-5. **Reveal:** hold up the three phones. Sam takes a ~$9 ride-share and leaves last. Maya bikes. Jordan walks, because a ride-share would break his budget, so he leaves first. Different modes and leave-by times, same arrival. Nobody in the group chat ever saw anyone's budget.
-6. **Explain the tech (60 s):** fairness objective (show the λ trade-off), synchronized arrival, money-vs-time mode choice per person, privacy guard (show that the LLM prompt contains no money), Nessie-derived limits, built on OpenStreetMap.
+4. **Bot → all three:** "🔎 Looking at options…" then the same 3-option poll with one-line explanations.
+5. **Vote:** two people reply `A` → all three get "🎉 Plan A: Koko. Everyone arrives around 6:42. Your route is below 👇" followed by their own itinerary.
+6. **Reveal:** hold up the three phones. Sam takes a ~$9 ride-share and leaves last. Maya bikes. Jordan walks, because a ride-share would break his budget, so he leaves first. Different modes and leave-by times, same arrival. Nobody ever saw anyone else's budget, location, or what they asked for.
+7. **Explain the tech (60 s):** fairness objective (show the λ trade-off), synchronized arrival, money-vs-time mode choice per person, privacy guard (show that the LLM prompt contains no money), Nessie-derived limits, built on OpenStreetMap.
 
 **Fallbacks:** if iMessage fails, run `scripts/run_demo_scenario.py` and show outboxes; if that fails, play the backup video.
 
@@ -1093,7 +1153,9 @@ Match on `(pid, field, value, kind)`; ignore confidence.
 
 | Risk | Mitigation | Verify by |
 |---|---|---|
-| Photon behavior differs from assumptions (DMs, polls, payloads) | Stage 0b spike; text poll fallback; "DM me start" onboarding | End of 0b |
+| Photon free plan: no group chats, a different bot number per person (confirmed in 0b) | v3 DM-only virtual group with join codes; text polls | Done (0b) |
+| Photon allowlist: bot only talks to registered phones that texted it first | Register all demo phones in the Photon project; each texts its bot line before judging | Stage 6, Stage 8 |
+| Inbound DMs stop arriving after a bridge restart (seen once in 0b, not yet explained) | Verify inbound with a "ping" DM after every bridge start; don't restart the bridge during judging | Stage 6 |
 | Bot cannot see messages before `@plan` | Designed in: collection starts at `@plan` | — |
 | No transit mode | Ride-share replaces it in the story; GTFS transit is a post-freeze stretch | — |
 | OSM data gaps (missing hours, odd names) | Hand-checked fixture; unknown hours treated as unknown, not guessed | Stage 4 |
