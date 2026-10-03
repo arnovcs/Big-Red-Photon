@@ -307,3 +307,63 @@ def test_several_preference_messages_all_count_and_each_gets_a_tapback(client) -
     client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
     send(client, "go")
     assert llm_saw == messages  # every message reached the planner
+
+
+# --- "running 10 min late" after the plan went out --------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "minutes"),
+    [
+        ("running 10 min late", 10), ("gonna be 15 late", 15), ("late by 20", 20),
+        ("I'll be 5 min late", 5), ("running half an hour late", 30),
+        ("an hour late sorry", 60), ("sorry running a bit late!", None),
+    ],
+)  # fmt: skip
+def test_running_late_is_understood(text, minutes) -> None:
+    from app.conversation.commands import parse_running_late
+
+    assert parse_running_late(text) == (True, minutes)
+
+
+@pytest.mark.parametrize("text", ["late night food?", "we should go late", "I'm not late"])
+def test_other_uses_of_late_are_not_running_late(text) -> None:
+    from app.conversation.commands import parse_running_late
+
+    assert parse_running_late(text)[0] is False
+
+
+def test_running_late_updates_eta_and_tells_everyone_else(client) -> None:
+    import re as _re
+
+    sam = "+16075550102"
+    for text in ["start", "Maya", "MAYA1", "yes", "olin"]:
+        send(client, text)
+    for text in ["start", "Sam", "SAM1", "yes", "olin"]:
+        client.post("/sim/message", json={"sender_handle": sam, "text": text})
+    # Before any plan is sent, it's just chat (a preference), not an ETA update.
+    code = _re.search(r"join ([A-Z0-9]{4})", " ".join(send(client, "plan"))).group(1)
+    client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
+    for who, text in [(H, "walk"), (H, "same"), (sam, "walk"), (sam, "same")]:
+        client.post("/sim/message", json={"sender_handle": who, "text": text})
+    assert send(client, "running 10 min late") == []  # collecting: a tapback, no broadcast
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
+    send(client, "go")
+    send(client, "A")
+    client.post("/sim/message", json={"sender_handle": sam, "text": "A"})  # plan sent
+
+    def sam_texts() -> list[str]:
+        return [m["text"] for m in client.get(f"/sim/outbox/{sam}").json()]
+
+    arrive = _re.search(r"around (\d+:\d\d)", " ".join(t for t in sam_texts() if "🎉" in t))
+    assert arrive, "the plan went out"
+    reply = send(client, "running 10 min late")
+    assert reply[0].startswith("got it, told everyone you're ~10 min late (around ")
+    heads_up = sam_texts()[-1]
+    assert heads_up.startswith("heads up: Maya's running ~10 min late, now around ")
+    h, m = map(int, arrive.group(1).split(":"))
+    new_h, new_m = map(int, heads_up.split("around ")[1].split(" ")[0].split(":"))
+    assert ((new_h * 60 + new_m) - (h * 60 + m)) % (12 * 60) == 10  # ETA moved by 10 min
+    # A new update replaces the old one.
+    send(client, "actually gonna be 20 late")
+    assert "~20 min late" in sam_texts()[-1]

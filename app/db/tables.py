@@ -106,6 +106,17 @@ class VoteRow(Base):
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class LateRow(Base):
+    """ "running 10 min late" after a plan was sent: their latest delay (None = unsaid)."""
+
+    __tablename__ = "late_updates"
+
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    minutes: Mapped[int | None] = mapped_column(nullable=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class SessionReadyRow(Base):
     """Who has said "go" in this planning session. The search starts at > half."""
 

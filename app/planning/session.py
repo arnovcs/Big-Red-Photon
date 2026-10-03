@@ -9,9 +9,10 @@ import asyncio
 import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Coroutine
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,12 +23,21 @@ from app.conversation.commands import (
     SessionCommand,
     is_greeting,
     parse_mode_change,
+    parse_running_late,
     parse_session_command,
     reaction_for,
 )
 from app.db import queries
 from app.db.session import session_factory
-from app.db.tables import GroupRow, SessionMessageRow, SessionReadyRow, SessionRow, UserRow
+from app.db.tables import (
+    GroupMemberRow,
+    GroupRow,
+    LateRow,
+    SessionMessageRow,
+    SessionReadyRow,
+    SessionRow,
+    UserRow,
+)
 from app.decision import poll
 from app.delivery import itinerary
 from app.deps import Deps
@@ -140,6 +150,41 @@ class PlanningSessions:
                 return False
             assert parsed.arg is not None
             await self._vote(db, group, session, user, parsed.arg)
+        return True
+
+    async def running_late(self, db: AsyncSession, user: UserRow, msg: InboundMessage) -> bool:
+        """ "running 10 min late" after a plan was sent: update their ETA, tell them, and
+        DM everyone else in that plan. False if it isn't that (or there's no recent plan)."""
+        late, minutes = parse_running_late(msg.text)
+        if not late:
+            return False
+        session = await _recent_delivered_session(db, user.id, self.deps.clock())
+        if session is None or session.target_time is None:
+            return False  # nothing sent yet: just chat
+        row = await db.get(LateRow, (session.id, user.id))
+        if row is None:
+            db.add(LateRow(session_id=session.id, user_id=user.id, minutes=minutes))
+        else:
+            row.minutes, row.ts = minutes, datetime.now(UTC)
+        await db.commit()
+        tz = ZoneInfo(self.deps.settings.demo_timezone)
+        eta = (pipeline.as_utc(session.target_time) + timedelta(minutes=minutes or 0)).astimezone(
+            tz
+        )
+        name = user.display_name or "someone"
+        log.info(kv("running_late", user=user.id.hex[:8], minutes=minutes))
+        await self._reply(user, copy.late_ack(minutes, eta))
+        others = [
+            m.handle for m in await queries.group_members(db, session.group_id) if m.id != user.id
+        ]
+        if others:
+            guard = await pipeline.build_guard(db, session.group_id, session.id)
+            await send_group(
+                self.deps.messaging,
+                others,
+                GroupSafeMessage(text=copy.late_heads_up(name, minutes, eta)),
+                guard,
+            )
         return True
 
     async def greet(self, db: AsyncSession, user: UserRow, msg: InboundMessage) -> bool:
@@ -390,7 +435,8 @@ class PlanningSessions:
         plan = pipeline.load_plans(session)[poll.LABELS.index(label)]
         session.state = SessionState.CONFIRMED
         session.winner_plan_id = plan.plan_id
-        session.target_time = plan.target_arrival
+        # Stored as UTC: SQLite drops the timezone, and reads assume UTC (as_utc).
+        session.target_time = plan.target_arrival.astimezone(UTC)
         await db.commit()
         session.state = SessionState.DELIVERING
         await db.commit()
@@ -499,6 +545,31 @@ class PlanningSessions:
         for task in self._poll_timers.values():
             task.cancel()
         self._poll_timers.clear()
+
+
+# How long after the planned arrival "running late" still refers to that plan.
+LATE_WINDOW = timedelta(hours=3)
+
+
+async def _recent_delivered_session(
+    db: AsyncSession, user_id: uuid.UUID, now: datetime
+) -> SessionRow | None:
+    """Their most recent plan that was sent out and isn't long over."""
+    rows = await db.scalars(
+        select(SessionRow)
+        .join(GroupMemberRow, GroupMemberRow.group_id == SessionRow.group_id)
+        .where(
+            GroupMemberRow.user_id == user_id,
+            SessionRow.state == SessionState.DONE,
+            SessionRow.target_time.is_not(None),
+        )
+        .order_by(SessionRow.target_time.desc())
+        .limit(1)
+    )
+    session = rows.first()
+    if session is None or pipeline.as_utc(session.target_time) + LATE_WINDOW < now:
+        return None
+    return session
 
 
 async def _clear_ready(db: AsyncSession, session_id: uuid.UUID) -> None:

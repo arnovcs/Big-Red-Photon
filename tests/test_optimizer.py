@@ -426,4 +426,13 @@ def test_poll_and_itinerary_say_price_unknown() -> None:
     )
     assert _price_tier(plan) == "?"
     line = copy.cost_line(NOW, None, Decimal(0), "walk")
-    assert "price unknown" in line and "$" not in line
+    assert "check website" in line and "$" not in line
+    assert copy.cost_line(NOW, Decimal(0), Decimal(0), "walk", "entry").endswith("entry is free 🎉")
+    from app.models.outbound import GroupPlanOption
+
+    base = dict(
+        label="A", title="X", max_travel_min=5, walking_level="low", arrival_window_min=0, blurb=""
+    )
+    assert "check website for price" in copy.poll_message([GroupPlanOption(price_tier="?", **base)])
+    free_poll = copy.poll_message([GroupPlanOption(price_tier="free", **base)])
+    assert "· free ·" in free_poll and "check website" not in free_poll

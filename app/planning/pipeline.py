@@ -36,7 +36,6 @@ from app.optimizer import cuisines as cuisine_families
 from app.optimizer.enumerate import EstimateIndex
 from app.optimizer.feasibility import allowed_modes
 from app.planning import combos
-from app.planning.explain import explain
 from app.private import vault
 from app.providers.mock.routing import haversine_mi
 
@@ -342,7 +341,8 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
         facts=plan_facts,
         hint=None if top else facts.nothing_fits_hint(preferences, candidates),
         no_places=not candidates,
-        blurbs=await explain(deps, plan_facts),
+        # The poll is just the options (no one-line pitch each), so no Gemini call here.
+        blurbs=["" for _ in plan_facts],
     )
 
 

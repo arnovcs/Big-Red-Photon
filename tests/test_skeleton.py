@@ -113,6 +113,7 @@ def test_app_boots_and_creates_tables(tmp_path, monkeypatch) -> None:
                 "sessions",
                 "session_messages",
                 "session_ready",
+                "late_updates",
                 "votes",
                 "processed_messages",
                 "pending_signups",

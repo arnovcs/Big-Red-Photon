@@ -41,6 +41,8 @@ def _walking_level(plan: Plan) -> str:
 
 def _price_tier(plan: Plan) -> str:
     cost = plan.candidate.est_cost_pp
+    if cost.value == 0:
+        return "free"  # parks, courts, trails (or Google says free)
     return "?" if cost.value is None or cost.status == "unknown" else tier_for_cost(cost.value)
 
 

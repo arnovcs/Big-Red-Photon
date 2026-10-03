@@ -145,6 +145,33 @@ def reaction_for(text: str) -> str:
     return "👍"
 
 
+# "running 10 min late", "gonna be 15 late", "late by 20", "running behind", "an hour late".
+_LATE_PHRASE = re.compile(
+    r"\b(running|gonna be|going to be|will be|ill be|im|i am|be|bit|little|few|super|so)\b"
+    r"[a-z0-9 ]{0,20}\blate\b|\d+\s*(m|min|mins|minute|minutes)?\s*late\b|\blate by\b|"
+    r"\brunning behind\b|\b(an|one|1|half an) (hour|hr) late\b"
+)
+_LATE_MINUTES = re.compile(r"(\d{1,3})\s*(?:m|min|mins|minute|minutes)?\b")
+
+
+def parse_running_late(text: str) -> tuple[bool, int | None]:
+    """("running 10 min late") → (True, 10); "running late" → (True, None);
+    anything else ("late night food?", "I'm not late") → (False, None)."""
+    lowered = " ".join(re.findall(r"[a-z0-9]+", text.lower().replace("'", "").replace("’", "")))
+    if not _LATE_PHRASE.search(lowered) or re.search(
+        r"\b(not|wont|won t) be late\b|\bnot late\b", lowered
+    ):
+        return False, None
+    if re.search(r"\bhalf (an )?hour\b", lowered):
+        return True, 30
+    if re.search(r"\b(an|1|one) (hour|hr)\b", lowered):
+        return True, 60
+    if m := _LATE_MINUTES.search(lowered):
+        minutes = int(m.group(1))
+        return True, minutes if 0 < minutes <= 180 else None
+    return True, None
+
+
 def is_go_sentence(text: str) -> bool:
     plain = _plain(text)
     return any(p.search(plain) for p in _GO_SENTENCE)

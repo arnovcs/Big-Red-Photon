@@ -93,8 +93,11 @@ def itinerary_text(
 
 
 def _food_cost(plan: Plan, assignment: PersonAssignment) -> Decimal | None:
-    """The venue's own estimate; None when its price is unknown (never the stand-in)."""
+    """The venue's own estimate; 0 for free-to-visit places; None when unknown (never the
+    stand-in)."""
     cost = plan.candidate.est_cost_pp
+    if cost.value == 0:
+        return cost.value
     return None if cost.status == "unknown" else cost.value
 
 

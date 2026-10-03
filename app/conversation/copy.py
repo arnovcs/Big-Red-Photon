@@ -119,7 +119,9 @@ def plan_blurb(max_travel_min: int) -> str:
 
 def _price_text(option: GroupPlanOption) -> str:
     if option.price_tier == "?":
-        return "price ?"
+        return "check website for price"
+    if option.price_tier == "free":
+        return "free"
     return f"{option.price_tier} est." if option.price_estimated else option.price_tier
 
 
@@ -143,7 +145,6 @@ def poll_message(options: list[GroupPlanOption]) -> str:
     lines = [header]
     for option in options:
         lines.append(_option_line(option))
-        lines.append(option.blurb)
     labels = [o.label for o in options]
     lines.append(f"reply {_join_names_or(labels)}")
     return "\n".join(lines)
@@ -284,6 +285,19 @@ HELLO_COLLECTING = "hey! 👋 tell me what you're in the mood for, or say go whe
 HELLO_VOTING = "hey! 👋 vote with A, B, or C"
 HELLO_BUSY = "hey! 👋 hang tight, I'm on it"
 
+
+def late_ack(minutes: int | None, eta: datetime) -> str:
+    if minutes is None:
+        return "got it, told everyone you're running a bit late ⏰"
+    return f"got it, told everyone you're ~{minutes} min late (around {clock_time(eta)}) ⏰"
+
+
+def late_heads_up(name: str, minutes: int | None, eta: datetime) -> str:
+    if minutes is None:
+        return f"heads up: {name}'s running a bit late ⏰"
+    return f"heads up: {name}'s running ~{minutes} min late, now around {clock_time(eta)} ⏰"
+
+
 # --- Web signup claim (app/onboarding/web_claim.py) ----------------------------
 
 
@@ -358,10 +372,14 @@ def cost_line(
     arrive_local: datetime, food: Decimal | None, fare: Decimal, mode: str, what: str = "food"
 ) -> str:
     """`what`: "food" for places to eat or drink, "entry" for activities."""
+    fare_name = "ride" if mode == "rideshare" else "gas + parking"
+    travel = f"{fare_name} {approx_usd(fare)}" if fare > 0 else ""
     if food is None:  # Google has no price for this venue
-        fare_name = "ride" if mode == "rideshare" else "gas + parking"
-        travel = f"{fare_name} {approx_usd(fare)} + " if fare > 0 else ""
-        return f"you'll get there ~{clock_time(arrive_local)}. cost: {travel}{what} (price unknown)"
+        cost = f"{travel} + {what}" if travel else what
+        return f"you'll get there ~{clock_time(arrive_local)}. cost: {cost} (check website)"
+    if food == 0:  # parks, courts, trails
+        cost = f"{travel}, {what} is free" if travel else f"{what} is free 🎉"
+        return f"you'll get there ~{clock_time(arrive_local)}. {cost}"
     total = approx_usd(food + fare)
     if fare > 0:
         fare_name = "ride" if mode == "rideshare" else "gas + parking"

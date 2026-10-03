@@ -112,7 +112,7 @@ def _sum_cost(stops: list[Candidate]) -> Uncertain[Decimal]:
     known = [c.value for c in costs if c.value is not None]
     if not known:
         return Uncertain[Decimal](value=None, status="unknown", source="combo")
-    unknown = any(c.status == "unknown" for c in costs)
+    unknown = any(c.value is None for c in costs)  # a free court is $0, not unknown
     highs = [c.high if c.high is not None else c.value for c in costs]
     return Uncertain[Decimal](
         value=sum(known, Decimal(0)),

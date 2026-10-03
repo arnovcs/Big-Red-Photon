@@ -110,3 +110,25 @@ def test_combo_options_vary_the_first_stop() -> None:
     estimates = index(*(trip(p, c.candidate_id, Mode.WALK, 8) for c in built for p in ("p1", "p2")))
     picked = select(run(built, estimates, people, PICKLEBALL_AND_BOBA), k=2)
     assert len({p.candidate.candidate_id.split("+")[0] for p in picked}) == 2
+
+
+def test_free_court_plus_priced_boba_shows_the_boba_price() -> None:
+    from types import SimpleNamespace
+
+    from app.decision.poll import _price_tier
+
+    free_court = COURT.model_copy(
+        update={
+            "est_cost_pp": COURT.est_cost_pp.model_copy(
+                update={
+                    "value": Decimal(0),
+                    "low": Decimal(0),
+                    "high": Decimal(0),
+                    "status": "unknown",
+                }
+            )
+        }
+    )
+    combo = combos.build([free_court, BOBA], combos.asks_by_person(PICKLEBALL_AND_BOBA))[0]
+    assert combo.est_cost_pp.value == Decimal(12) and combo.est_cost_pp.status == "estimated"
+    assert _price_tier(SimpleNamespace(candidate=combo)) == "$"  # not "check website"
