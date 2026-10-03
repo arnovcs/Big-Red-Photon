@@ -55,10 +55,11 @@ class PrivateProfileRow(Base):
     nessie_customer_id: Mapped[str | None] = mapped_column(String, nullable=True)
     spend_limit_usd: Mapped[Decimal] = mapped_column(Numeric(10, 2))
     limit_source: Mapped[str] = mapped_column(String)
-    origin_lat: Mapped[float] = mapped_column(Float)
-    origin_lng: Mapped[float] = mapped_column(Float)
-    origin_label: Mapped[str] = mapped_column(String)
-    modes_json: Mapped[str] = mapped_column(Text)
+    # Origin and modes are filled in during onboarding, after the limit.
+    origin_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    origin_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
+    origin_label: Mapped[str | None] = mapped_column(String, nullable=True)
+    modes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 

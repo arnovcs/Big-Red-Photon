@@ -1,5 +1,6 @@
 """Async engine, session factory, and `init_db()`."""
 
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -16,6 +17,15 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 def configure(database_url: str) -> None:
     global _engine, _session_factory
     _engine = create_async_engine(database_url)
+    if database_url.startswith("sqlite"):
+        # WAL lets DM handlers write while a planning run holds a read transaction.
+        @event.listens_for(_engine.sync_engine, "connect")
+        def _sqlite_pragmas(dbapi_conn, _record) -> None:  # type: ignore[no-untyped-def]
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA busy_timeout=5000")
+            cursor.close()
+
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 
 
@@ -33,6 +43,13 @@ def session_factory() -> async_sessionmaker[AsyncSession]:
 
 async def init_db() -> None:
     async with get_engine().begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+
+async def reset_db() -> None:
+    """Drop and recreate every table (simulator reset only)."""
+    async with get_engine().begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
 
 

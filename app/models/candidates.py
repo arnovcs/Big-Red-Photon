@@ -8,6 +8,16 @@ from pydantic import BaseModel
 
 from app.models.private import LatLng
 
+# §6.4 category defaults for Candidate.typical_duration_min
+DEFAULT_DURATION_MIN: dict[str, int] = {
+    "food": 60,
+    "cafe": 45,
+    "dessert": 30,
+    "bar": 90,
+    "activity": 90,
+    "event": 90,
+}
+
 
 class Uncertain[T](BaseModel):
     value: T | None

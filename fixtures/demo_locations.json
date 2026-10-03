@@ -1,0 +1,8 @@
+[
+  {"name": "Olin Library", "aliases": ["olin", "olin lib"], "lat": 42.4479, "lng": -76.4843},
+  {"name": "Willard Straight Hall", "aliases": ["willard straight", "the straight", "wsh"], "lat": 42.4466, "lng": -76.4855},
+  {"name": "Robert Purcell Community Center", "aliases": ["north campus", "rpcc", "appel"], "lat": 42.4562, "lng": -76.4776},
+  {"name": "Duffield Hall", "aliases": ["duffield", "engineering quad", "engineering"], "lat": 42.4446, "lng": -76.4826},
+  {"name": "Collegetown", "aliases": ["ctown", "college ave"], "lat": 42.4421, "lng": -76.4853},
+  {"name": "Ithaca Commons", "aliases": ["the commons", "commons", "downtown"], "lat": 42.4393, "lng": -76.4977}
+]

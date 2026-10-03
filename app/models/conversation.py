@@ -7,6 +7,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.models.private import LatLng
+
 
 class ChatMessage(BaseModel):
     message_id: str
@@ -58,3 +60,16 @@ class GroupPreferences(BaseModel):
     constraints: list[ExtractedConstraint]
     group_intent: Literal["food", "activity", "either", "unknown"]
     unresolved: list[str] = []
+
+
+class InboundMessage(BaseModel):
+    """A message from the bridge webhook (§9.1) or the simulator (§14.3)."""
+
+    message_id: str
+    chat_id: str
+    is_group: bool
+    sender_handle: str
+    sender_name: str | None = None
+    text: str
+    ts: datetime
+    location: LatLng | None = None
