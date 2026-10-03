@@ -1,0 +1,13 @@
+.env
+*.db
+*.db-journal
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+node_modules/
+demo_video*
+*.mp4
+*.mov
+.DS_Store
