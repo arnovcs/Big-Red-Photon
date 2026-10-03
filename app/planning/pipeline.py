@@ -7,7 +7,8 @@ import asyncio
 import json
 import random
 import uuid
-from dataclasses import dataclass
+from collections import defaultdict
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -20,6 +21,7 @@ from app.db.session import session_factory
 from app.db.tables import SessionMessageRow, SessionRow
 from app.deps import Deps
 from app.logging import get_logger, kv
+from app.messaging.guard import MemberSecrets, PrivacyGuard
 from app.models.candidates import Candidate
 from app.models.conversation import (
     ConstraintField,
@@ -29,7 +31,7 @@ from app.models.conversation import (
 )
 from app.models.plans import Plan
 from app.models.private import LatLng, PrivateConstraints
-from app.optimizer import OptimizerParams
+from app.optimizer import OptimizerParams, facts
 from app.optimizer.enumerate import EstimateIndex
 from app.optimizer.feasibility import allowed_modes
 from app.private import vault
@@ -140,6 +142,8 @@ class PlanningResult:
     pid_map: dict[str, uuid.UUID]
     preferences: GroupPreferences
     plans: list[Plan]  # top 3, best first; [] if nothing fits
+    facts: list[dict] = field(default_factory=list)  # group-safe, one per plan (§13.8)
+    hint: str | None = None  # "nothing fits" suggestion, when plans is []
 
 
 async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> PlanningResult:
@@ -192,9 +196,14 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
     # 5. Optimize
     params = OptimizerParams(lam=settings.optimizer_lambda)
     ranked = optimizer.rank(candidates, index, constraints, preferences, now_local, params)
+    top = optimizer.select(ranked, k=3)
     log.info(kv("pipeline_ranked", candidates=len(candidates), feasible=len(ranked)))
     return PlanningResult(
-        pid_map=pid_map, preferences=preferences, plans=optimizer.select(ranked, k=3)
+        pid_map=pid_map,
+        preferences=preferences,
+        plans=top,
+        facts=facts.plan_facts(top, preferences),
+        hint=None if top else facts.nothing_fits_hint(preferences, candidates),
     )
 
 
@@ -202,3 +211,40 @@ def save_result(session: SessionRow, result: PlanningResult) -> None:
     session.pid_map_json = json.dumps({pid: str(uid) for pid, uid in result.pid_map.items()})
     session.preferences_json = result.preferences.model_dump_json()
     session.plans_json = json.dumps([p.model_dump(mode="json") for p in result.plans])
+
+
+async def build_guard(
+    db: AsyncSession,
+    group_id: uuid.UUID,
+    session_id: uuid.UUID | None,
+    public_terms: list[str] | None = None,
+) -> PrivacyGuard:
+    """PrivacyGuard for one virtual group: every member's secrets plus the preference DMs
+    collected in this session. Build it before the session's messages are deleted."""
+    members = await queries.group_members(db, group_id)
+    secrets = await vault.guard_secrets_for(db, [m.id for m in members])
+    texts: dict[uuid.UUID, list[str]] = defaultdict(list)
+    if session_id is not None:
+        rows = await db.scalars(
+            select(SessionMessageRow).where(SessionMessageRow.session_id == session_id)
+        )
+        for row in rows:
+            texts[row.sender_user_id].append(row.text)
+    return PrivacyGuard(
+        members=[
+            MemberSecrets(
+                handle=m.handle,
+                spend_limit_usd=secrets[m.id].spend_limit_usd if m.id in secrets else None,
+                origin_label=secrets[m.id].origin_label if m.id in secrets else None,
+                nessie_customer_id=secrets[m.id].nessie_customer_id if m.id in secrets else None,
+                preference_texts=tuple(texts[m.id]),
+            )
+            for m in members
+        ],
+        public_terms=public_terms or [],
+    )
+
+
+def venue_terms(plans: list[Plan]) -> list[str]:
+    """Public venue names and addresses, exempt from the guard's scan."""
+    return [t for p in plans for t in (p.candidate.name, p.candidate.address)]

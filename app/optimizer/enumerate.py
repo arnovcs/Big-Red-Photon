@@ -13,10 +13,15 @@ from app.models.routing import Mode, RouteEstimate
 from app.optimizer import arrival
 from app.optimizer.burden import person_burden, preference_satisfaction, travel_tolerance
 from app.optimizer.feasibility import (
+    HardLimits,
     allowed_modes,
     fare_amount,
+    hard_limits,
+    is_known_closed,
     is_vetoed,
-    mode_refused,
+    mode_ok,
+    schedule_ok,
+    trip_ok,
     venue_cost,
     within_budget,
 )
@@ -40,17 +45,20 @@ class _Option:
 def _person_options(
     pid: str,
     candidate: Candidate,
+    cost: Decimal,
+    price_unknown: bool,
     constraint: PrivateConstraints,
+    limits: HardLimits,
     estimates: EstimateIndex,
     preferences: GroupPreferences,
     tolerance: float,
     params: OptimizerParams,
 ) -> list[_Option]:
-    cost, price_unknown = venue_cost(candidate)
+    """Modes that pass every person-level hard filter (mode, walk, travel, budget)."""
     options = []
     for mode in allowed_modes(constraint.modes):
         est = estimates.get((pid, candidate.candidate_id, mode))
-        if est is None or mode_refused(pid, mode, preferences):
+        if est is None or not mode_ok(mode, limits) or not trip_ok(est, limits):
             continue
         fare = fare_amount(est.fare_usd)
         total = cost + fare
@@ -66,13 +74,12 @@ def _person_options(
 
 def _build_plan(
     candidate: Candidate,
+    cost: Decimal,
+    price_unknown: bool,
     combo: tuple[_Option, ...],
     score: PlanScore,
-    ready: dict[str, datetime],
+    target: datetime,
 ) -> Plan:
-    durations = {o.pid: o.estimate.duration_min for o in combo}
-    target = arrival.target_arrival(ready, durations)
-    cost, price_unknown = venue_cost(candidate)
     assignments = [
         PersonAssignment(
             pid=o.pid,
@@ -123,28 +130,44 @@ def rank(
         return []
     tolerance = {pid: travel_tolerance(pid, preferences, params) for pid in pids}
     ready = {pid: arrival.ready_time(pid, preferences, now, params) for pid in pids}
+    limits = {pid: hard_limits(pid, preferences, now) for pid in pids}
 
     plans = []
     for candidate in candidates:
-        if is_vetoed(candidate, preferences):
-            continue
+        cost, price_unknown = venue_cost(candidate)
+        if cost is None or is_vetoed(candidate, preferences) or is_known_closed(candidate):
+            continue  # no price to check against budgets, vetoed, or closed
         per_person = [
             _person_options(
-                pid, candidate, constraints[pid], estimates, preferences, tolerance[pid], params
+                pid,
+                candidate,
+                cost,
+                price_unknown,
+                constraints[pid],
+                limits[pid],
+                estimates,
+                preferences,
+                tolerance[pid],
+                params,
             )
             for pid in pids
         ]
         if any(not options for options in per_person):
             continue
 
-        best: tuple[float, float, int, tuple[_Option, ...], PlanScore] | None = None
+        best: tuple[float, float, int, tuple[_Option, ...], PlanScore, datetime] | None = None
         for i, combo in enumerate(itertools.product(*per_person)):
+            trips = {o.pid: o.estimate.duration_min for o in combo}
+            target = arrival.target_arrival(ready, trips)
+            if not schedule_ok(candidate, target, trips, limits):
+                continue
             score = group_score([o.burden.total for o in combo], params)
             key = (score.J, score.burden_spread, i)
             if best is None or key < best[:3]:
-                best = (*key, combo, score)
-        assert best is not None
-        plans.append(_build_plan(candidate, best[3], best[4], ready))
+                best = (*key, combo, score, target)
+        if best is not None:
+            _, _, _, combo, score, target = best
+            plans.append(_build_plan(candidate, cost, price_unknown, combo, score, target))
 
     plans.sort(key=lambda p: (p.score.J, p.score.burden_spread, p.candidate.candidate_id))
     return plans

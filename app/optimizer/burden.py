@@ -30,8 +30,11 @@ def travel_tolerance(pid: str, preferences: GroupPreferences, params: OptimizerP
     return params.default_travel_tolerance_min
 
 
-def _satisfied(c: ExtractedConstraint, candidate: Candidate, mode: Mode) -> bool | None:
-    """Does the candidate satisfy this preference? None = not a scored preference."""
+def satisfies(c: ExtractedConstraint, candidate: Candidate) -> bool | None:
+    """Does the venue have what this cuisine/category/novelty preference names?
+
+    Ignores polarity. None for fields that don't describe venues.
+    """
     values = values_of(c)
     if c.field == ConstraintField.CUISINE:
         return any(v in {x.lower() for x in candidate.cuisines} for v in values)
@@ -39,9 +42,14 @@ def _satisfied(c: ExtractedConstraint, candidate: Candidate, mode: Mode) -> bool
         return candidate.category.lower() in values
     if c.field == ConstraintField.NOVELTY:
         return bool(candidate.novelty_tags)
-    if c.field == ConstraintField.MODE_PREFERENCE:
-        return mode.value in values
     return None
+
+
+def _satisfied(c: ExtractedConstraint, candidate: Candidate, mode: Mode) -> bool | None:
+    """Does this candidate + mode satisfy the preference? None = not a scored preference."""
+    if c.field == ConstraintField.MODE_PREFERENCE:
+        return mode.value in values_of(c)
+    return satisfies(c, candidate)
 
 
 def preference_satisfaction(

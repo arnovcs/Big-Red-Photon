@@ -2,8 +2,10 @@
 stubbed LLM defined here (there is no mock LLM in app/)."""
 
 import json
+import logging
 import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -26,8 +28,9 @@ from app.settings import Settings
 # 18:00 in Ithaca (EDT) on the demo date.
 FIXED_NOW = datetime(2026, 10, 3, 22, 0, tzinfo=UTC)
 
-# name, handle, bank code, stub limit, typed start, geocoded label, modes reply
-MAYA = ("Maya", "+16075550101", "MAYA1", 30, "Olin Library", "Olin Library", "bike")
+# name, handle, bank code, stub limit, typed start, geocoded label, modes reply.
+# Realistic, spread-out starts: Collegetown, North Campus, and downtown.
+MAYA = ("Maya", "+16075550101", "MAYA1", 30, "collegetown", "Collegetown", "bike")
 SAM = (
     "Sam",
     "+16075550102",
@@ -37,15 +40,7 @@ SAM = (
     "Robert Purcell Community Center",
     "neither",
 )
-JORDAN = (
-    "Jordan",
-    "+16075550103",
-    "JORDAN1",
-    15,
-    "Willard Straight",
-    "Willard Straight Hall",
-    "neither",
-)
+JORDAN = ("Jordan", "+16075550103", "JORDAN1", 15, "downtown", "Ithaca Commons", "neither")
 PERSONAS = [MAYA, SAM, JORDAN]
 
 # What each person DMs privately while the plan is collecting (§18 step 3).
@@ -91,6 +86,8 @@ class StubLLM:
                 add(m, ConstraintField.AVAILABLE_UNTIL, "21:00", ConstraintKind.HARD)
             if "haven't tried" in text:
                 add(m, ConstraintField.NOVELTY, 1.0, ConstraintKind.SOFT, confidence=0.6)
+            if "1 minute away" in text:
+                add(m, ConstraintField.MAX_TRAVEL_MIN, 1, ConstraintKind.HARD)
         return GroupPreferences(constraints=found, group_intent="food")
 
     async def phrase_explanations(self, facts: list[dict]) -> list[str]:
@@ -134,6 +131,15 @@ def onboard(client: TestClient, persona: tuple) -> None:
     assert "join <code>" in dm(client, handle, modes)
 
 
+VENUE_NAMES = [v["name"] for v in json.loads(Path("fixtures/venues.json").read_text())]
+
+
+def without_venue_names(text: str) -> str:
+    for name in sorted(VENUE_NAMES, key=len, reverse=True):
+        text = text.replace(name, " ")
+    return text
+
+
 def leaks_limit(text: str, limit: int) -> bool:
     patterns = [
         rf"\$\s?{limit}(\.\d{{2}})?\b",
@@ -159,8 +165,9 @@ def finished_session(client: TestClient) -> tuple[Plan, dict[str, str]]:
     return client.portal.call(load)
 
 
-def test_demo_scenario(harness) -> None:
+def test_demo_scenario(harness, caplog: pytest.LogCaptureFixture) -> None:
     client, llm = harness
+    caplog.set_level(logging.WARNING)
     handles = [p[1] for p in PERSONAS]
     for persona in PERSONAS:
         onboard(client, persona)
@@ -221,6 +228,10 @@ def test_demo_scenario(harness) -> None:
         assert itinerary["text"].startswith("Your plan for tonight:")
         itineraries[handle] = itinerary["text"]
     assert len(set(itineraries.values())) == len(PERSONAS)
+    # Different modes, same arrival: Sam (far, $50) rides, Maya bikes, Jordan ($15) walks.
+    assert "Request a ride by" in itineraries[SAM[1]]
+    assert "bike about" in itineraries[MAYA[1]]
+    assert "walk about" in itineraries[JORDAN[1]]
     arrivals = {re.search(r"Arrive ~(\d+:\d\d)", t).group(1) for t in itineraries.values()}
     assert len(arrivals) == 1
     assert arrivals.pop() in confirmation["text"]
@@ -230,7 +241,7 @@ def test_demo_scenario(harness) -> None:
         for msg in outbox(client, handle):
             if msg["kind"] != "group":
                 continue
-            text = msg["text"] + json.dumps(msg["poll"] or [])
+            text = without_venue_names(msg["text"] + json.dumps(msg["poll"] or []))
             for _, other_handle, _, limit, _, label, _ in PERSONAS:
                 assert not leaks_limit(text, limit), text
                 assert other_handle not in text and other_handle[-4:] not in text
@@ -239,7 +250,7 @@ def test_demo_scenario(harness) -> None:
     # No member's DMs contain another member's private values or preferences.
     for name, handle, *_ in PERSONAS:
         received = outbox(client, handle)[after_onboarding[handle] :]
-        everything = "\n".join(m["text"] for m in received)
+        everything = without_venue_names("\n".join(m["text"] for m in received))
         for other in PERSONAS:
             if other[1] == handle:
                 continue
@@ -248,6 +259,9 @@ def test_demo_scenario(harness) -> None:
             assert other_label not in everything
             assert other_handle not in everything
             assert all(text not in everything for text in PREFERENCES[other_handle])
+
+    # The guard checked every message and had nothing to block in a normal run.
+    assert "privacy_block" not in caplog.text
 
     # Every leave_by + travel time reaches the same T_target, within each budget.
     plan, pid_to_handle = finished_session(client)
@@ -290,3 +304,25 @@ def test_join_rules(harness) -> None:
     for handle in (MAYA[1], SAM[1]):
         assert outbox(client, handle)[-1]["text"].startswith("Plan cancelled.")
     assert "don't know that code" in dm(client, SAM[1], f"join {code}")
+
+
+def test_nothing_fits_returns_to_collecting_with_a_safe_hint(harness) -> None:
+    client, _ = harness
+    onboard(client, MAYA)
+    onboard(client, JORDAN)
+    code = re.search(r"join ([A-Z0-9]{4})", dm(client, MAYA[1], "@plan")).group(1)
+    dm(client, JORDAN[1], f"join {code}")
+    dm(client, JORDAN[1], "it has to be 1 minute away")  # HARD: nothing qualifies
+    dm(client, MAYA[1], "something we haven't tried?")  # SOFT: named in the hint
+    dm(client, MAYA[1], "@go")
+
+    expected = (
+        "Nothing fits everyone right now. Being open to somewhere familiar could help. "
+        "Then say @go again."
+    )
+    for handle in (MAYA[1], JORDAN[1]):
+        assert outbox(client, handle)[-1] == {"kind": "group", "text": expected, "poll": None}
+    # Back to COLLECTING: @go runs again (and Jordan's HARD limit still rules everything out).
+    assert dm(client, MAYA[1], "@go") == expected
+    texts = [m["text"] for m in outbox(client, MAYA[1])]
+    assert texts.count("🔎 Looking at options…") == 2

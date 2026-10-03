@@ -94,11 +94,18 @@ class Onboarding:
 
     async def _location(self, db: AsyncSession, user: UserRow, text: str) -> None:
         """Typed landmarks only (v3). A geocoded place is stored, then confirmed yes/no."""
-        pending = await vault.origin_label(db, user.id)
-        if pending and is_yes(text):
-            await self._location_confirmed(db, user)
-            return
-        if pending and is_no(text):
+        if is_yes(text):
+            status = await vault.confirm_origin(db, user.id)
+            if status == "complete":
+                # Re-entry from the READY "location" command: modes are already known.
+                user.onboarding_state = OnboardingState.READY
+                await self._reply(user, copy.UPDATED)
+                return
+            if status == "needs_modes":
+                user.onboarding_state = OnboardingState.AWAITING_MODES
+                await self._reply(user, copy.ASK_MODES)
+                return
+        if is_no(text):
             await vault.clear_origin(db, user.id)
             await self._reply(user, copy.ASK_LOCATION)
             return
@@ -115,15 +122,6 @@ class Onboarding:
         coords, label = found
         await vault.set_origin(db, user.id, coords, label)
         await self._reply(user, copy.confirm_location(label))
-
-    async def _location_confirmed(self, db: AsyncSession, user: UserRow) -> None:
-        if await vault.get_modes(db, user.id) is not None:
-            # Re-entry from the READY "location" command: modes are already known.
-            user.onboarding_state = OnboardingState.READY
-            await self._reply(user, copy.UPDATED)
-            return
-        user.onboarding_state = OnboardingState.AWAITING_MODES
-        await self._reply(user, copy.ASK_MODES)
 
     async def _modes(self, db: AsyncSession, user: UserRow, text: str) -> None:
         modes = parse_modes(text)
@@ -151,10 +149,7 @@ class Onboarding:
             user.onboarding_state = OnboardingState.AWAITING_LOCATION
             await self._reply(user, copy.ASK_LOCATION)
         elif command.name == "car":
-            modes = await vault.get_modes(db, user.id)
-            if modes is not None:
-                modes.drive = is_yes(command.arg)
-                await vault.set_modes(db, user.id, modes)
+            await vault.set_drive(db, user.id, is_yes(command.arg))
             await self._reply(user, copy.UPDATED)
         elif command.name == "start":
             await self._reply(user, copy.ALREADY_SET)

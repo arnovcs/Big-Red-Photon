@@ -1,10 +1,15 @@
 """The only code that reads or writes `private_profiles` (§11).
 
-Readers outside onboarding may use only `constraints_for()` (planning pipeline) and
-`itinerary_context_for()` (delivery). The write helpers are for onboarding only.
+Read API (planning/pipeline.py and delivery/itinerary.py only): `constraints_for()`,
+`itinerary_context_for()`, `guard_secrets_for()`.
+Write API (onboarding/fsm.py only): `link_customer()`, `set_limit()`, `set_origin()`,
+`clear_origin()`, `confirm_origin()`, `set_modes()`, `set_drive()`. Writes return at most
+a status or the value just written, never another stored private value.
+tests/test_privacy_boundary.py enforces both lists.
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Literal
@@ -82,17 +87,16 @@ async def clear_origin(db: AsyncSession, user_id: uuid.UUID) -> None:
     await db.flush()
 
 
-async def origin_label(db: AsyncSession, user_id: uuid.UUID) -> str | None:
-    """The user's own origin label, for their DM only."""
+async def confirm_origin(
+    db: AsyncSession, user_id: uuid.UUID
+) -> Literal["missing", "needs_modes", "complete"]:
+    """Confirm the stored (geocoded) origin. Reports what onboarding should do next."""
     profile = await _profile(db, user_id)
-    return profile.origin_label if profile else None
-
-
-async def get_modes(db: AsyncSession, user_id: uuid.UUID) -> TravelModes | None:
-    profile = await _profile(db, user_id)
-    if profile is None or profile.modes_json is None:
-        return None
-    return TravelModes.model_validate_json(profile.modes_json)
+    if profile is None or profile.origin_lat is None:
+        return "missing"
+    profile.updated_at = _now()
+    await db.flush()
+    return "complete" if profile.modes_json else "needs_modes"
 
 
 async def set_modes(db: AsyncSession, user_id: uuid.UUID, modes: TravelModes) -> None:
@@ -102,6 +106,19 @@ async def set_modes(db: AsyncSession, user_id: uuid.UUID, modes: TravelModes) ->
     profile.modes_json = modes.model_dump_json()
     profile.updated_at = _now()
     await db.flush()
+
+
+async def set_drive(db: AsyncSession, user_id: uuid.UUID, drive: bool) -> bool:
+    """Turn own-car driving on or off. False if modes were never set."""
+    profile = await _profile(db, user_id)
+    if profile is None or profile.modes_json is None:
+        return False
+    modes = TravelModes.model_validate_json(profile.modes_json)
+    modes.drive = drive
+    profile.modes_json = modes.model_dump_json()
+    profile.updated_at = _now()
+    await db.flush()
+    return True
 
 
 async def constraints_for(
@@ -137,4 +154,30 @@ async def itinerary_context_for(
         row.user_id: LatLng(lat=row.origin_lat, lng=row.origin_lng)
         for row in rows
         if row.origin_lat is not None and row.origin_lng is not None
+    }
+
+
+@dataclass(frozen=True)
+class ProfileSecrets:
+    """The values the PrivacyGuard must keep out of anyone else's messages."""
+
+    spend_limit_usd: Decimal | None
+    origin_label: str | None
+    nessie_customer_id: str | None
+
+
+async def guard_secrets_for(
+    db: AsyncSession, user_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, ProfileSecrets]:
+    """For PrivacyGuard only: these values are matched against, never sent."""
+    rows = await db.scalars(
+        select(PrivateProfileRow).where(PrivateProfileRow.user_id.in_(user_ids))
+    )
+    return {
+        row.user_id: ProfileSecrets(
+            spend_limit_usd=row.spend_limit_usd,
+            origin_label=row.origin_label,
+            nessie_customer_id=row.nessie_customer_id,
+        )
+        for row in rows
     }
