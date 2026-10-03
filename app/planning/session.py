@@ -233,7 +233,7 @@ class PlanningSessions:
                 guard = await pipeline.build_guard(
                     db, group_id, session_id, pipeline.venue_terms(result.plans)
                 )
-                poll_message = poll.build_poll_message(result.plans, result.facts)
+                poll_message = poll.build_poll_message(result.plans, result.facts, result.blurbs)
                 await self._tell_group(db, group_id, session_id, poll_message, guard)
                 self._start_poll_timer(group_id, session_id)
                 return

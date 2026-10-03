@@ -17,7 +17,8 @@ class Settings(BaseSettings):
 
     # Gemini
     gemini_api_key: str = ""
-    gemini_model: str = ""  # fill from current Gemini docs; a Flash model
+    # Stable Flash (ai.google.dev). 3.8/3.7 returned 503 "high demand" on 2026-10-03; 3.5 works.
+    gemini_model: str = "gemini-3.5-flash"
 
     # OpenRouteService
     ors_api_key: str = ""

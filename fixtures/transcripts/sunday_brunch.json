@@ -1,0 +1,10 @@
+{"description": "Sunday-morning demo time: coffee, a walking limit, a deadline, a category veto.",
+ "now_local": "2026-10-04T09:30:00-04:00",
+ "messages": [{"message_id": "m1", "pid": "p1", "text": "I really want coffee"},
+              {"message_id": "m2", "pid": "p2", "text": "I can't walk more than 15 minutes, my ankle is hurt"},
+              {"message_id": "m3", "pid": "p3", "text": "I need to be back by noon"},
+              {"message_id": "m4", "pid": "p1", "text": "and no bars lol"}],
+ "expected": [{"pid": "p1", "field": "category", "value": "cafe", "kind": "soft"},
+              {"pid": "p2", "field": "max_walking_minutes", "value": 15, "kind": "hard"},
+              {"pid": "p3", "field": "available_until", "value": "12:00", "kind": "hard"},
+              {"pid": "p1", "field": "category", "value": "bar", "polarity": "avoid", "kind": "veto"}]}

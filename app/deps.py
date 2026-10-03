@@ -20,6 +20,7 @@ from app.providers.protocols import (
     PlacesProvider,
     RoutingProvider,
 )
+from app.providers.real.gemini import GeminiLLM
 from app.providers.real.nessie import NessieFinance
 from app.providers.real.ors import OrsRouting
 from app.providers.real.osm_places import OsmPlaces, resolve_path
@@ -70,7 +71,7 @@ def build_deps(
         messaging=messaging,
         places=places,
         routing=routing,
-        llm=llm,
+        llm=llm or (GeminiLLM(settings, cache) if settings.gemini_api_key else None),
         finance=finance or (NessieFinance(settings) if settings.nessie_api_key else None),
         clock=clock or utcnow,
     )

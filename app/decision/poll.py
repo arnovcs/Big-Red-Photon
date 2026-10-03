@@ -36,13 +36,18 @@ def _walking_level(plan: Plan) -> str:
     return "high"
 
 
-def build_options(plans: list[Plan], facts: list[dict]) -> list[GroupPlanOption]:
+def build_options(
+    plans: list[Plan], facts: list[dict], blurbs: list[str] | None = None
+) -> list[GroupPlanOption]:
     """Aggregate, group-safe view of each plan: no per-person values.
 
-    Blurbs are the fact-based template until Stage 3 adds LLM phrasing + number check.
+    `blurbs` are the number-checked LLM explanations (§13.8); without them, each plan
+    gets the fact-based template.
     """
+    if not blurbs or len(blurbs) != len(plans):
+        blurbs = [copy.plan_blurb(f["max_travel_min"]) for f in facts]
     options = []
-    for plan, fact in zip(plans, facts, strict=True):
+    for plan, fact, blurb in zip(plans, facts, blurbs, strict=True):
         options.append(
             GroupPlanOption(
                 label=fact["label"],
@@ -51,14 +56,16 @@ def build_options(plans: list[Plan], facts: list[dict]) -> list[GroupPlanOption]
                 walking_level=_walking_level(plan),
                 price_tier=tier_for_cost(plan.candidate.est_cost_pp.value or 0),
                 arrival_window_min=fact["arrival_window_min"],
-                blurb=copy.plan_blurb(fact["max_travel_min"]),
+                blurb=blurb,
             )
         )
     return options
 
 
-def build_poll_message(plans: list[Plan], facts: list[dict]) -> GroupSafeMessage:
-    options = build_options(plans, facts)
+def build_poll_message(
+    plans: list[Plan], facts: list[dict], blurbs: list[str] | None = None
+) -> GroupSafeMessage:
+    options = build_options(plans, facts, blurbs)
     return GroupSafeMessage(text=copy.poll_message(options), poll=options)
 
 
