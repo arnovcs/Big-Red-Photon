@@ -1,0 +1,3 @@
+/* Small additions to Tailwind (loaded from its CDN). */
+html { -webkit-text-size-adjust: 100%; }
+input, select, button { font-size: 16px; } /* 16px+ keeps iOS from zooming on focus */

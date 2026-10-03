@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from app.api import health, sim, webhooks
 from app.conversation.router import Router
@@ -11,6 +12,8 @@ from app.db import session as db
 from app.deps import Deps, build_deps
 from app.logging import get_logger, kv, setup_logging
 from app.settings import get_settings
+from app.web import WEB_DIR, routes_signup
+from app.web.tunnel import PublicPathGuard
 
 log = get_logger(__name__)
 
@@ -40,11 +43,15 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         app.state.chat_router.shutdown()
         await db.dispose()
 
-    app = FastAPI(title="Big Red Photon", lifespan=lifespan)
+    app = FastAPI(title=settings.app_name, lifespan=lifespan)
     app.include_router(health.router)
     app.include_router(webhooks.router)
     if settings.provider_messaging == "sim":
         app.include_router(sim.router)
+    # Web signup. Through a tunnel, only the signup pages are reachable.
+    app.include_router(routes_signup.router)
+    app.mount("/static", StaticFiles(directory=WEB_DIR / "static"), name="static")
+    app.add_middleware(PublicPathGuard)
     return app
 
 

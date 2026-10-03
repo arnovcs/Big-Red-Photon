@@ -5,8 +5,10 @@ Read API (planning/pipeline.py and delivery/itinerary.py only): `constraints_for
 Write API (onboarding/fsm.py only): `link_customer()`, `set_limit()`, `set_origin()`,
 `clear_origin()`, `confirm_origin()`, `set_modes()`, `clear_modes()`, `set_drive()`.
 Writes return at most a status or the value just written, never another stored value.
+Write API is also open to onboarding/web_claim.py (a web signup finished by text).
 Refresh API (planning/pipeline.py only): `refresh_shared_origins()` swaps in each
 member's current Find My location at @go; it returns a count, never a location.
+Public API (web/routes_signup.py only): `bank_choices()`, demo bank codes and names.
 tests/test_privacy_boundary.py enforces both lists.
 """
 
@@ -40,6 +42,14 @@ def _personas_by_code() -> dict[str, dict]:
     """Bank code → persona from fixtures/personas.json (written by scripts/seed_nessie.py)."""
     data = json.loads(PERSONAS_PATH.read_text(encoding="utf-8"))
     return {p["bank_code"].upper(): p for p in data["personas"]}
+
+
+def bank_choices() -> list[tuple[str, str]]:
+    """(bank code, persona name) for the signup form's demo-bank dropdown.
+
+    Codes and names only: balances, bills, and Nessie ids never leave the vault.
+    """
+    return [(code, p["name"]) for code, p in sorted(_personas_by_code().items())]
 
 
 def _as_utc(dt: datetime) -> datetime:

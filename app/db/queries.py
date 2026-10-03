@@ -5,7 +5,7 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.tables import GroupMemberRow, GroupRow, SessionRow, UserRow
+from app.db.tables import GroupMemberRow, GroupRow, PendingSignupRow, SessionRow, UserRow
 from app.models.identity import OnboardingState
 
 
@@ -75,3 +75,21 @@ async def active_session(db: AsyncSession, group: GroupRow) -> SessionRow | None
     if group.active_session_id is None:
         return None
     return await db.get(SessionRow, group.active_session_id)
+
+
+async def user_by_handle(db: AsyncSession, handle: str) -> UserRow | None:
+    return await db.scalar(select(UserRow).where(UserRow.handle == handle))
+
+
+async def signup_by_token(db: AsyncSession, token: str) -> PendingSignupRow | None:
+    return await db.scalar(select(PendingSignupRow).where(PendingSignupRow.token == token.upper()))
+
+
+async def claimed_signup_for(db: AsyncSession, user_id: uuid.UUID) -> PendingSignupRow | None:
+    """The web signup this user finished by text, if they came through the website."""
+    return await db.scalar(
+        select(PendingSignupRow)
+        .where(PendingSignupRow.claimed_user_id == user_id)
+        .order_by(PendingSignupRow.claimed_at.desc())
+        .limit(1)
+    )

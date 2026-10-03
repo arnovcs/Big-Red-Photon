@@ -114,6 +114,7 @@ def test_app_boots_and_creates_tables(tmp_path, monkeypatch) -> None:
                 "session_messages",
                 "votes",
                 "processed_messages",
+                "pending_signups",
             }
     finally:
         get_settings.cache_clear()

@@ -106,6 +106,10 @@ class Onboarding:
     async def join_before_ready(self, user: UserRow, code: str, first_dm: bool) -> None:
         """`join <code>` from someone not set up yet: explain, then (re)ask the current step."""
         await self._reply(user, copy.setup_first(code))
+        await self.reprompt(user)
+
+    async def reprompt(self, user: UserRow) -> None:
+        """(Re)ask whatever setup step this not-yet-READY user is on."""
         state = OnboardingState(user.onboarding_state)
         if state == OnboardingState.NEW:
             await self._new(user, "", first_dm=True)
@@ -147,6 +151,11 @@ class Onboarding:
                 await self._reply(user, copy.LIMIT_INVALID)
                 return
             await vault.set_limit(db, user.id, amount, "user_override")
+        if await queries.claimed_signup_for(db, user.id) is not None:
+            # Signed up on the website: no setup location step (asked per plan instead).
+            user.onboarding_state = OnboardingState.READY
+            await self._reply(user, copy.web_intro(user.display_name))
+            return
         user.onboarding_state = OnboardingState.AWAITING_LOCATION
         await self._ask_location(db, user)
 

@@ -28,6 +28,19 @@ class MessagingProvider(Protocol):
         ...
 
 
+class UserDirectoryProvider(Protocol):
+    """Who may text the bot. On Photon's shared line pool, a number must be registered as a
+    user of the project before the bot can talk to it, and each user is assigned the line
+    (bot number) they text."""
+
+    async def register(self, phone: str, first_name: str) -> str | None:
+        """Make sure `phone` (E.164) is a user; return the number they should text.
+
+        Idempotent. None if the number isn't known (yet) or the call failed: never raises.
+        """
+        ...
+
+
 class FinanceProvider(Protocol):
     async def get_customer(self, customer_id: str) -> dict: ...
 

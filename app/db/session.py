@@ -46,6 +46,7 @@ def session_factory() -> async_sessionmaker[AsyncSession]:
 ADDED_COLUMNS = [
     ("private_profiles", "origin_typed_at", "DATETIME"),
     ("private_profiles", "origin_place_id", "VARCHAR"),
+    ("pending_signups", "bot_phone", "VARCHAR"),
 ]
 
 

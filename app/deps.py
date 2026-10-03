@@ -12,12 +12,14 @@ from datetime import UTC, datetime
 from app.providers.cache import RecordReplayCache
 from app.providers.mock.routing import MockRouting
 from app.providers.mock.sim_messaging import SimMessaging
+from app.providers.mock.sim_users import SimUsers
 from app.providers.protocols import (
     FinanceProvider,
     LLMProvider,
     MessagingProvider,
     PlacesProvider,
     RoutingProvider,
+    UserDirectoryProvider,
 )
 from app.providers.real.gemini import GeminiLLM
 from app.providers.real.google_places import GooglePlaces
@@ -25,6 +27,7 @@ from app.providers.real.google_routes import GoogleRoutes
 from app.providers.real.nessie import NessieFinance
 from app.providers.real.ors import OrsRouting
 from app.providers.real.photon import PhotonMessaging
+from app.providers.real.photon_users import PhotonUsers
 from app.settings import Settings
 
 
@@ -40,6 +43,7 @@ class Deps:
     routing: RoutingProvider
     llm: LLMProvider | None = None
     finance: FinanceProvider | None = None
+    users: UserDirectoryProvider | None = None  # who may text the bot (web signup)
     clock: Callable[[], datetime] = field(default=utcnow)
 
 
@@ -50,13 +54,16 @@ def build_deps(
     finance: FinanceProvider | None = None,
     clock: Callable[[], datetime] | None = None,
     places: PlacesProvider | None = None,
+    users: UserDirectoryProvider | None = None,
 ) -> Deps:
-    """`places` lets tests plug in a fake; otherwise it's Google Places."""
+    """`places` and `users` let tests plug in fakes; otherwise they're the real providers."""
     messaging: MessagingProvider
     if settings.provider_messaging == "photon":
         messaging = PhotonMessaging(settings)
+        users = users or PhotonUsers(settings)
     else:
         messaging = SimMessaging()
+        users = users or SimUsers(settings)
     cache = RecordReplayCache(settings.cache_mode)
     places = places or GooglePlaces(settings, cache)
     routing: RoutingProvider
@@ -73,5 +80,6 @@ def build_deps(
         routing=routing,
         llm=llm or (GeminiLLM(settings, cache) if settings.gemini_api_key else None),
         finance=finance or (NessieFinance(settings) if settings.nessie_api_key else None),
+        users=users,
         clock=clock or utcnow,
     )
