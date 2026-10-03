@@ -73,6 +73,12 @@ async function handleInbound(space: Space, message: Message): Promise<void> {
   if (content.type === "attachment") {
     console.log(`[in] attachment mime=${content.mimeType} name=${content.name}`);
   }
+
+  if (content.type === "custom") {
+    // Log only the kind and key names, never values (may hold coordinates).
+    const raw = (content.raw ?? {}) as Record<string, unknown>;
+    console.log(`[in] custom imessage_type=${raw.imessage_type} keys=${Object.keys(raw).join(",")}`);
+  }
 }
 
 // Inbound loop. One bad message must never stop the stream.
