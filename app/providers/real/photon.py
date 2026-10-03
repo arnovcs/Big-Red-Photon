@@ -5,6 +5,7 @@ replaying a send would mean a message never reaches the phone.
 """
 
 import time
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from tenacity import (
@@ -39,6 +40,7 @@ class PhotonMessaging:
     def __init__(self, settings: Settings) -> None:
         self.bridge_url = settings.bridge_url.rstrip("/")
         self.timeout = settings.http_timeout_sec
+        self.max_location_age = timedelta(minutes=settings.shared_location_max_age_min)
 
     async def send_group(self, handles: list[str], msg: GroupSafeMessage) -> None:
         # msg.text already contains the rendered poll options (copy.poll_message).
@@ -68,10 +70,25 @@ class PhotonMessaging:
             if response.status_code != 200:
                 return None
             data = response.json()
+            if data.get("type") == "legacy" or self._is_stale(data.get("at")):
+                return None  # an old snapshot: they've probably stopped sharing
             return LatLng(lat=float(data["lat"]), lng=float(data["lng"]))
         except Exception:
             log.warning(kv("photon_shared_location_failed", handle=mask_handle(handle)))
             return None
+
+    def _is_stale(self, at: str | None) -> bool:
+        """True if the snapshot's timestamp is older than the max age. No or unreadable
+        timestamp → trust it (Photon says the time "may be absent")."""
+        if not at:
+            return False
+        try:
+            taken = datetime.fromisoformat(str(at).replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        if taken.tzinfo is None:
+            taken = taken.replace(tzinfo=UTC)
+        return datetime.now(UTC) - taken > self.max_location_age
 
     async def _post(self, path: str, body: dict) -> httpx.Response:
         async with httpx.AsyncClient(timeout=self.timeout) as client:

@@ -1,6 +1,6 @@
 # CLAUDE.md — working rules for this repo
 
-Read `ARCHITECTURE.md` fully before writing any code. It is the source of truth for scope, design, and build order. It is now **v2 (free-API stack)**: Gemini, OpenStreetMap (Overpass, Nominatim), OpenRouteService, Nessie, Photon. No Google Maps Platform or xAI APIs.
+Read `ARCHITECTURE.md` fully before writing any code. It is the source of truth for scope, design, and build order. It is now **v2 (free-API stack)**: Gemini, OpenStreetMap (Overpass, Nominatim), OpenRouteService, Nessie, Photon. No xAI APIs. The only Google Maps Platform APIs allowed are **Places API (New)** for worldwide venues (`PROVIDER_PLACES=google`) and the **Routes API** for travel times in every mode, with live traffic for driving (`PROVIDER_ROUTING=google`; ORS is the fallback), team decisions 2026-10-03; keep their per-day quotas capped.
 
 ## Context
 - This is a 24-hour hackathon project (BigRed//Hacks 2026, theme: Navigation). Hard deadline: **Sunday 8:30 AM ET** (Devpost submission).

@@ -12,7 +12,7 @@ The Stage 0b spike showed that Photon's free plan (the only plan available to us
 - **Voting:** a text poll in each DM; members reply `A`, `B`, or `C`. No native polls. (§7.3)
 - **Interface change:** `MessagingProvider.send_group(chat_id, msg)` → `send_group(handles, msg)` (§8).
 - **Model change:** `Group.chat_id` → `Group.join_code` (§6.1, §6.8).
-- **Location:** typed landmarks only (in the spike, a shared location arrived as `custom` content with no usable coordinates).
+- **Location (post-v3):** Find My sharing via Photon's Advanced iMessage `locations` API (bridge `/request_location`, `/location`). If someone already shares with the bot, onboarding uses it; at **@go** every sharing member's origin is refreshed to where they are now (`vault.refresh_shared_origins`, called only by the pipeline). Typed landmarks remain the fallback.
 - Unchanged: optimizer, budgets, Nessie, routing, places, Gemini, record/replay, privacy rules.
 
 ### v2 changes (summary)
@@ -86,6 +86,8 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 | Routing | **OpenRouteService** (matrix + directions; `foot-walking`, `cycling-regular`, `driving-car`) | Free key, no card. Free plan: 2,000 directions/day, 500 matrix/day. |
 | Modes | `walk`, `bike`, `drive` (own car), `rideshare` | No free transit API for Ithaca. Ride-share = ORS driving time + pickup wait, cost from formula. |
 | Venues | **OpenStreetMap via Overpass**, fetched once into `fixtures/venues.json` | Free, no key. No prices in OSM, so price tiers are hand-entered. |
+| Venues, worldwide (post-v3) | **Google Places API (New)** Nearby Search, `PROVIDER_PLACES=google` | Real price level, hours, rating anywhere. Free monthly allowance; key restricted to Places API (New) with a capped daily quota. Falls back to the curated fixture. |
+| Travel times, all modes, live traffic for driving (post-v3) | **Google Routes API** Compute Route Matrix + Compute Routes, `PROVIDER_ROUTING=google` | One matrix call per travel mode (WALK, BICYCLE, DRIVE; rideshare derived from DRIVE), billed per origin × destination. Only DRIVE uses `TRAFFIC_AWARE` (the Pro SKU). Same key, with Routes API allowed and a capped daily quota. A mode Google can't route (e.g. no bike coverage) falls back to ORS, then mock. |
 | Geocoding | `fixtures/demo_locations.json`, then **Nominatim** | Free. Max ~1 request/second; requires a descriptive User-Agent. |
 | LLM | **Gemini** (structured output) for extraction and explanation | Team already has a key. Model name is config. Use a Flash model. |
 | Live events | Gemini + Google Search grounding **only if the key's tier supports it**; otherwise a hand-checked list | **Stretch only** (Stage 7). |
@@ -609,7 +611,8 @@ READY ──► DM: "You're set! Start a plan with @plan, or join a friend's wit
 ```
 
 - **Bank code:** a short code per seeded persona (e.g. `MAYA1`), mapped to a Nessie customer id in `fixtures/personas.json` after seeding. This simulates "linking a bank account."
-- v3: **typed landmarks only.** In the spike, a shared location arrived as `custom` content with no usable coordinates.
+- v3: typed landmarks only. In the spike, a shared location *message* arrived as `custom` content with no usable coordinates.
+- Post-v3: Find My sharing (`locations.get`) does give coordinates. Onboarding uses it when available, and @go refreshes every sharing member's origin before planning. Commands (`@…`) sent during the location step are never geocoded.
 - Any invalid input re-asks with a short hint. Never echo dollar amounts in any group-safe message.
 
 ### 7.3 Planning session FSM (`planning/session.py`)
@@ -1084,14 +1087,14 @@ Where the Stage 1 code depends on group chats (from a scan of `main`): `provider
 
 - Reading chat history from before `@plan` (or from before a member joined).
 - iMessage group chats (need Photon's paid Business plan), relaying members' messages to each other, and native polls (v3).
-- Find My location sharing via Photon's Advanced iMessage kit (`im.locations`). Real, but outside the plan; typed landmarks instead.
+- Automatic location updates via `im.locations.watch()` (on the shared line it streams everyone sharing with that line). We read `locations.get(handle)` at onboarding and @go instead.
 - Supabase/Postgres, deployment, Docker, CI pipelines.
 - HMAC/auth between bridge and backend.
 - Live re-planning when someone is late; live location tracking.
 - Multi-stop plans.
 - Learned weights / any ML model.
 - Public transit. (Stretch only, after Stage 8: direct-trip routing from TCAT's GTFS schedule files.)
-- Any Google Maps Platform or xAI API (paid; replaced in v2).
+- Any xAI API, and any Google Maps Platform API other than Places API (New) and the Routes API (post-v3 decisions: worldwide venues, Google routing with live traffic).
 - Real ride-share APIs or booking (cost is a formula estimate).
 - Real bank account linking (Nessie sandbox only).
 - A web frontend (a judge-facing debug page only if everything else is done).

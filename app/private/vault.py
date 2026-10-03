@@ -3,11 +3,14 @@
 Read API (planning/pipeline.py and delivery/itinerary.py only): `constraints_for()`,
 `itinerary_context_for()`, `guard_secrets_for()`.
 Write API (onboarding/fsm.py only): `link_customer()`, `set_limit()`, `set_origin()`,
-`clear_origin()`, `confirm_origin()`, `set_modes()`, `set_drive()`. Writes return at most
-a status or the value just written, never another stored private value.
+`clear_origin()`, `confirm_origin()`, `set_modes()`, `clear_modes()`, `set_drive()`.
+Writes return at most a status or the value just written, never another stored value.
+Refresh API (planning/pipeline.py only): `refresh_shared_origins()` swaps in each
+member's current Find My location at @go; it returns a count, never a location.
 tests/test_privacy_boundary.py enforces both lists.
 """
 
+import asyncio
 import json
 import uuid
 from dataclasses import dataclass
@@ -24,7 +27,8 @@ from app.db.tables import PrivateProfileRow
 from app.logging import get_logger, kv
 from app.models.private import LatLng, PrivateConstraints, TravelModes
 from app.private import budget
-from app.providers.protocols import FinanceProvider
+from app.providers.mock.places import load_demo_locations, near_label
+from app.providers.protocols import FinanceProvider, MessagingProvider
 
 log = get_logger(__name__)
 
@@ -36,6 +40,11 @@ def _personas_by_code() -> dict[str, dict]:
     """Bank code → persona from fixtures/personas.json (written by scripts/seed_nessie.py)."""
     data = json.loads(PERSONAS_PATH.read_text(encoding="utf-8"))
     return {p["bank_code"].upper(): p for p in data["personas"]}
+
+
+def _as_utc(dt: datetime) -> datetime:
+    """SQLite drops tzinfo; stored times are UTC."""
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt.astimezone(UTC)
 
 
 def _now() -> datetime:
@@ -103,13 +112,57 @@ async def set_limit(
     return True
 
 
-async def set_origin(db: AsyncSession, user_id: uuid.UUID, origin: LatLng, label: str) -> None:
+async def set_origin(
+    db: AsyncSession, user_id: uuid.UUID, origin: LatLng, label: str, typed: bool = False
+) -> None:
+    """`typed`: the person typed this place (it then wins over live location for the
+    plan it was typed in); False when it came from location sharing."""
     profile = await _profile(db, user_id)
     if profile is None:
         return
     profile.origin_lat, profile.origin_lng, profile.origin_label = origin.lat, origin.lng, label
+    profile.origin_typed_at = _now() if typed else None
     profile.updated_at = _now()
     await db.flush()
+
+
+async def refresh_shared_origins(
+    db: AsyncSession,
+    handles: dict[uuid.UUID, str],
+    messaging: MessagingProvider,
+    keep_typed_since: datetime | None = None,
+) -> int:
+    """Replace each member's origin with where they are now, for everyone sharing their
+    location with the bot (Find My). Members who don't share keep their stored origin,
+    and so does anyone who typed a place since `keep_typed_since` (this plan's start).
+    Lookups run in parallel and never raise. Returns how many were refreshed."""
+    typed_recently = set()
+    if keep_typed_since is not None:
+        since = _as_utc(keep_typed_since)
+        for user_id in handles:
+            profile = await _profile(db, user_id)
+            typed_at = profile.origin_typed_at if profile else None
+            if typed_at is not None and _as_utc(typed_at) >= since:
+                typed_recently.add(user_id)
+    user_ids = [u for u in handles if u not in typed_recently]
+    results = await asyncio.gather(
+        *(messaging.shared_location(handles[u]) for u in user_ids), return_exceptions=True
+    )
+    locations = load_demo_locations()
+    refreshed = 0
+    for user_id, coords in zip(user_ids, results, strict=True):
+        if isinstance(coords, LatLng):
+            await set_origin(db, user_id, coords, near_label(coords, locations))
+            refreshed += 1
+    log.info(
+        kv(
+            "shared_origins_refreshed",
+            refreshed=refreshed,
+            members=len(handles),
+            kept_typed=len(typed_recently),
+        )
+    )
+    return refreshed
 
 
 async def clear_origin(db: AsyncSession, user_id: uuid.UUID) -> None:
@@ -138,6 +191,15 @@ async def set_modes(db: AsyncSession, user_id: uuid.UUID, modes: TravelModes) ->
         return
     profile.modes_json = modes.model_dump_json()
     profile.updated_at = _now()
+    await db.flush()
+
+
+async def clear_modes(db: AsyncSession, user_id: uuid.UUID) -> None:
+    """Travel modes are per plan: forget the last answer before asking again."""
+    profile = await _profile(db, user_id)
+    if profile is None:
+        return
+    profile.modes_json = None
     await db.flush()
 
 

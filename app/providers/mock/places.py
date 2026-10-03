@@ -84,7 +84,12 @@ class MockPlaces:
         )
 
     async def search_nearby(
-        self, center: LatLng, radius_m: int, categories: list[str], open_at: datetime
+        self,
+        center: LatLng,
+        radius_m: int,
+        categories: list[str],
+        open_at: datetime,
+        cuisines: list[str] | None = None,  # the fixture is small: filtering happens later
     ) -> list[Candidate]:
         radius_mi = radius_m / METERS_PER_MILE
         return [

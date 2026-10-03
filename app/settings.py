@@ -17,12 +17,18 @@ class Settings(BaseSettings):
 
     # Gemini
     gemini_api_key: str = ""
-    # Stable Flash (ai.google.dev). 3.8/3.7 returned 503 "high demand" on 2026-10-03; 3.5 works.
-    gemini_model: str = "gemini-3.5-flash"
+    # 3.8/3.7 returned 503 "high demand" on 2026-10-03; 3.5 Flash hit its free-tier
+    # 20 requests/day. Flash-Lite has its own per-model quota.
+    gemini_model: str = "gemini-3.5-flash-lite"
 
     # OpenRouteService
     ors_api_key: str = ""
     ors_base_url: str = "https://api.openrouteservice.org"
+
+    # Google Places API (New): worldwide venues (PROVIDER_PLACES=google)
+    google_places_api_key: str = ""
+    # Routes API; empty = use the Places key (same Google Cloud project).
+    google_routes_api_key: str = ""
 
     # OpenStreetMap community services
     nominatim_base_url: str = "https://nominatim.openstreetmap.org"
@@ -42,8 +48,9 @@ class Settings(BaseSettings):
 
     # Provider selection
     provider_messaging: Literal["photon", "sim"] = "sim"
-    provider_places: Literal["osm", "mock"] = "mock"
-    provider_routing: Literal["ors", "mock"] = "mock"
+    provider_places: Literal["google", "osm", "mock"] = "mock"
+    # google = Google Routes for every mode (live traffic for driving), ORS as fallback.
+    provider_routing: Literal["google", "ors", "mock"] = "mock"
     provider_finance: Literal["nessie"] = "nessie"
 
     # Record/replay cache (§14.1)
@@ -77,6 +84,8 @@ class Settings(BaseSettings):
     # Timeouts (§8)
     llm_timeout_sec: float = 20.0
     http_timeout_sec: float = 10.0
+    # A Find My location older than this counts as "not sharing" (they likely stopped).
+    shared_location_max_age_min: int = 120
 
 
 @lru_cache

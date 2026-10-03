@@ -10,6 +10,7 @@ from app.conversation.commands import (
     parse_dm_command,
     parse_modes,
 )
+from app.db import queries
 from app.db.tables import UserRow
 from app.deps import Deps
 from app.messaging.outbound import send_private
@@ -21,6 +22,18 @@ from app.providers.mock.places import load_demo_locations, near_label
 
 # Short replies that mean "I shared my location" rather than a place name.
 SHARE_REPLIES = {"done", "shared", "shared it", "sent", "sent it", "here", "i shared", "ok done"}
+# Any reply containing one of these ("I shared my live location", "ok") means "look at
+# what I shared", not a place name.
+SHARE_WORDS = {"done", "shared", "share", "sharing", "sent", "location", "ok", "okay"}
+
+
+def is_share_reply(text: str) -> bool:
+    normalized = " ".join(text.lower().split()).strip(".!")
+    words = set(normalized.replace(",", " ").replace(".", " ").replace("!", " ").split())
+    return normalized in SHARE_REPLIES or bool(words & SHARE_WORDS)
+
+
+SAME_REPLIES = {"same", "same place", "same as before", "same as last time"}
 
 MIN_LIMIT_USD = 1
 MAX_LIMIT_USD = 1000
@@ -33,9 +46,19 @@ class Onboarding:
     async def _reply(self, user: UserRow, text: str) -> None:
         await send_private(self.deps.messaging, user.handle, PrivateMessage(text=text))
 
-    async def _ask_location(self, user: UserRow) -> None:
-        """Ask where they're starting, and send the Find My share card alongside."""
+    async def _ask_location(self, db: AsyncSession, user: UserRow, use_share: bool = True) -> None:
+        """Already sharing their location with the bot (and `use_share`)? Use it (they
+        confirm yes/no). Otherwise ask where they're starting, with the Find My card."""
+        found = await self._shared_location(user) if use_share else None
+        if found is not None:
+            coords, label = found
+            await vault.set_origin(db, user.id, coords, label)
+            await self._reply(user, copy.confirm_location(label))
+            return
         await self._reply(user, copy.ASK_LOCATION)
+        await self._send_location_card(user)
+
+    async def _send_location_card(self, user: UserRow) -> None:
         try:
             await self.deps.messaging.request_location(user.handle)
         except Exception:
@@ -111,28 +134,39 @@ class Onboarding:
                 return
             await vault.set_limit(db, user.id, amount, "user_override")
         user.onboarding_state = OnboardingState.AWAITING_LOCATION
-        await self._ask_location(user)
+        await self._ask_location(db, user)
 
     async def _location(self, db: AsyncSession, user: UserRow, text: str) -> None:
         """A typed landmark, or the person's shared (Find My) location. Either way the
         place is stored, then confirmed yes/no."""
-        if is_yes(text):
+        if is_yes(text) or " ".join(text.lower().split()).strip(".!") in SAME_REPLIES:
+            # "yes" confirms the place just found; "same" keeps last time's starting point.
             status = await vault.confirm_origin(db, user.id)
             if status == "complete":
-                # Re-entry from the READY "location" command: modes are already known.
+                # Re-entry (a plan's location question, or the "location" command).
                 user.onboarding_state = OnboardingState.READY
-                await self._reply(user, copy.UPDATED)
+                in_plan = await queries.active_group_for_user(db, user.id) is not None
+                await self._reply(user, copy.TRIP_MODES_SET if in_plan else copy.UPDATED)
                 return
             if status == "needs_modes":
-                user.onboarding_state = OnboardingState.AWAITING_MODES
-                await self._reply(user, copy.ASK_MODES)
+                # Travel modes are asked per plan (at @plan / join), not during setup.
+                user.onboarding_state = OnboardingState.READY
+                await self._reply(user, copy.YOU_ARE_SET)
+                return
+            if not is_share_reply(text):  # "ok" may mean "I shared it": checked below
+                await self._reply(user, copy.ASK_LOCATION)  # "yes" with nothing to confirm
                 return
         if is_no(text):
             await vault.clear_origin(db, user.id)
             await self._reply(user, copy.ASK_LOCATION)
             return
 
-        if " ".join(text.lower().split()).strip(".!") in SHARE_REPLIES:
+        if text.strip().startswith("@"):
+            # A command (e.g. @plan) sent mid-setup is not a place name.
+            await self._reply(user, copy.LOCATION_FIRST)
+            return
+        typed = False
+        if is_share_reply(text):
             found = await self._shared_location(user)
             if found is None:
                 await self._reply(user, copy.SHARE_NOT_SEEN)
@@ -144,6 +178,7 @@ class Onboarding:
                 found = await self.deps.places.geocode(text, center)
             except Exception:
                 found = None
+            typed = found is not None
             if found is None:
                 # Not a place we know; maybe they shared their location instead.
                 found = await self._shared_location(user)
@@ -151,17 +186,32 @@ class Onboarding:
                 await self._reply(user, copy.LOCATION_NOT_FOUND)
                 return
         coords, label = found
-        await vault.set_origin(db, user.id, coords, label)
+        await vault.set_origin(db, user.id, coords, label, typed=typed)
         await self._reply(user, copy.confirm_location(label))
 
+    async def ask_trip_modes(self, db: AsyncSession, user: UserRow) -> None:
+        """At @plan / join: forget last time's answer and ask how they're getting there."""
+        await vault.clear_modes(db, user.id)
+        user.onboarding_state = OnboardingState.AWAITING_MODES
+        await self._reply(user, copy.ASK_TRIP_MODES)
+
     async def _modes(self, db: AsyncSession, user: UserRow, text: str) -> None:
+        if text.strip().startswith("@"):
+            await self._reply(user, copy.MODES_FIRST)  # e.g. @go before answering
+            return
         modes = parse_modes(text)
         if modes is None:
             await self._reply(user, copy.MODES_INVALID)
             return
         await vault.set_modes(db, user.id, modes)
-        user.onboarding_state = OnboardingState.READY
-        await self._reply(user, copy.YOU_ARE_SET)
+        # Next question, one at a time: where from? Live location answers it by itself.
+        if await self._shared_location(user) is not None:
+            user.onboarding_state = OnboardingState.READY
+            await self._reply(user, copy.TRIP_LIVE_LOCATION)
+            return
+        user.onboarding_state = OnboardingState.AWAITING_LOCATION
+        await self._reply(user, copy.ASK_TRIP_LOCATION)
+        await self._send_location_card(user)
 
     async def handle_settings(self, db: AsyncSession, user: UserRow, text: str) -> bool:
         """READY-state settings commands. Returns False if `text` isn't one."""
@@ -178,7 +228,8 @@ class Onboarding:
         elif command.name == "location":
             await vault.clear_origin(db, user.id)
             user.onboarding_state = OnboardingState.AWAITING_LOCATION
-            await self._ask_location(user)
+            # They asked to change it: ask, even if they're sharing (to type somewhere else).
+            await self._ask_location(db, user, use_share=False)
         elif command.name == "car":
             await vault.set_drive(db, user.id, is_yes(command.arg))
             await self._reply(user, copy.UPDATED)

@@ -25,6 +25,7 @@ from app.models.conversation import (
 )
 from app.models.private import TravelModes
 from app.models.routing import Mode, RouteEstimate
+from app.optimizer import cuisines
 from app.optimizer.arrival import parse_hhmm
 from app.optimizer.params import OptimizerParams
 
@@ -102,14 +103,14 @@ def hard_limits(pid: str, preferences: GroupPreferences, now: datetime) -> HardL
 
 
 def is_vetoed(candidate: Candidate, preferences: GroupPreferences) -> bool:
-    cuisines = {x.lower() for x in candidate.cuisines}
+    """ "no japanese" also rules out sushi and ramen (cuisine families)."""
     for c in preferences.constraints:
         if c.kind != ConstraintKind.VETO:
             continue
         if c.field not in (ConstraintField.CUISINE, ConstraintField.CATEGORY):
             continue
         for value in values_of(c):
-            if value in cuisines or value == candidate.category.lower():
+            if value == candidate.category.lower() or cuisines.matches([value], candidate.cuisines):
                 return True
     return False
 

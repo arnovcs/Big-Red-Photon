@@ -41,7 +41,11 @@ class PlacesProvider(Protocol):
         radius_m: int,
         categories: list[str],
         open_at: datetime,
-    ) -> list[Candidate]: ...
+        cuisines: list[str] | None = None,
+    ) -> list[Candidate]:
+        """`cuisines` (e.g. ["japanese"]): wanted cuisines a provider may search for
+        specifically, so matching venues are among the results. Optional to honour."""
+        ...
 
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
 

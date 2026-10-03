@@ -28,7 +28,7 @@ class Uncertain[T](BaseModel):
 
 
 class Candidate(BaseModel):
-    candidate_id: str  # "osm:<node|way>/<id>" | "ev:<hash>"
+    candidate_id: str  # "osm:<node|way>/<id>" | "google:<place id>" | "ev:<hash>"
     name: str
     category: str  # food | bar | cafe | dessert | activity | event
     cuisines: list[str] = []
@@ -39,7 +39,7 @@ class Candidate(BaseModel):
     closes_at: datetime | None = None
     typical_duration_min: int  # category default: food 60, cafe 45, dessert 30, bar 90, activity 90
     rating: float | None = None
-    source: Literal["osm_fixture", "event"]
+    source: Literal["osm_fixture", "google", "event"]
     novelty_tags: list[str] = []
 
 

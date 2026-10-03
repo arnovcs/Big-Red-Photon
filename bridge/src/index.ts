@@ -159,6 +159,8 @@ Bun.serve({
           label: loc.shortAddress ?? loc.name ?? null,
           accuracy_m: loc.accuracy ?? null,
           at: loc.locationTimestamp ?? null,
+          // "live" | "legacy" (old cached snapshot) | "unknown" — freshness only.
+          type: loc.locationType ?? null,
         });
       }
 
