@@ -220,6 +220,7 @@ def run_plan(client: TestClient, answers: dict[str, str | None], chat: list[tupl
             dm(client, handle, "same")
     for name, text in chat:
         dm(client, people[name][1], text)
+    dm(client, SAM[1], "go")  # more than half must say go: both of 2
     assert "for everyone" in dm(client, MAYA[1], "@go")
     dm(client, MAYA[1], "A")
     dm(client, SAM[1], "A")

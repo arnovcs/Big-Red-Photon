@@ -25,7 +25,7 @@ from app.conversation.commands import (
 )
 from app.db import queries
 from app.db.session import session_factory
-from app.db.tables import GroupRow, SessionMessageRow, SessionRow, UserRow
+from app.db.tables import GroupRow, SessionMessageRow, SessionReadyRow, SessionRow, UserRow
 from app.decision import poll
 from app.delivery import itinerary
 from app.deps import Deps
@@ -231,6 +231,31 @@ class PlanningSessions:
             await self._reply(user, copy.need_two(group.join_code))
             return
         members = await queries.group_members(db, group.id)
+        # The search starts only once MORE than half the group has said go (2 of 2,
+        # 2 of 3, 3 of 4...). Everyone hears who's ready, so the group stays in sync.
+        name = user.display_name or "someone"
+        already = await db.get(SessionReadyRow, (session.id, user.id)) is not None
+        if not already:
+            db.add(SessionReadyRow(session_id=session.id, user_id=user.id))
+            await db.flush()
+        member_ids = {m.id for m in members}
+        ready_ids = set(
+            await db.scalars(
+                select(SessionReadyRow.user_id).where(SessionReadyRow.session_id == session.id)
+            )
+        )
+        ready = len(ready_ids & member_ids)
+        needed = len(members) // 2 + 1
+        log.info(kv("go_ready", ready=ready, members=len(members), needed=needed))
+        if ready < needed:
+            await db.commit()
+            if already:
+                await self._reply(user, copy.already_ready(needed - ready))
+            else:
+                await self._tell_group(
+                    db, group.id, session.id, copy.ready_progress(name, ready, needed)
+                )
+            return
         for m in members:
             if m.onboarding_state == OnboardingState.AWAITING_MODES:
                 # Never said how they're getting there: walking, and they're told so.
@@ -242,6 +267,7 @@ class PlanningSessions:
                 still = m.onboarding_state == OnboardingState.AWAITING_MODES
                 await self._reply(m, copy.ASK_TRIP_MODES if still else copy.ASK_TRIP_LOCATION)
             return
+        await self._tell_group(db, group.id, session.id, copy.ready_enough(name))
         session.state = SessionState.RUNNING
         await db.commit()
         # Typing dots while planning ("…"), the way a friend would look things up.
@@ -274,6 +300,7 @@ class PlanningSessions:
                     member.onboarding_state = OnboardingState.AWAITING_LOCATION
                     await self._reply(member, copy.ASK_TRIP_LOCATION)
                 session.state = SessionState.COLLECTING
+                await _clear_ready(db, session_id)
                 await db.commit()
                 names = [m.display_name or "someone" for m in users.values()]
                 await self._tell_group(db, group_id, session_id, copy.waiting_on(names))
@@ -298,6 +325,7 @@ class PlanningSessions:
                 return
 
             session.state = SessionState.COLLECTING
+            await _clear_ready(db, session_id)  # agree again before the next search
             await db.commit()
             await self._tell_group(db, group_id, session_id, notice)
 
@@ -410,6 +438,7 @@ class PlanningSessions:
         await db.execute(
             delete(SessionMessageRow).where(SessionMessageRow.session_id == session.id)
         )
+        await _clear_ready(db, session.id)
         for member in await queries.group_members(db, group.id):
             if member.onboarding_state in QUESTION_STATES:
                 member.onboarding_state = OnboardingState.READY  # don't strand them
@@ -448,6 +477,10 @@ class PlanningSessions:
         for task in self._poll_timers.values():
             task.cancel()
         self._poll_timers.clear()
+
+
+async def _clear_ready(db: AsyncSession, session_id: uuid.UUID) -> None:
+    await db.execute(delete(SessionReadyRow).where(SessionReadyRow.session_id == session_id))
 
 
 async def _handles(db: AsyncSession, group_id: uuid.UUID) -> list[str]:

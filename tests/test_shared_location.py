@@ -206,6 +206,7 @@ def test_go_refreshes_origins_from_live_shares(client, caplog) -> None:
     for text in ["neither", "same"]:
         client.post("/sim/message", json={"sender_handle": sam, "text": text})
     sim(client).shared[HANDLE] = COLLEGETOWN  # Maya walked to Collegetown since setup
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
     dm(client, "@go")
 
     assert stored_label(client, HANDLE) == "your live location"  # refreshed
@@ -247,6 +248,7 @@ def test_where_from_is_asked_after_how_unless_sharing(client) -> None:
     assert sim(client).location_requests == [sam]  # the Find My card, with the question
     client.post("/sim/message", json={"sender_handle": sam, "text": "same"})
     assert all_texts(client, sam)[-1] == "bet. what are you in the mood for?"
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
     assert "for everyone" in dm(client, "@go")
 
 
@@ -262,6 +264,7 @@ def test_typed_place_this_plan_beats_live_location_at_go(client, caplog) -> None
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
     for text in ["neither", "same"]:
         client.post("/sim/message", json={"sender_handle": sam, "text": text})
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
     dm(client, "@go")
     assert stored_label(client, HANDLE) == "Olin Library"  # typed wins this plan
     assert "kept_typed=1" in caplog.text
@@ -273,6 +276,7 @@ def test_typed_place_this_plan_beats_live_location_at_go(client, caplog) -> None
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
     for text in ["neither", "same"]:
         client.post("/sim/message", json={"sender_handle": sam, "text": text})
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
     dm(client, "@go")
     assert stored_label(client, HANDLE) == "your live location"
 
@@ -284,6 +288,7 @@ def test_go_waits_for_where_from_and_commands_still_work_mid_question(client) ->
         dm(client, text)
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
     client.post("/sim/message", json={"sender_handle": sam, "text": "neither"})  # not "where"
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
     assert dm(client, "@go") == "still waiting on Sam ⏳"
     assert all_texts(client, sam)[-1].startswith("where are you starting from?")
     client.post("/sim/message", json={"sender_handle": sam, "text": "@cancel"})
@@ -335,6 +340,7 @@ def test_modes_are_asked_every_plan_and_unanswered_means_walking(client) -> None
     assert dm(client, "same") == "bet. what are you in the mood for?"
 
     # Sam never answered: @go plans him as walking and tells him so.
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
     assert "for everyone" in dm(client, "@go")
     assert any(
         t.startswith("you didn't say how you're getting there") for t in all_texts(client, sam)
@@ -358,3 +364,33 @@ def test_cancel_while_asked_for_modes_does_not_strand_you(client) -> None:
     dm(client, "@plan")
     assert dm(client, "@cancel").startswith("plan cancelled")
     assert "join <code>" in dm(client, "help")  # back to normal, not "Reply car, bike..."
+
+
+# --- sharing after the location step (the "it's just not processing it" bug) ----------------
+
+
+def test_done_after_setup_switches_to_the_live_location(client) -> None:
+    for text in ["start", "Maya", "MAYA1", "yes"]:
+        dm(client, text)
+    assert dm(client, "olin").startswith("got it, Olin Library 📍")  # typed, auto-confirmed
+    assert stored_label(client, HANDLE) == "Olin Library"
+    sim(client).shared[HANDLE] = COLLEGETOWN  # then shares from the card...
+    assert dm(client, "done") == copy.LIVE_LOCATION_SET  # ...and says done
+    assert stored_label(client, HANDLE) == "your live location"
+    # Plain chat that isn't about sharing doesn't trigger a location lookup.
+    assert dm(client, "ok") != copy.LIVE_LOCATION_SET
+
+
+def test_done_after_setup_without_sharing_explains(client) -> None:
+    for text in ["start", "Maya", "MAYA1", "yes", "olin"]:
+        dm(client, text)
+    assert dm(client, "done") == copy.SHARE_NOT_SEEN
+    assert stored_label(client, HANDLE) == "Olin Library"
+
+
+def test_ok_done_at_the_location_step_reads_the_live_location(client) -> None:
+    to_location_step(client)
+    assert dm(client, "north campus") == "Robert Purcell Community Center, right?"
+    sim(client).shared[HANDLE] = COLLEGETOWN  # changes their mind and shares instead
+    assert dm(client, "ok done") == "your live location, right?"  # not a yes to the old place
+    assert stored_label(client, HANDLE) == "your live location"

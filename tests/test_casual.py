@@ -212,6 +212,41 @@ def test_a_go_sentence_also_keeps_what_was_said(client) -> None:
             return ["" for _ in facts]
 
     deps.llm = SeeingLLM()
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
     reply = " ".join(send(client, "ok thats all, somewhere cheap pls. tell me where to go"))
     assert "for everyone" in reply  # planned
     assert llm_saw == ["ok thats all, somewhere cheap pls. tell me where to go"]
+
+
+# --- more than half the group must say go -----------------------------------------------
+
+
+def test_search_waits_for_more_than_half_and_everyone_hears_who_is_ready(client) -> None:
+    import re as _re
+
+    people = {"Maya": H, "Sam": "+16075550102", "Jordan": "+16075550103"}
+    for name, handle in people.items():
+        for text in ["start", name, "SAM1", "yes", "olin"]:
+            client.post("/sim/message", json={"sender_handle": handle, "text": text})
+    code = _re.search(r"join ([A-Z0-9]{4})", " ".join(send(client, "plan"))).group(1)
+    for handle in list(people.values())[1:]:
+        client.post("/sim/message", json={"sender_handle": handle, "text": f"join {code}"})
+    for handle in people.values():
+        for text in ["walk", "same"]:
+            client.post("/sim/message", json={"sender_handle": handle, "text": text})
+
+    def last(handle: str) -> str:
+        return client.get(f"/sim/outbox/{handle}").json()[-1]["text"]
+
+    # 1 of 3 isn't enough: everyone hears Maya's ready, nothing is searched yet.
+    send(client, "go")
+    for handle in people.values():
+        assert last(handle) == "Maya's ready ✅ (1/2 needed). say go when you're in too"
+    assert client.app.state.deps.messaging.typing_events == []
+    # Saying it twice doesn't count twice.
+    assert send(client, "ok go") == [copy.already_ready(1)]
+    # 2 of 3 is more than half: go.
+    client.post("/sim/message", json={"sender_handle": people["Sam"], "text": "that's all"})
+    texts = [m["text"] for m in client.get(f"/sim/outbox/{people['Jordan']}").json()]
+    assert "Sam's ready too ✅ finding spots 👀" in texts
+    assert any(t.startswith("ok here's what works") for t in texts)

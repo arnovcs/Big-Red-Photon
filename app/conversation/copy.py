@@ -54,6 +54,19 @@ NOTED = "got it 👍"
 GO_HINT = "say go when everyone's in"
 
 
+def ready_progress(name: str, ready: int, needed: int) -> str:
+    """To the whole group when someone says go, before enough people have."""
+    return f"{name}'s ready ✅ ({ready}/{needed} needed). say go when you're in too"
+
+
+def already_ready(more: int) -> str:
+    return f"you're already in ✅ waiting on {more} more to say go"
+
+
+def ready_enough(name: str) -> str:
+    return f"{name}'s ready too ✅ finding spots 👀"
+
+
 def need_two(code: str) -> str:
     return f"need at least 2 people! share code {code} first"
 
@@ -187,6 +200,7 @@ LOCATION_NOT_FOUND = (
     'like "Collegetown Bagels", or share your location and say "done"'
 )
 LIVE_LOCATION_LABEL = "your live location"
+LIVE_LOCATION_SET = "got it, using your live location 📍"
 LOCATION_UNCLEAR = (
     "is that a yes? if not, send me the place you're starting from (or share your location "
     'and say "done")'
@@ -250,6 +264,33 @@ HELP = (
     "A/B/C to vote, nvm to cancel.\n"
     "settings: budget <amount>, location, car yes / car no"
 )
+
+# --- Web signup claim (app/onboarding/web_claim.py) ----------------------------
+
+
+def claim_linked(name: str, limit: Decimal) -> str:
+    return (
+        f"thanks {name}! your demo bank's linked. looks like ~{usd(limit)} is comfy. "
+        "cool? (or send a number)"
+    )
+
+
+def web_intro(name: str) -> str:
+    return f"hey {name}! you're all set. say plan to start one, or join <code> for a friend's"
+
+
+def web_signup_nudge(name: str, token: str) -> str:
+    return f"hey {name}! to finish signing up, reply: start {token}"
+
+
+CLAIM_UNKNOWN = "hmm can't find that signup code. double check it, or sign up again on the website"
+CLAIM_USED = "that signup code was already used"
+CLAIM_EXPIRED = "that signup code expired 😕 sign up again on the website"
+CLAIM_WRONG_PHONE = (
+    "that code was made for a different number. text it from the phone you signed up with"
+)
+CLAIM_ALREADY_SET = "you're already set up! text help if you need anything"
+CLAIM_BANK_GONE = "couldn't link that demo bank. sign up again on the website"
 
 # --- Personal itinerary DM ----------------------------------------------------
 

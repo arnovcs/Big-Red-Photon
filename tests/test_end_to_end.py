@@ -209,6 +209,12 @@ def test_demo_scenario(harness, caplog: pytest.LogCaptureFixture) -> None:
         assert [(h, e) for h, _, e in added] == [(handle, "👍")]  # first message only
         assert not any(m["text"].startswith("got it 👍") for m in outbox(client, handle))
 
+    # More than half must say go (2 of 3). Everyone hears who's ready.
+    dm(client, SAM[1], "go")
+    for handle in handles:
+        assert outbox(client, handle)[-1]["text"] == (
+            "Sam's ready ✅ (1/2 needed). say go when you're in too"
+        )
     dm(client, MAYA[1], "@go")
 
     # The LLM saw only pseudonymous text: no names, handles, or limits.
@@ -337,6 +343,7 @@ def test_nothing_fits_returns_to_collecting_with_a_safe_hint(harness) -> None:
     answer_modes(client, JORDAN)
     dm(client, JORDAN[1], "it has to be 1 minute away")  # HARD: nothing qualifies
     dm(client, MAYA[1], "I'd love korean")  # SOFT: named in the hint
+    dm(client, JORDAN[1], "go")
     dm(client, MAYA[1], "@go")
 
     expected = (
@@ -345,7 +352,9 @@ def test_nothing_fits_returns_to_collecting_with_a_safe_hint(harness) -> None:
     )
     for handle in (MAYA[1], JORDAN[1]):
         assert outbox(client, handle)[-1] == {"kind": "group", "text": expected, "poll": None}
-    # Back to COLLECTING: @go runs again (and Jordan's HARD limit still rules everything out).
+    # Back to COLLECTING, readiness reset: both say go again (Jordan's HARD limit still
+    # rules everything out).
+    dm(client, JORDAN[1], "go")
     assert dm(client, MAYA[1], "@go").endswith(expected)
     typing = [on for h, on in client.app.state.deps.messaging.typing_events if h == MAYA[1]]
     assert typing == [True, False, True, False]  # planned twice

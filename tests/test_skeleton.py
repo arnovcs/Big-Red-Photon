@@ -112,6 +112,7 @@ def test_app_boots_and_creates_tables(tmp_path, monkeypatch) -> None:
                 "private_profiles",
                 "sessions",
                 "session_messages",
+                "session_ready",
                 "votes",
                 "processed_messages",
                 "pending_signups",

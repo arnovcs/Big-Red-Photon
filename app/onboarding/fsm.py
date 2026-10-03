@@ -52,6 +52,16 @@ def is_share_reply(text: str) -> bool:
     return normalized in SHARE_REPLIES or bool(words & SHARE_WORDS)
 
 
+# Unmistakable "I just shared my location" ("done", "shared it", "sent my location"):
+# not "ok" or "yes", which are also answers to other questions.
+EXPLICIT_SHARE_WORDS = {"done", "shared", "share", "sharing", "sent", "location"}
+
+
+def is_explicit_share(text: str) -> bool:
+    words = set(re.findall(r"[a-z]+", text.lower()))
+    return bool(words & EXPLICIT_SHARE_WORDS)
+
+
 # Words people put around a place name ("I'm at", "near") that aren't part of it.
 _FILLER = {"im", "i", "am", "at", "near", "by", "the", "from", "in", "starting", "outside"}
 CLEAR_MATCH_MAX_MILES = 10.0
@@ -219,6 +229,8 @@ class Onboarding:
     async def _location(self, db: AsyncSession, user: UserRow, text: str) -> None:
         """A typed landmark, or the person's shared (Find My) location. Either way the
         place is stored, then confirmed yes/no."""
+        if is_explicit_share(text) and await self._use_shared_location(db, user):
+            return  # "ok done" / "done ✅": their live location, not a yes to the old place
         if is_yes(text) or " ".join(text.lower().split()).strip(".!") in SAME_REPLIES:
             # "yes" confirms the place just found; "same" keeps last time's starting point.
             if await self._confirm_location(db, user):
@@ -274,6 +286,38 @@ class Onboarding:
             await self._confirm_location(db, user)
             return
         await self._reply(user, copy.confirm_location(place.label))
+
+    async def _use_shared_location(self, db: AsyncSession, user: UserRow) -> bool:
+        """At the location step: store their live location and confirm it. False if the
+        bot can't see a shared location (the usual flow then explains)."""
+        found = await self._shared_location(user)
+        if found is None:
+            return False
+        coords, label = found
+        await vault.set_origin(db, user.id, coords, label)
+        log.info(kv("origin_stored", user=user.id.hex[:8], source="shared"))
+        await self._reply(user, copy.confirm_location(label))
+        return True
+
+    async def handle_shared_after_setup(self, db: AsyncSession, user: UserRow, text: str) -> bool:
+        """Already set up, then "done" / "shared it" after sharing their location: switch to
+        the live location (it replaces a typed place, so it's what @go uses).
+        False if the message isn't that, so the router moves on."""
+        normalized = " ".join(re.findall(r"[a-z]+", text.lower()))
+        if not (
+            normalized in SHARE_REPLIES or ("location" in normalized and is_explicit_share(text))
+        ):
+            return False
+        found = await self._shared_location(user)
+        if found is None:
+            await self._reply(user, copy.SHARE_NOT_SEEN)
+            return True
+        coords, label = found
+        await vault.set_origin(db, user.id, coords, label)  # typed=False: live wins at @go
+        await vault.confirm_origin(db, user.id)
+        log.info(kv("origin_stored", user=user.id.hex[:8], source="shared_after_setup"))
+        await self._reply(user, copy.LIVE_LOCATION_SET)
+        return True
 
     async def _confirm_location(self, db: AsyncSession, user: UserRow) -> bool:
         """The stored place is theirs: move on to the next step. False if none is stored."""

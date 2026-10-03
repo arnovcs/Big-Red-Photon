@@ -106,6 +106,16 @@ class VoteRow(Base):
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 
 
+class SessionReadyRow(Base):
+    """Who has said "go" in this planning session. The search starts at > half."""
+
+    __tablename__ = "session_ready"
+
+    session_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("sessions.id"), primary_key=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+
+
 class ProcessedMessageRow(Base):
     """Idempotency for webhook retries."""
 

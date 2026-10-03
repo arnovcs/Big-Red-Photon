@@ -169,6 +169,7 @@ def test_5_each_member_gets_their_own_origin_and_directions(client) -> None:
     for _, handle, _, _, modes in PEOPLE:
         dm(client, handle, modes)
         dm(client, handle, "same")
+    dm(client, PEOPLE[1][1], "go")  # 2 of 3 must say go
     assert "for everyone" in dm(client, PEOPLE[0][1], "@go")
     dm(client, PEOPLE[0][1], "A")
     dm(client, PEOPLE[1][1], "A")

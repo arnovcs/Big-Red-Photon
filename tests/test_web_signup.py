@@ -175,7 +175,7 @@ def test_a_new_signup_replaces_the_earlier_code_for_that_phone(web) -> None:
     second = sign_up(client)
     assert first != second
     assert dm(client, SAM_PHONE, f"start {first}").startswith(copy.CLAIM_EXPIRED)
-    assert dm(client, SAM_PHONE, f"start {second}").startswith("Thanks, Sam!")
+    assert dm(client, SAM_PHONE, f"start {second}").startswith("thanks Sam!")
 
 
 def test_no_text_is_sent_from_the_form_unless_photon_can_initiate(tmp_path) -> None:
@@ -234,7 +234,7 @@ def test_claim_from_a_different_phone(web) -> None:
     assert texts[0] == copy.CLAIM_WRONG_PHONE
     assert copy.ASK_NAME in texts[1]
     # The real owner can still claim it.
-    assert "Your demo bank is linked" in dm(client, SAM_PHONE, f"start {token}")
+    assert "demo bank's linked" in dm(client, SAM_PHONE, f"start {token}")
 
 
 def test_unknown_token_and_plain_start(web) -> None:
@@ -286,7 +286,7 @@ def test_web_signup_to_ready_end_to_end(web) -> None:
     token = sign_up(client, name="Sam", phone="607-555-0102", bank="SAM1")
     assert user_state(client, SAM_PHONE) is None  # nobody texted yet
 
-    assert "Your demo bank is linked" in dm(client, SAM_PHONE, f"start {token.lower()}")
+    assert "demo bank's linked" in dm(client, SAM_PHONE, f"start {token.lower()}")
     assert dm(client, SAM_PHONE, "yes") == copy.web_intro("Sam")
     intro = outbox(client, SAM_PHONE)[-1]
     assert intro == {"kind": "private", "text": copy.web_intro("Sam"), "image_path": None}
