@@ -24,7 +24,7 @@
   </ol>
 
   {% if sms_link %}
-  <a href="{{ sms_link }}" class="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-red-600 text-lg font-semibold text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-200">
+  <a href="{{ sms_link }}" class="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-yellow-400 text-lg font-semibold text-slate-900 shadow-sm hover:bg-yellow-500 focus:outline-none focus:ring-4 focus:ring-yellow-200">
     Text the bot to finish
   </a>
   <p class="mt-2 text-center text-sm text-slate-500">Opens Messages with everything filled in.</p>
@@ -46,11 +46,11 @@
 {% elif state == "expired" %}
   <h1 class="text-2xl font-bold tracking-tight">This code expired</h1>
   <p class="mt-3 text-slate-600">No problem: sign up again to get a new one.</p>
-  <a href="/signup" class="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-red-600 text-lg font-semibold text-white hover:bg-red-700">Sign up again</a>
+  <a href="/signup" class="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-yellow-400 text-lg font-semibold text-slate-900 hover:bg-yellow-500">Sign up again</a>
 
 {% else %}
   <h1 class="text-2xl font-bold tracking-tight">We couldn't find that code</h1>
   <p class="mt-3 text-slate-600">Check the link, or sign up again.</p>
-  <a href="/signup" class="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-red-600 text-lg font-semibold text-white hover:bg-red-700">Go to sign up</a>
+  <a href="/signup" class="mt-6 flex h-14 w-full items-center justify-center rounded-xl bg-yellow-400 text-lg font-semibold text-slate-900 hover:bg-yellow-500">Go to sign up</a>
 {% endif %}
 {% endblock %}
