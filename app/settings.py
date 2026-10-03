@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     # Record/replay cache (§14.1)
     cache_mode: Literal["off", "record", "replay"] = "off"
 
+    # Hand-curated venue fixture (§9.3). Tests point this at tests/fixtures/.
+    venues_path: str = "fixtures/venues.json"
+
     # Demo area
     demo_timezone: str = "America/New_York"
     demo_area_label: str = "Ithaca, NY"

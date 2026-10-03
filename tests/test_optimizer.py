@@ -21,6 +21,8 @@ from app.settings import Settings
 from tests.optimizer_helpers import NOW, index, person, pref, prefs, run, trip, venue
 
 WALK, BIKE, DRIVE, RIDE = Mode.WALK, Mode.BIKE, Mode.DRIVE, Mode.RIDESHARE
+# A frozen copy: fixtures/venues.json is hand-curated and will change.
+TEST_VENUES = Path(__file__).parent / "fixtures" / "venues_test.json"
 
 
 def ids(plans) -> list[str]:
@@ -355,7 +357,7 @@ def test_demo_origins_sam_rides_and_jordan_walks_with_default_weights() -> None:
         center_lat = sum(o.lat for o in origins.values()) / len(origins)
         center_lng = sum(o.lng for o in origins.values()) / len(origins)
         center = origins["maya"].model_copy(update={"lat": center_lat, "lng": center_lng})
-        candidates = await MockPlaces().search_nearby(
+        candidates = await MockPlaces(venues_path=TEST_VENUES).search_nearby(
             center, 2500, ["food", "cafe", "dessert"], NOW
         )
         estimates = await MockRouting(settings).matrix(

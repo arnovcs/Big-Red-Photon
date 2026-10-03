@@ -1,0 +1,143 @@
+{
+ "method": "matrix",
+ "provider": "ors",
+ "request": {
+  "body": {
+   "destinations": [
+    "3"
+   ],
+   "locations": [
+    [
+     -76.4977,
+     42.4393
+    ],
+    [
+     -76.4852,
+     42.4422
+    ],
+    [
+     -76.4777,
+     42.456
+    ],
+    [
+     -76.4971,
+     42.4397
+    ]
+   ],
+   "metrics": [
+    "duration",
+    "distance"
+   ],
+   "sources": [
+    "0",
+    "1",
+    "2"
+   ],
+   "units": "mi"
+  },
+  "path": "/v2/matrix/driving-car"
+ },
+ "response": {
+  "destinations": [
+   {
+    "location": [
+     -76.497473,
+     42.44015
+    ],
+    "snapped_distance": 58.65
+   }
+  ],
+  "distances": [
+   [
+    0.54
+   ],
+   [
+    0.8
+   ],
+   [
+    2.15
+   ]
+  ],
+  "durations": [
+   [
+    123.73
+   ],
+   [
+    131.26
+   ],
+   [
+    400.73
+   ]
+  ],
+  "metadata": {
+   "attribution": "openrouteservice.org | OpenStreetMap contributors",
+   "engine": {
+    "build_date": "2026-08-13T11:53:14Z",
+    "graph_date": "2026-09-21T10:31:27Z",
+    "osm_date": "2026-09-13T23:59:59Z",
+    "version": "9.10.0"
+   },
+   "query": {
+    "destinations": [
+     "3"
+    ],
+    "locations": [
+     [
+      -76.4977,
+      42.4393
+     ],
+     [
+      -76.4852,
+      42.4422
+     ],
+     [
+      -76.4777,
+      42.456
+     ],
+     [
+      -76.4971,
+      42.4397
+     ]
+    ],
+    "metrics": [
+     "duration",
+     "distance"
+    ],
+    "profile": "driving-car",
+    "profileName": "driving-car",
+    "responseType": "json",
+    "sources": [
+     "0",
+     "1",
+     "2"
+    ],
+    "units": "mi"
+   },
+   "service": "matrix",
+   "timestamp": 1791015069561
+  },
+  "sources": [
+   {
+    "location": [
+     -76.498118,
+     42.439095
+    ],
+    "snapped_distance": 41.2
+   },
+   {
+    "location": [
+     -76.485278,
+     42.442198
+    ],
+    "snapped_distance": 6.37
+   },
+   {
+    "location": [
+     -76.478151,
+     42.456064
+    ],
+    "snapped_distance": 37.67
+   }
+  ]
+ }
+}

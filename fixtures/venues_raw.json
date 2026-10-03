@@ -1,0 +1,2012 @@
+[
+  {
+    "id": "osm:node/1221372469",
+    "name": "Cinemapolis",
+    "category": "activity",
+    "cuisines": [],
+    "lat": 42.438926,
+    "lng": -76.497232,
+    "address": "120 East Green Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/1676946840",
+    "name": "Cornell Cinema",
+    "category": "activity",
+    "cuisines": [],
+    "lat": 42.446362,
+    "lng": -76.485806,
+    "address": "",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 09:00-17:00"
+  },
+  {
+    "id": "osm:node/12110836482",
+    "name": "Bar Argos",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.439622,
+    "lng": -76.493192,
+    "address": "408 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 16:00-22:00"
+  },
+  {
+    "id": "osm:way/107869176",
+    "name": "Big Red Barn",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.44846,
+    "lng": -76.480959,
+    "address": "135 Presidents Drive",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 08:00-22:00; Fr 08:00-19:00"
+  },
+  {
+    "id": "osm:node/12106772860",
+    "name": "Bike Bar",
+    "category": "bar",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.439689,
+    "lng": -76.494987,
+    "address": "314",
+    "price_tier": null,
+    "opening_hours": "Tu-Th 16:00-23:00; Fr-Sa 16:00-00:00"
+  },
+  {
+    "id": "osm:node/8796628221",
+    "name": "Chanticleer",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.439402,
+    "lng": -76.499197,
+    "address": "101 West State Street",
+    "price_tier": null,
+    "opening_hours": "Tu-We, Sa-Su 17:00-01:00; Th-Fr 15:00-01:00"
+  },
+  {
+    "id": "osm:node/1264187771",
+    "name": "Fall Creek House",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.452276,
+    "lng": -76.494817,
+    "address": "302 Lake Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Sa 11:00-01:00; Su 12:00-01:00"
+  },
+  {
+    "id": "osm:node/8796623652",
+    "name": "Hideaway",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.441995,
+    "lng": -76.487299,
+    "address": "409 Eddy Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Sa 21:00-01:00"
+  },
+  {
+    "id": "osm:node/9167322999",
+    "name": "Ithaca 5 & Dime",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.438828,
+    "lng": -76.509723,
+    "address": "619 West State Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/14007500969",
+    "name": "Nowhere Special Libations Parlor",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.439628,
+    "lng": -76.499591,
+    "address": "114 West State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 17:00-22:00; Fr-Sa 16:00-22:00"
+  },
+  {
+    "id": "osm:node/1676946851",
+    "name": "Tavern on the Commons",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.440698,
+    "lng": -76.497027,
+    "address": "130 East Seneca Street",
+    "price_tier": null,
+    "opening_hours": "Mo-We 11:00-23:00; Th 11:00-01:00; Fr 11:00-13:00; Sa-Su 12:00-01:00"
+  },
+  {
+    "id": "osm:way/542935915",
+    "name": "The Rhine House",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.440268,
+    "lng": -76.510318,
+    "address": "632 West Seneca Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:way/106297261",
+    "name": "The Westy",
+    "category": "bar",
+    "cuisines": [],
+    "lat": 42.439503,
+    "lng": -76.506959,
+    "address": "516 West State Street",
+    "price_tier": null,
+    "opening_hours": "Su-Th 16:00-01:00; Fr-Sa 15:00-01:00"
+  },
+  {
+    "id": "osm:way/330921981",
+    "name": "Uncle Joe's Grill and Sports Bar",
+    "category": "bar",
+    "cuisines": [
+      "burger"
+    ],
+    "lat": 42.438779,
+    "lng": -76.501948,
+    "address": "302 West Green Street",
+    "price_tier": null,
+    "opening_hours": "Mo, We, Fr 17:00-00:00; Tu 16:00-00:00; Sa-Su 12:00-00:00; Th 16:00-00:30"
+  },
+  {
+    "id": "osm:node/8796639067",
+    "name": "Alley Cat Cafe",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.439893,
+    "lng": -76.499222,
+    "address": "112 North Cayuga Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Sa 09:00-18:00; Su 10:00-17:00"
+  },
+  {
+    "id": "osm:node/2095832671",
+    "name": "Amit Bhatia Libe Café",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.447949,
+    "lng": -76.48469,
+    "address": "",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 08:00-22:00; Fr 08:00-17:00; Sa 10:00-17:00; Su 10:00-22:00"
+  },
+  {
+    "id": "osm:node/13298062633",
+    "name": "Atrium Cafe",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.445952,
+    "lng": -76.483359,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/12596448425",
+    "name": "Bank Coffee",
+    "category": "cafe",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.439695,
+    "lng": -76.497119,
+    "address": "154 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 07:00-19:00"
+  },
+  {
+    "id": "osm:node/2095834022",
+    "name": "Bus Stop Bagels",
+    "category": "cafe",
+    "cuisines": [
+      "bagel"
+    ],
+    "lat": 42.44785,
+    "lng": -76.479444,
+    "address": "",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 07:00-15:00"
+  },
+  {
+    "id": "osm:node/13298062634",
+    "name": "Café Jennie",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.446787,
+    "lng": -76.484482,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/2108342530",
+    "name": "Carol's Cafe",
+    "category": "cafe",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.45318,
+    "lng": -76.479319,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/4221840489",
+    "name": "Coal Yard Cafe",
+    "category": "cafe",
+    "cuisines": [
+      "cake",
+      "sandwich",
+      "fish_and_chips",
+      "american",
+      "breakfast",
+      "coffee_shop",
+      "crepe",
+      "bagel",
+      "diner"
+    ],
+    "lat": 42.441094,
+    "lng": -76.475323,
+    "address": "143 Maple Avenue",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 08:00-15:00; Sa,Su 09:00-15:00"
+  },
+  {
+    "id": "osm:node/5482867047",
+    "name": "Cornell Dairy Bar",
+    "category": "cafe",
+    "cuisines": [
+      "ice_cream"
+    ],
+    "lat": 42.447281,
+    "lng": -76.470556,
+    "address": "",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 08:00-18:00; Fr 08:00-19:30; Sa 12:00-19:30; Su 12:00-18:00"
+  },
+  {
+    "id": "osm:node/13298062637",
+    "name": "Crossings Café",
+    "category": "cafe",
+    "cuisines": [
+      "sandwich",
+      "salad",
+      "breakfast"
+    ],
+    "lat": 42.456022,
+    "lng": -76.47926,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/12580022534",
+    "name": "FairPour Coffee Roasters",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.439496,
+    "lng": -76.505487,
+    "address": "430 West State Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/4482618705",
+    "name": "Fork and Gavel",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.443596,
+    "lng": -76.486293,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/13604617428",
+    "name": "Forty Weight Coffee Roasters",
+    "category": "cafe",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.445269,
+    "lng": -76.509778,
+    "address": "770 Cascadilla Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 07:00-17:00"
+  },
+  {
+    "id": "osm:node/13604617431",
+    "name": "Forty Weight Coffee Roasters",
+    "category": "cafe",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.440684,
+    "lng": -76.485037,
+    "address": "307 College Avenue",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 07:30-18:00; Sa-Su 09:00-18:00"
+  },
+  {
+    "id": "osm:node/1151424710",
+    "name": "Gimme! Coffee",
+    "category": "cafe",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.444464,
+    "lng": -76.499448,
+    "address": "430 North Cayuga Street",
+    "price_tier": null,
+    "opening_hours": "07:00-19:00"
+  },
+  {
+    "id": "osm:node/10075676849",
+    "name": "Gimme! Coffee",
+    "category": "cafe",
+    "cuisines": [
+      "pastry"
+    ],
+    "lat": 42.444892,
+    "lng": -76.481145,
+    "address": "",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 08:00-15:00"
+  },
+  {
+    "id": "osm:way/106693739",
+    "name": "Gimme! Coffee",
+    "category": "cafe",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.439518,
+    "lng": -76.506449,
+    "address": "506 W State St",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 07:30-17:00"
+  },
+  {
+    "id": "osm:node/5423329397",
+    "name": "Gola Osteria",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.43726,
+    "lng": -76.48818,
+    "address": "115 South Quarry Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/8796628240",
+    "name": "Hound & Mare",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.440234,
+    "lng": -76.495811,
+    "address": "118 North Aurora Street",
+    "price_tier": null,
+    "opening_hours": "We-Su 08:00-14:00"
+  },
+  {
+    "id": "osm:node/1312151155",
+    "name": "Ithaca Bakery",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.44266,
+    "lng": -76.508746,
+    "address": "400 North Meadow Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 06:30-20:00"
+  },
+  {
+    "id": "osm:node/7581419413",
+    "name": "Kung Fu Tea",
+    "category": "cafe",
+    "cuisines": [
+      "bubble_tea"
+    ],
+    "lat": 42.441504,
+    "lng": -76.485969,
+    "address": "143 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "13:00-20:00"
+  },
+  {
+    "id": "osm:node/13298062632",
+    "name": "Mac's Cafe",
+    "category": "cafe",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.446354,
+    "lng": -76.482026,
+    "address": "130 Statler Drive",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/4482618704",
+    "name": "Mattin's Cafe",
+    "category": "cafe",
+    "cuisines": [
+      "breakfast",
+      "sandwich"
+    ],
+    "lat": 42.444732,
+    "lng": -76.482421,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/14079708542",
+    "name": "Ninja Chicken & Friends",
+    "category": "cafe",
+    "cuisines": [
+      "bubble_tea"
+    ],
+    "lat": 42.441703,
+    "lng": -76.485901,
+    "address": "114 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 11:30-22:00"
+  },
+  {
+    "id": "osm:node/13298062636",
+    "name": "Novick's Café",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.454056,
+    "lng": -76.476158,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/11758870634",
+    "name": "Paris Baguette",
+    "category": "cafe",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.439457,
+    "lng": -76.497606,
+    "address": "125 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 07:30-21:00"
+  },
+  {
+    "id": "osm:node/9176400983",
+    "name": "Press Cafe",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.438727,
+    "lng": -76.500059,
+    "address": "118 West Green Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 08:00-15:00, Sa-Su 09:00-16:00"
+  },
+  {
+    "id": "osm:node/13298062635",
+    "name": "Straight from the Market",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.446723,
+    "lng": -76.48582,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/8444746032",
+    "name": "Sultana Cafe",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.443941,
+    "lng": -76.501651,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/2095832605",
+    "name": "Temple of Zeus",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.449071,
+    "lng": -76.483319,
+    "address": "",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 08:00-17:00"
+  },
+  {
+    "id": "osm:node/2095832647",
+    "name": "The Green Dragon",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.45087,
+    "lng": -76.484213,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/9167280113",
+    "name": "The Greenhouse Cafe & Cocktail Lounge",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.439672,
+    "lng": -76.494841,
+    "address": "320 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 15:00-23:00; Fr-Sa 15:00-00:00"
+  },
+  {
+    "id": "osm:way/540123615",
+    "name": "The Nocturnal Cafe",
+    "category": "cafe",
+    "cuisines": [
+      "tea",
+      "coffee_shop",
+      "dessert"
+    ],
+    "lat": 42.439284,
+    "lng": -76.500491,
+    "address": "103 South Geneva Street",
+    "price_tier": null,
+    "opening_hours": "Mo-We 16:00-22:00; Th-Sa 16:00-00:00"
+  },
+  {
+    "id": "osm:node/12011180477",
+    "name": "The Strand Cafe",
+    "category": "cafe",
+    "cuisines": [],
+    "lat": 42.440197,
+    "lng": -76.494836,
+    "address": "324 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 06:00-23:00; Sa-Su 23:00-01:00"
+  },
+  {
+    "id": "osm:node/9179789846",
+    "name": "U Tea",
+    "category": "cafe",
+    "cuisines": [
+      "bubble_tea"
+    ],
+    "lat": 42.441528,
+    "lng": -76.484855,
+    "address": "205 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Th,Su 11:30-22:30; Fr-Sa 11:30-23:00"
+  },
+  {
+    "id": "osm:node/6398578945",
+    "name": "Vet School Cafe",
+    "category": "cafe",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.447715,
+    "lng": -76.465754,
+    "address": "606 Tower Road",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/3758970266",
+    "name": "Yellow Deli",
+    "category": "cafe",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.43945,
+    "lng": -76.497491,
+    "address": "143 Ithaca Commons;East State Street",
+    "price_tier": null,
+    "opening_hours": "Su-We 10:00-21:00; Th 10:00-14:00; Fr 10:00-15:00"
+  },
+  {
+    "id": "osm:node/13890207501",
+    "name": "Cayuga Lake Creamery",
+    "category": "dessert",
+    "cuisines": [],
+    "lat": 42.440991,
+    "lng": -76.498813,
+    "address": "215 North Cayuga Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Su 12:30-21:00"
+  },
+  {
+    "id": "osm:node/8796617265",
+    "name": "Cold Stone Creamery",
+    "category": "dessert",
+    "cuisines": [
+      "ice_cream"
+    ],
+    "lat": 42.429813,
+    "lng": -76.506542,
+    "address": "222 Elmira Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 11:00-22:00"
+  },
+  {
+    "id": "osm:way/907062397",
+    "name": "Purity Ice Cream",
+    "category": "dessert",
+    "cuisines": [],
+    "lat": 42.444467,
+    "lng": -76.509146,
+    "address": "700 Cascadilla Street",
+    "price_tier": null,
+    "opening_hours": "07:30-22:00"
+  },
+  {
+    "id": "osm:node/9116763789",
+    "name": "Sweet Melissa's Ice Cream",
+    "category": "dessert",
+    "cuisines": [],
+    "lat": 42.44056,
+    "lng": -76.501114,
+    "address": "200 West Seneca Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 13:00-21:00; Oct-Mar off"
+  },
+  {
+    "id": "osm:node/13186298501",
+    "name": "Adam Grill",
+    "category": "food",
+    "cuisines": [
+      "mediterranean"
+    ],
+    "lat": 42.439213,
+    "lng": -76.496908,
+    "address": "171 East State Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/4444567489",
+    "name": "Agava",
+    "category": "food",
+    "cuisines": [
+      "southwestern",
+      "farm-to-table"
+    ],
+    "lat": 42.43834,
+    "lng": -76.464906,
+    "address": "381 Pine Tree Road",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/13186322101",
+    "name": "Angelhearts Donuts",
+    "category": "food",
+    "cuisines": [
+      "donut"
+    ],
+    "lat": 42.438752,
+    "lng": -76.499598,
+    "address": "110 West Green Street",
+    "price_tier": null,
+    "opening_hours": "We-Su 08:00-14:00"
+  },
+  {
+    "id": "osm:node/1219032966",
+    "name": "Asia Cuisine",
+    "category": "food",
+    "cuisines": [
+      "korean",
+      "japanese"
+    ],
+    "lat": 42.440371,
+    "lng": -76.495832,
+    "address": "126 North Aurora Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/9178762314",
+    "name": "Asian Chili Spot",
+    "category": "food",
+    "cuisines": [
+      "asian"
+    ],
+    "lat": 42.441713,
+    "lng": -76.484554,
+    "address": "208B Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 11:00-22:00; Fr-Sa 11:00-22:30; Su 11:30-22:00"
+  },
+  {
+    "id": "osm:node/13186298402",
+    "name": "Authentic Jerk Restaurant & Grill",
+    "category": "food",
+    "cuisines": [
+      "caribbean"
+    ],
+    "lat": 42.439212,
+    "lng": -76.496635,
+    "address": "171 East State Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/8796640628",
+    "name": "BiBiBowl Asian Grill",
+    "category": "food",
+    "cuisines": [
+      "asian"
+    ],
+    "lat": 42.441723,
+    "lng": -76.484863,
+    "address": "202 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Sa 11:00-21:30"
+  },
+  {
+    "id": "osm:node/8796630448",
+    "name": "Bickering Twins",
+    "category": "food",
+    "cuisines": [
+      "mexican"
+    ],
+    "lat": 42.439859,
+    "lng": -76.499294,
+    "address": "114 North Cayuga Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Th,Su 16:00-21:00; Fr,Sa 16:00-21:30"
+  },
+  {
+    "id": "osm:node/4444583773",
+    "name": "Burger King",
+    "category": "food",
+    "cuisines": [
+      "burger"
+    ],
+    "lat": 42.436526,
+    "lng": -76.463684,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:way/447293851",
+    "name": "Burger King",
+    "category": "food",
+    "cuisines": [
+      "burger"
+    ],
+    "lat": 42.436517,
+    "lng": -76.463673,
+    "address": "1010 Ellis Hollow Road",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/9167217824",
+    "name": "Café Dewitt",
+    "category": "food",
+    "cuisines": [
+      "coffee_shop"
+    ],
+    "lat": 42.440804,
+    "lng": -76.498597,
+    "address": "215 North Cayuga Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 09:00-14:00"
+  },
+  {
+    "id": "osm:node/3683053646",
+    "name": "Capital Corner",
+    "category": "food",
+    "cuisines": [
+      "chinese"
+    ],
+    "lat": 42.439624,
+    "lng": -76.500584,
+    "address": "140 West State Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:way/447292544",
+    "name": "Chili's",
+    "category": "food",
+    "cuisines": [
+      "tex-mex"
+    ],
+    "lat": 42.433092,
+    "lng": -76.508478,
+    "address": "608 South Meadow Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 11:00-23:00; Fr-Sa 11:00-00:00; Su 11:00-23:00"
+  },
+  {
+    "id": "osm:node/977202978",
+    "name": "Collegetown Bagels",
+    "category": "food",
+    "cuisines": [
+      "bagel"
+    ],
+    "lat": 42.442254,
+    "lng": -76.485473,
+    "address": "420 College Avenue",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 07:00-21:00"
+  },
+  {
+    "id": "osm:node/1219032903",
+    "name": "Collegetown Bagels",
+    "category": "food",
+    "cuisines": [
+      "sandwich",
+      "bagel"
+    ],
+    "lat": 42.439464,
+    "lng": -76.495079,
+    "address": "301 East State Street",
+    "price_tier": null,
+    "opening_hours": "Su-We 06:30-20:00; Th-Sa 06:30-22:00"
+  },
+  {
+    "id": "osm:node/9170494592",
+    "name": "D.P. Dough",
+    "category": "food",
+    "cuisines": [
+      "calzone"
+    ],
+    "lat": 42.441899,
+    "lng": -76.485398,
+    "address": "408 College Ave",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 16:00-04:00"
+  },
+  {
+    "id": "osm:node/9179793674",
+    "name": "De Tasty Hot Pot",
+    "category": "food",
+    "cuisines": [
+      "chinese"
+    ],
+    "lat": 42.442144,
+    "lng": -76.48761,
+    "address": "422 Eddy Street",
+    "price_tier": null,
+    "opening_hours": "Mo,We-Su 11:00-21:30"
+  },
+  {
+    "id": "osm:node/8570097168",
+    "name": "Domino's",
+    "category": "food",
+    "cuisines": [
+      "pizza"
+    ],
+    "lat": 42.439066,
+    "lng": -76.494155,
+    "address": "311 East Green Street",
+    "price_tier": null,
+    "opening_hours": "Su-Th 10:30-00:00; Fr-Sa 10:30-01:00"
+  },
+  {
+    "id": "osm:node/9167259016",
+    "name": "Dos Amigos",
+    "category": "food",
+    "cuisines": [
+      "mexican"
+    ],
+    "lat": 42.441833,
+    "lng": -76.485114,
+    "address": "403 College Avenue",
+    "price_tier": null,
+    "opening_hours": "Tu,We 11:00-22:00; Th-Su 11:00-23:00"
+  },
+  {
+    "id": "osm:node/13295586901",
+    "name": "Dream Tea & Poké",
+    "category": "food",
+    "cuisines": [
+      "asian",
+      "bubble_tea",
+      "seafood",
+      "tea"
+    ],
+    "lat": 42.440596,
+    "lng": -76.497328,
+    "address": "130 East Seneca Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Tu, Th 11:30-14:30, 15:30-23:00; Fr-Su 11:30-23:00"
+  },
+  {
+    "id": "osm:way/106289642",
+    "name": "Dunkin'",
+    "category": "food",
+    "cuisines": [
+      "donut",
+      "coffee_shop"
+    ],
+    "lat": 42.438119,
+    "lng": -76.507921,
+    "address": "205 South Meadow Street",
+    "price_tier": null,
+    "opening_hours": "24/7"
+  },
+  {
+    "id": "osm:node/5840567907",
+    "name": "El Chamo",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.441976,
+    "lng": -76.489998,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/13667982072",
+    "name": "Farm to Feast NY",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.439342,
+    "lng": -76.499818,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/8796636524",
+    "name": "Food Lab",
+    "category": "food",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.440075,
+    "lng": -76.495494,
+    "address": "113 North Aurora Street",
+    "price_tier": null,
+    "opening_hours": "Su-Th 11:00-22:00; Fr-Sa 11:00-00:00"
+  },
+  {
+    "id": "osm:way/447293671",
+    "name": "Former restaurant. Vacant as of August 2026.",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.43834,
+    "lng": -76.464853,
+    "address": "381 Pine Tree Road",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/9179838063",
+    "name": "Four Seasons",
+    "category": "food",
+    "cuisines": [
+      "korean"
+    ],
+    "lat": 42.441779,
+    "lng": -76.487616,
+    "address": "404 Eddy Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/8796641569",
+    "name": "Franco's Pizzeria",
+    "category": "food",
+    "cuisines": [
+      "pizza"
+    ],
+    "lat": 42.438934,
+    "lng": -76.507682,
+    "address": "527 West State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 12:00-21:00"
+  },
+  {
+    "id": "osm:node/3840051820",
+    "name": "Franny's",
+    "category": "food",
+    "cuisines": [
+      "vietnamese"
+    ],
+    "lat": 42.451062,
+    "lng": -76.484229,
+    "address": "",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 11:00-16:00"
+  },
+  {
+    "id": "osm:node/8796618255",
+    "name": "Frida's Mexican Grill",
+    "category": "food",
+    "cuisines": [
+      "mexican"
+    ],
+    "lat": 42.429825,
+    "lng": -76.50603,
+    "address": "222 Elmira Road",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/8557401130",
+    "name": "Fusia Bento Bar",
+    "category": "food",
+    "cuisines": [
+      "asian",
+      "chinese",
+      "japanese"
+    ],
+    "lat": 42.442172,
+    "lng": -76.485132,
+    "address": "405 College Avenue",
+    "price_tier": null,
+    "opening_hours": "Mo-Sa 11:00-22:30; Su 11:30-22:00"
+  },
+  {
+    "id": "osm:node/9179809456",
+    "name": "Gangnam Station",
+    "category": "food",
+    "cuisines": [
+      "korean"
+    ],
+    "lat": 42.441738,
+    "lng": -76.486433,
+    "address": "104 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo 11:00-20:30; Tu-Su 11:00-21:00"
+  },
+  {
+    "id": "osm:node/2095834019",
+    "name": "Goldies",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.450127,
+    "lng": -76.481405,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/8570165381",
+    "name": "Gorgers",
+    "category": "food",
+    "cuisines": [
+      "sandwich"
+    ],
+    "lat": 42.439634,
+    "lng": -76.499696,
+    "address": "116 West State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Sa 11:00-20:00"
+  },
+  {
+    "id": "osm:node/8796634878",
+    "name": "HaKaCha",
+    "category": "food",
+    "cuisines": [
+      "noodle"
+    ],
+    "lat": 42.447263,
+    "lng": -76.504944,
+    "address": "311 Third Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Sa 11:00-14:00; Mo-Th 16:00-21:00; Fr-Sa 16:00-22:00"
+  },
+  {
+    "id": "osm:node/8796628426",
+    "name": "Hawi Ethiopian Cuisine",
+    "category": "food",
+    "cuisines": [
+      "african",
+      "ethiopian"
+    ],
+    "lat": 42.439012,
+    "lng": -76.498836,
+    "address": "113 South Cayuga Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Th 15:00-21:00; Fr-Sa 12:00-21:00"
+  },
+  {
+    "id": "osm:node/12000042049",
+    "name": "Ithaca Ale House",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.439295,
+    "lng": -76.495255,
+    "address": "301 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-We 11:00-23:00; Th-Sa 11:00-01:00; Su 11:00-22:00"
+  },
+  {
+    "id": "osm:node/8796641877",
+    "name": "Ithaca Ghost Kitchen",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.442034,
+    "lng": -76.490006,
+    "address": "310 Stewart Avenue",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 11:00-01:30"
+  },
+  {
+    "id": "osm:node/8796623425",
+    "name": "Jack's Collegetown Grill",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.441703,
+    "lng": -76.48567,
+    "address": "120 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Su-We 11:00-23:00; Th-Sa 11:00-02:00"
+  },
+  {
+    "id": "osm:way/702971568",
+    "name": "Jade Garden",
+    "category": "food",
+    "cuisines": [
+      "chinese"
+    ],
+    "lat": 42.438955,
+    "lng": -76.50863,
+    "address": "108 South Meadow Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Sa 11:00-21:30; Su 12:00-21:30"
+  },
+  {
+    "id": "osm:node/8796635022",
+    "name": "Jimmy John's",
+    "category": "food",
+    "cuisines": [
+      "sandwich"
+    ],
+    "lat": 42.440283,
+    "lng": -76.495818,
+    "address": "122 North Aurora Street",
+    "price_tier": null,
+    "opening_hours": "11:00-21:00"
+  },
+  {
+    "id": "osm:node/3509359373",
+    "name": "Joe's",
+    "category": "food",
+    "cuisines": [
+      "italian"
+    ],
+    "lat": 42.441164,
+    "lng": -76.508673,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/3834718457",
+    "name": "Kelly's Dock-Side Cafe",
+    "category": "food",
+    "cuisines": [
+      "american",
+      "regional"
+    ],
+    "lat": 42.441843,
+    "lng": -76.512281,
+    "address": "319 Taughannock Boulevard",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/13186265001",
+    "name": "Kimchi Korean BBQ",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.439714,
+    "lng": -76.498076,
+    "address": "124 Ithaca Commons",
+    "price_tier": null
+  },
+  {
+    "id": "osm:way/808939296",
+    "name": "Koko",
+    "category": "food",
+    "cuisines": [
+      "asian",
+      "korean"
+    ],
+    "lat": 42.441322,
+    "lng": -76.485048,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/11795886950",
+    "name": "Komonz Grill",
+    "category": "food",
+    "cuisines": [
+      "burger",
+      "pizza"
+    ],
+    "lat": 42.439694,
+    "lng": -76.49753,
+    "address": "146 East State Street",
+    "price_tier": null,
+    "opening_hours": "Su-Mo, We-Th 11:00-20:45; Fr-Sa 11:00-23:45"
+  },
+  {
+    "id": "osm:node/4938706211",
+    "name": "Le Café Cent-Dix",
+    "category": "food",
+    "cuisines": [
+      "french"
+    ],
+    "lat": 42.440011,
+    "lng": -76.495802,
+    "address": "110 North Aurora Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Sa 17:30-21:00"
+  },
+  {
+    "id": "osm:node/12000048571",
+    "name": "Lev Kitchen",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.439747,
+    "lng": -76.495924,
+    "address": "222 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 10:00-21:00; Fr-Sa 10:00-00:00; Su 10:00-21:00"
+  },
+  {
+    "id": "osm:node/8917809312",
+    "name": "Lincoln Street Diner",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.451943,
+    "lng": -76.496932,
+    "address": "309 East Lincoln Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 06:30-13:00; Sa 07:00-12:30"
+  },
+  {
+    "id": "osm:node/12082133671",
+    "name": "Ling Ling",
+    "category": "food",
+    "cuisines": [
+      "chinese"
+    ],
+    "lat": 42.429818,
+    "lng": -76.506323,
+    "address": "222 Elmira Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 11:00-21:30; Fr-Sa 11:00-22:30"
+  },
+  {
+    "id": "osm:node/2095822763",
+    "name": "Louie's Lunch",
+    "category": "food",
+    "cuisines": [
+      "american",
+      "pizza",
+      "sandwich"
+    ],
+    "lat": 42.45336,
+    "lng": -76.481225,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/13186315701",
+    "name": "Marrakech Pizzeria & Mediterranean Cuisine",
+    "category": "food",
+    "cuisines": [
+      "mediterranean",
+      "pizza"
+    ],
+    "lat": 42.439439,
+    "lng": -76.498548,
+    "address": "109 East State Street",
+    "price_tier": null,
+    "opening_hours": "Su-We 10:00-21:00; Th-Sa 10:30-02:00"
+  },
+  {
+    "id": "osm:node/2095834018",
+    "name": "Martha's",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.450209,
+    "lng": -76.479117,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/8421842645",
+    "name": "Maru Korea",
+    "category": "food",
+    "cuisines": [
+      "korean"
+    ],
+    "lat": 42.439426,
+    "lng": -76.506845,
+    "address": "512 West State Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:way/106693723",
+    "name": "Maru Ramen",
+    "category": "food",
+    "cuisines": [
+      "japanese",
+      "ramen"
+    ],
+    "lat": 42.439502,
+    "lng": -76.506841,
+    "address": "512 West State Street",
+    "price_tier": null,
+    "opening_hours": "Su-Mo, We-Th 11:00-21:00; Fr-Sa 11:00-22:00"
+  },
+  {
+    "id": "osm:way/545333364",
+    "name": "Maxie's Supper Club & Oyster Bar",
+    "category": "food",
+    "cuisines": [
+      "seafood"
+    ],
+    "lat": 42.438983,
+    "lng": -76.510179,
+    "address": "635 West State Street",
+    "price_tier": null,
+    "opening_hours": "We-Th,Su 15:30-21:00; Fr-Sa 15:30-21:30"
+  },
+  {
+    "id": "osm:node/6899370038",
+    "name": "Mercato Bar & Kitchen",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.439953,
+    "lng": -76.495796,
+    "address": "108 North Aurora Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Sa 17:30-21:00"
+  },
+  {
+    "id": "osm:way/542935937",
+    "name": "Milkstand Breakfast & Lunch",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.440726,
+    "lng": -76.508044,
+    "address": "215 North Meadow Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 08:00-15:30"
+  },
+  {
+    "id": "osm:way/207815669",
+    "name": "Modern Ohana",
+    "category": "food",
+    "cuisines": [
+      "asian"
+    ],
+    "lat": 42.430324,
+    "lng": -76.503163,
+    "address": "205 Elmira Road",
+    "price_tier": null,
+    "opening_hours": "Tu-Fr 07:30-15:00,15:30-21:30; Sa-Su 07:30-15:00,16:30-21:30"
+  },
+  {
+    "id": "osm:node/6412469013",
+    "name": "Monks on the Commons",
+    "category": "food",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.439164,
+    "lng": -76.495658,
+    "address": "120 South Aurora Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 06:30-11:00; Mo-Su 12:00-14:00; Mo-Su 17:00-22:00"
+  },
+  {
+    "id": "osm:node/1219032943",
+    "name": "Moosewood Restaurant",
+    "category": "food",
+    "cuisines": [
+      "local"
+    ],
+    "lat": 42.440632,
+    "lng": -76.498632,
+    "address": "215 North Cayuga Street",
+    "price_tier": null,
+    "opening_hours": "We-Su 11:30-14:30, 17:00-21:00"
+  },
+  {
+    "id": "osm:node/14005628253",
+    "name": "More than Pizza",
+    "category": "food",
+    "cuisines": [
+      "pizza"
+    ],
+    "lat": 42.43949,
+    "lng": -76.496008,
+    "address": "215 East State Street",
+    "price_tier": null,
+    "opening_hours": "Su-We 10:30-21:00; Th-Sa 10:30-02:00"
+  },
+  {
+    "id": "osm:way/1151622577",
+    "name": "Morrison Dining",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.45556,
+    "lng": -76.479324,
+    "address": "18 Sisson Place",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/977203388",
+    "name": "Ned's Pizza",
+    "category": "food",
+    "cuisines": [
+      "pizza"
+    ],
+    "lat": 42.44151,
+    "lng": -76.486227,
+    "address": "139 Dryden Road",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/4508822070",
+    "name": "New Delhi Diamond’s Indian Cuisine",
+    "category": "food",
+    "cuisines": [
+      "indian"
+    ],
+    "lat": 42.438736,
+    "lng": -76.499368,
+    "address": "106 West Green Street",
+    "price_tier": null,
+    "opening_hours": "We-Mo 11:30-14:30, 16:15-21:00"
+  },
+  {
+    "id": "osm:node/2108337074",
+    "name": "North Star Dining",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.453518,
+    "lng": -76.475996,
+    "address": "186 Cradit Farm Drive",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/1676910076",
+    "name": "Northstar House",
+    "category": "food",
+    "cuisines": [
+      "regional"
+    ],
+    "lat": 42.453062,
+    "lng": -76.497258,
+    "address": "202 East Falls Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Tu 16:00-20:30; Th 16:00-20:30; Fr-Sa 16:00-21:00"
+  },
+  {
+    "id": "osm:node/7243574915",
+    "name": "Oishii Bowl",
+    "category": "food",
+    "cuisines": [
+      "japanese"
+    ],
+    "lat": 42.44174,
+    "lng": -76.485118,
+    "address": "401 College Avenue",
+    "price_tier": null,
+    "opening_hours": "Mo-Sa 11:00-21:00; Su 00:00-21:00"
+  },
+  {
+    "id": "osm:node/2095832657",
+    "name": "Okenshields",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.446578,
+    "lng": -76.485795,
+    "address": "",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 11:00-14:30"
+  },
+  {
+    "id": "osm:node/8796632039",
+    "name": "Old Mexico Express",
+    "category": "food",
+    "cuisines": [
+      "mexican"
+    ],
+    "lat": 42.441634,
+    "lng": -76.486682,
+    "address": "111 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "11:00-22:00"
+  },
+  {
+    "id": "osm:node/5311062768",
+    "name": "Papa John's",
+    "category": "food",
+    "cuisines": [
+      "pizza"
+    ],
+    "lat": 42.448154,
+    "lng": -76.505946,
+    "address": "435 Franklin Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 09:00-24:00; Fr-Sa 09:00-01:00; Su 09:00-24:00"
+  },
+  {
+    "id": "osm:node/9178731303",
+    "name": "Pho Time",
+    "category": "food",
+    "cuisines": [
+      "vietnamese"
+    ],
+    "lat": 42.441713,
+    "lng": -76.4846,
+    "address": "208A Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 11:00-22:00; Fr-Sa 11:00-22:30; Su 11:30-22:00"
+  },
+  {
+    "id": "osm:node/8796635045",
+    "name": "Pizza Aroma",
+    "category": "food",
+    "cuisines": [
+      "pizza"
+    ],
+    "lat": 42.437213,
+    "lng": -76.508016,
+    "address": "307 South Meadow Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Sa 11:00-21:00"
+  },
+  {
+    "id": "osm:node/9178794925",
+    "name": "Plum Tree Restaurant",
+    "category": "food",
+    "cuisines": [
+      "japanese"
+    ],
+    "lat": 42.441494,
+    "lng": -76.486553,
+    "address": "113 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo-We 11:15-14:15,16:30-21:45; Th 11:15-14:15,16:30-22:15; Fr 11:15-14:15,16:30-22:45; Sa 11:45-14:45,16:30-22:45; Su 11:45-14:45,16:30-21:45"
+  },
+  {
+    "id": "osm:node/12065676277",
+    "name": "Pokelava",
+    "category": "food",
+    "cuisines": [
+      "poke"
+    ],
+    "lat": 42.441715,
+    "lng": -76.48464,
+    "address": "206B Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Th,Su 11:00-21:00; Fr-Sa 11:00-21:30"
+  },
+  {
+    "id": "osm:way/207815688",
+    "name": "Pudgie's Pizza",
+    "category": "food",
+    "cuisines": [
+      "pizza",
+      "wings"
+    ],
+    "lat": 42.429702,
+    "lng": -76.504702,
+    "address": "215 Elmira Road",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/6412467162",
+    "name": "Revelry Yards",
+    "category": "food",
+    "cuisines": [
+      "american",
+      "pizza"
+    ],
+    "lat": 42.439978,
+    "lng": -76.495483,
+    "address": "109-111 North Aurora Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 11:00-22:00; Fr 11:00-23:00; Sa 10:00-23:00; Su 10:00-22:00"
+  },
+  {
+    "id": "osm:node/2095822851",
+    "name": "Risley Dining",
+    "category": "food",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.453261,
+    "lng": -76.482207,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/2108342502",
+    "name": "Robert Purcell Marketplace Eatery",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.455996,
+    "lng": -76.477717,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:way/698312598",
+    "name": "Royal Court Restaurant",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.434606,
+    "lng": -76.507847,
+    "address": "529 S Meadow Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Fr 07:00-21:00; Sa 17:00-21:00"
+  },
+  {
+    "id": "osm:node/13058625042",
+    "name": "Saigon Kitchen",
+    "category": "food",
+    "cuisines": [
+      "vietnamese"
+    ],
+    "lat": 42.43944,
+    "lng": -76.507533,
+    "address": "526 West State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 11:00-21:30; Sa-Su 11:00-22:30"
+  },
+  {
+    "id": "osm:node/11758870636",
+    "name": "Salt & Pepper",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.439686,
+    "lng": -76.497959,
+    "address": "130 East State Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/13357634101",
+    "name": "Sal’s Pizzeria",
+    "category": "food",
+    "cuisines": [
+      "pizza"
+    ],
+    "lat": 42.437238,
+    "lng": -76.509276,
+    "address": "220 South Fulton Street",
+    "price_tier": null,
+    "opening_hours": "Su-Mo, We-Th 11:00-20:00; Fr-Sa 11:00-21:00"
+  },
+  {
+    "id": "osm:node/977202200",
+    "name": "Sangam",
+    "category": "food",
+    "cuisines": [
+      "indian"
+    ],
+    "lat": 42.442196,
+    "lng": -76.487617,
+    "address": "424 Eddy Street",
+    "price_tier": null,
+    "opening_hours": "11:30-15:00; 17:00-22:00"
+  },
+  {
+    "id": "osm:node/13186298602",
+    "name": "Sangam Indian Curry",
+    "category": "food",
+    "cuisines": [
+      "indian"
+    ],
+    "lat": 42.43931,
+    "lng": -76.497195,
+    "address": "171 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 11:30-15:00, 17:00-22:00"
+  },
+  {
+    "id": "osm:node/8796633265",
+    "name": "Shi Miao Dao Yunnan Rice Noodle",
+    "category": "food",
+    "cuisines": [
+      "chinese"
+    ],
+    "lat": 42.441941,
+    "lng": -76.487613,
+    "address": "414 Eddy Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Su 11:30-21:30"
+  },
+  {
+    "id": "osm:node/1676946836",
+    "name": "Simeon's American Bistro",
+    "category": "food",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.439749,
+    "lng": -76.495788,
+    "address": "224 East State Street",
+    "price_tier": null,
+    "opening_hours": "We-Fr 11:30-21:00; Sa 11:00-21:00; Su 11:00-21:00"
+  },
+  {
+    "id": "osm:node/9178783712",
+    "name": "Souvlaki House",
+    "category": "food",
+    "cuisines": [
+      "greek"
+    ],
+    "lat": 42.441387,
+    "lng": -76.487311,
+    "address": "315 Eddy Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Sa 11:00-21:00"
+  },
+  {
+    "id": "osm:node/12142235263",
+    "name": "Sunset Grill",
+    "category": "food",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.429015,
+    "lng": -76.497287,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:way/350406318",
+    "name": "Sunset Grill",
+    "category": "food",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.429002,
+    "lng": -76.497303,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/9178763771",
+    "name": "Sushi Osaka",
+    "category": "food",
+    "cuisines": [
+      "sushi"
+    ],
+    "lat": 42.439431,
+    "lng": -76.498433,
+    "address": "113 East State Street",
+    "price_tier": null,
+    "opening_hours": "Su-Th 11:00-22:00; Fr-Sa 11:00-23:00"
+  },
+  {
+    "id": "osm:node/8796624340",
+    "name": "Tacos CDMX",
+    "category": "food",
+    "cuisines": [
+      "mexican",
+      "tacos"
+    ],
+    "lat": 42.438871,
+    "lng": -76.500065,
+    "address": "118 West Green Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Sa 10:00-18:00; Su 10:00-17:00"
+  },
+  {
+    "id": "osm:way/539357573",
+    "name": "Tamarind",
+    "category": "food",
+    "cuisines": [
+      "thai"
+    ],
+    "lat": 42.443418,
+    "lng": -76.508209,
+    "address": "503 North Meadow Street",
+    "price_tier": null,
+    "opening_hours": "Mo,We,Fr 11:30-15:00,17:00-22:00; Th 17:00-22:00; Sa-Su 11:30-22:00"
+  },
+  {
+    "id": "osm:node/9786870677",
+    "name": "Taste of Thai",
+    "category": "food",
+    "cuisines": [
+      "thai"
+    ],
+    "lat": 42.439779,
+    "lng": -76.49602,
+    "address": "216 East State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 11:30-14:30,17:00-22:00; Sa-Su 11:30-22:00"
+  },
+  {
+    "id": "osm:way/106289641",
+    "name": "Taste of Thai Express",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.437799,
+    "lng": -76.507942,
+    "address": "209 South Meadow Street",
+    "price_tier": null,
+    "opening_hours": "11:00-22:00"
+  },
+  {
+    "id": "osm:node/12008684084",
+    "name": "Taverna Banfi",
+    "category": "food",
+    "cuisines": [
+      "italian"
+    ],
+    "lat": 42.446529,
+    "lng": -76.482163,
+    "address": "130 Statler Drive",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 07:30-10:00,11:30-14:00; Mo-Su 17:30-21:00; Sa-Su 07:00-14:00"
+  },
+  {
+    "id": "osm:way/106292518",
+    "name": "Texas Roadhouse",
+    "category": "food",
+    "cuisines": [
+      "steak_house"
+    ],
+    "lat": 42.430774,
+    "lng": -76.507552,
+    "address": "719-25 South Meadow Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 16:00-22:00; Fr 16:00-23:00; Sa 12:00-23:00; Su 12:00-21:00"
+  },
+  {
+    "id": "osm:node/8570197875",
+    "name": "Thai Basil",
+    "category": "food",
+    "cuisines": [
+      "thai"
+    ],
+    "lat": 42.439636,
+    "lng": -76.499737,
+    "address": "118 West State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 07:30-22:00"
+  },
+  {
+    "id": "osm:way/331165605",
+    "name": "The Boatyard Grill",
+    "category": "food",
+    "cuisines": [
+      "american",
+      "burger",
+      "seafood"
+    ],
+    "lat": 42.445884,
+    "lng": -76.51252,
+    "address": "525 Old Taughannock Boulevard",
+    "price_tier": null,
+    "opening_hours": "We-Th 16:00-21:00; Fr 16:00-22:00; Sa 11:00-14:00, 16:00-22:00; Su 11:00-14:00, 16:00-21:00"
+  },
+  {
+    "id": "osm:node/12110807238",
+    "name": "The Lotus",
+    "category": "food",
+    "cuisines": [
+      "korean"
+    ],
+    "lat": 42.439745,
+    "lng": -76.495507,
+    "address": "101 North Aurora Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 11:30-23:00"
+  },
+  {
+    "id": "osm:node/8796633186",
+    "name": "The Rook",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.442226,
+    "lng": -76.499357,
+    "address": "105 West Court Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Th 17:00-21:00; Fr-Sa 17:00-21:30"
+  },
+  {
+    "id": "osm:way/1304926299",
+    "name": "The State Diner",
+    "category": "food",
+    "cuisines": [
+      "american"
+    ],
+    "lat": 42.439526,
+    "lng": -76.505208,
+    "address": "428 West State Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 07:00-16:00"
+  },
+  {
+    "id": "osm:node/12016026390",
+    "name": "The Terrace Restaurant",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.446267,
+    "lng": -76.482018,
+    "address": "130 Statler Drive",
+    "price_tier": null,
+    "opening_hours": "Mo-Fr 08:00-14:30"
+  },
+  {
+    "id": "osm:node/14005667426",
+    "name": "Thompson and Bleeker",
+    "category": "food",
+    "cuisines": [
+      "pizza"
+    ],
+    "lat": 42.44036,
+    "lng": -76.496153,
+    "address": "211 East Seneca Street",
+    "price_tier": null,
+    "opening_hours": "Mo-Su 17:00-21:00"
+  },
+  {
+    "id": "osm:node/13186298401",
+    "name": "Tian Jin Foods",
+    "category": "food",
+    "cuisines": [
+      "chinese"
+    ],
+    "lat": 42.43919,
+    "lng": -76.497216,
+    "address": "171 East State Street",
+    "price_tier": null,
+    "opening_hours": "Tu-We, Sa 09:00-18:00; Th-Fr 09:00-20:00; Su 11:00-17:00"
+  },
+  {
+    "id": "osm:node/13186298601",
+    "name": "Tibetan Momo Bar",
+    "category": "food",
+    "cuisines": [
+      "asian",
+      "japanese"
+    ],
+    "lat": 42.439254,
+    "lng": -76.496592,
+    "address": "171 East State Street",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/2095834016",
+    "name": "Trillium",
+    "category": "food",
+    "cuisines": [],
+    "lat": 42.447945,
+    "lng": -76.479095,
+    "address": "",
+    "price_tier": null
+  },
+  {
+    "id": "osm:node/9167390231",
+    "name": "Viva Taqueria",
+    "category": "food",
+    "cuisines": [
+      "mexican"
+    ],
+    "lat": 42.439488,
+    "lng": -76.495865,
+    "address": "215 East State Street",
+    "price_tier": null,
+    "opening_hours": "Tu-Th 11:30-21:00; Fr-Sa 11:30-22:00"
+  },
+  {
+    "id": "osm:node/9448536911",
+    "name": "Wings Over Ithaca",
+    "category": "food",
+    "cuisines": [
+      "wings"
+    ],
+    "lat": 42.441509,
+    "lng": -76.486412,
+    "address": "121 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "Mo-Th 11:00-00:00; Fr-Sa 11:00-02:00; Su 11:00-00:00"
+  },
+  {
+    "id": "osm:node/7243574916",
+    "name": "Xi'an Street Food",
+    "category": "food",
+    "cuisines": [
+      "chinese"
+    ],
+    "lat": 42.441513,
+    "lng": -76.485698,
+    "address": "159 Dryden Road",
+    "price_tier": null,
+    "opening_hours": "12:00-21:00"
+  }
+]

@@ -1,0 +1,222 @@
+{
+ "method": "directions",
+ "provider": "ors",
+ "request": {
+  "body": {
+   "coordinates": [
+    [
+     -76.4852,
+     42.4422
+    ],
+    [
+     -76.4971,
+     42.4397
+    ]
+   ],
+   "instructions": true,
+   "units": "mi"
+  },
+  "path": "/v2/directions/cycling-regular"
+ },
+ "response": {
+  "bbox": [
+   -76.497099,
+   42.439274,
+   -76.485063,
+   42.442708
+  ],
+  "metadata": {
+   "attribution": "openrouteservice.org | OpenStreetMap contributors",
+   "engine": {
+    "build_date": "2026-08-13T11:53:14Z",
+    "graph_date": "2026-09-21T23:29:54Z",
+    "osm_date": "2026-09-13T23:59:59Z",
+    "version": "9.10.0"
+   },
+   "query": {
+    "coordinates": [
+     [
+      -76.4852,
+      42.4422
+     ],
+     [
+      -76.4971,
+      42.4397
+     ]
+    ],
+    "format": "json",
+    "instructions": true,
+    "profile": "cycling-regular",
+    "profileName": "cycling-regular",
+    "units": "mi"
+   },
+   "service": "routing",
+   "timestamp": 1791015068585
+  },
+  "routes": [
+   {
+    "bbox": [
+     -76.497099,
+     42.439274,
+     -76.485063,
+     42.442708
+    ],
+    "geometry": "wn`bGloyqMe@@GBI@ESMMKFINCLl@F~CGJ?@R@dB?dA?R?NKZm@x@k@r@ELAn@@RbBC?PFxEBxE@L?NDtD@~B@dA@p@?`@NAtCCN?NAfFKP?A^QzCI`BAR?NIxAANALIjAIxACb@Cf@AT?RFtE?XM??^",
+    "segments": [
+     {
+      "distance": 0.943,
+      "duration": 367.4,
+      "steps": [
+       {
+        "distance": 0.02,
+        "duration": 19.1,
+        "instruction": "Head north on College Avenue",
+        "name": "College Avenue",
+        "type": 11,
+        "way_points": [
+         0,
+         3
+        ]
+       },
+       {
+        "distance": 0.012,
+        "duration": 3.8,
+        "instruction": "Turn right onto Oak Avenue",
+        "name": "Oak Avenue",
+        "type": 1,
+        "way_points": [
+         3,
+         5
+        ]
+       },
+       {
+        "distance": 0.014,
+        "duration": 4.4,
+        "instruction": "Turn left onto Oak Avenue",
+        "name": "Oak Avenue",
+        "type": 0,
+        "way_points": [
+         5,
+         8
+        ]
+       },
+       {
+        "distance": 0.076,
+        "duration": 24.3,
+        "instruction": "Turn sharp left onto College Avenue",
+        "name": "College Avenue",
+        "type": 2,
+        "way_points": [
+         8,
+         11
+        ]
+       },
+       {
+        "distance": 0.13,
+        "duration": 41.7,
+        "instruction": "Turn right onto Dryden Road",
+        "name": "Dryden Road",
+        "type": 1,
+        "way_points": [
+         11,
+         22
+        ]
+       },
+       {
+        "distance": 0.035,
+        "duration": 11.2,
+        "instruction": "Turn left onto Eddy Street",
+        "name": "Eddy Street",
+        "type": 0,
+        "way_points": [
+         22,
+         23
+        ]
+       },
+       {
+        "distance": 0.242,
+        "duration": 77.8,
+        "instruction": "Turn right onto East Buffalo Street",
+        "name": "East Buffalo Street",
+        "type": 1,
+        "way_points": [
+         23,
+         33
+        ]
+       },
+       {
+        "distance": 0.154,
+        "duration": 49.7,
+        "instruction": "Turn left onto Schuyler Place",
+        "name": "Schuyler Place",
+        "type": 0,
+        "way_points": [
+         33,
+         39
+        ]
+       },
+       {
+        "distance": 0.073,
+        "duration": 23.6,
+        "instruction": "Turn right onto East State Street, NY 79",
+        "name": "East State Street, NY 79",
+        "type": 1,
+        "way_points": [
+         39,
+         42
+        ]
+       },
+       {
+        "distance": 0.175,
+        "duration": 98.9,
+        "instruction": "Continue straight onto East State Street, NY 79",
+        "name": "East State Street, NY 79",
+        "type": 6,
+        "way_points": [
+         42,
+         55
+        ]
+       },
+       {
+        "distance": 0.013,
+        "duration": 12.9,
+        "instruction": "Turn right onto Ithaca Commons",
+        "name": "Ithaca Commons",
+        "type": 1,
+        "way_points": [
+         55,
+         57
+        ]
+       },
+       {
+        "distance": 0.0,
+        "duration": 0.0,
+        "instruction": "Arrive at Ithaca Commons, on the right",
+        "name": "-",
+        "type": 10,
+        "way_points": [
+         57,
+         57
+        ]
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "distance": 0.943,
+     "duration": 367.4
+    },
+    "warnings": [
+     {
+      "code": 4,
+      "message": "Extra info requested but not available: roadaccessrestrictions"
+     }
+    ],
+    "way_points": [
+     0,
+     57
+    ]
+   }
+  ]
+ }
+}

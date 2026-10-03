@@ -1,0 +1,14 @@
+{
+  "durations": [[600.0, 1200.0, null], [300.0, 900.0, 450.0]],
+  "distances": [[0.5, 1.0, null], [0.25, 0.75, 0.4]],
+  "destinations": [
+    {"location": [-76.4852, 42.442], "snapped_distance": 3.1},
+    {"location": [-76.4970, 42.4390], "snapped_distance": 5.2},
+    {"location": [-76.5200, 42.4000], "snapped_distance": 900.0}
+  ],
+  "sources": [
+    {"location": [-76.4850, 42.4430], "snapped_distance": 2.0},
+    {"location": [-76.4790, 42.4560], "snapped_distance": 4.0}
+  ],
+  "metadata": {"service": "matrix", "query": {"profile": "driving-car", "units": "mi"}}
+}

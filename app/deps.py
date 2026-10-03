@@ -9,6 +9,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
+from app.providers.cache import RecordReplayCache
 from app.providers.mock.places import MockPlaces
 from app.providers.mock.routing import MockRouting
 from app.providers.mock.sim_messaging import SimMessaging
@@ -20,6 +21,8 @@ from app.providers.protocols import (
     RoutingProvider,
 )
 from app.providers.real.nessie import NessieFinance
+from app.providers.real.ors import OrsRouting
+from app.providers.real.osm_places import OsmPlaces, resolve_path
 from app.providers.real.photon import PhotonMessaging
 from app.settings import Settings
 
@@ -51,15 +54,22 @@ def build_deps(
         messaging = PhotonMessaging(settings)
     else:
         messaging = SimMessaging()
-    if settings.provider_places != "mock":
-        raise NotImplementedError("OSM places arrive in Stage 4; use PROVIDER_PLACES=mock")
-    if settings.provider_routing != "mock":
-        raise NotImplementedError("ORS routing arrives in Stage 4; use PROVIDER_ROUTING=mock")
+    cache = RecordReplayCache(settings.cache_mode)
+    places: PlacesProvider
+    if settings.provider_places == "osm":
+        places = OsmPlaces(settings, cache)
+    else:
+        places = MockPlaces(venues_path=resolve_path(settings.venues_path))
+    routing: RoutingProvider
+    if settings.provider_routing == "ors":
+        routing = OrsRouting(settings, cache)
+    else:
+        routing = MockRouting(settings)
     return Deps(
         settings=settings,
         messaging=messaging,
-        places=MockPlaces(),
-        routing=MockRouting(settings),
+        places=places,
+        routing=routing,
         llm=llm,
         finance=finance or (NessieFinance(settings) if settings.nessie_api_key else None),
         clock=clock or utcnow,
