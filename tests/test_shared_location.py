@@ -10,6 +10,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from app.conversation import copy
 from app.deps import build_deps
 from app.main import create_app
 from app.models.private import LatLng
@@ -55,46 +56,46 @@ def sim(client: TestClient):
 
 def test_location_step_sends_the_find_my_card(client) -> None:
     ask = to_location_step(client)
-    assert ask.startswith("Where are you starting from?")
-    assert "Share your location" in ask
+    assert ask.startswith("where are you starting from?")
+    assert "share your location" in ask
     assert sim(client).location_requests == [HANDLE]
 
 
 def test_done_without_sharing_explains(client) -> None:
     to_location_step(client)
-    assert dm(client, "done").startswith("I can't see your location yet")
+    assert dm(client, "done").startswith("can't see your location yet")
 
 
 def test_done_after_sharing_uses_it_and_names_the_nearest_landmark(client) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, "Done!") == "Got it: your live location. Right? (yes/no)"
-    assert dm(client, "yes").startswith("You're set!")
+    assert dm(client, "Done!") == "your live location, right?"
+    assert dm(client, "yes").startswith("you're all set!")
 
 
 def test_far_away_share_gets_a_generic_label(client) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = FAR_AWAY
-    assert dm(client, "shared") == "Got it: your live location. Right? (yes/no)"
+    assert dm(client, "shared") == "your live location, right?"
 
 
 def test_command_during_location_step_is_not_geocoded(client) -> None:
     to_location_step(client)
-    assert dm(client, "@plan").startswith("Almost done! First, where are you starting from?")
-    assert dm(client, "olin") == "Got it: Olin Library. Right? (yes/no)"
+    assert dm(client, "@plan").startswith("almost done! where are you starting from?")
+    assert dm(client, "olin").startswith("got it, Olin Library 📍")
 
 
 @pytest.mark.parametrize("reply", ["ok", "I shared my live location", "sharing now!", "done."])
 def test_casual_share_replies_use_the_shared_location(client, reply) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, reply) == "Got it: your live location. Right? (yes/no)"
+    assert dm(client, reply) == "your live location, right?"
 
 
 def test_typed_landmark_still_wins(client) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = FAR_AWAY
-    assert dm(client, "olin") == "Got it: Olin Library. Right? (yes/no)"
+    assert dm(client, "olin").startswith("got it, Olin Library 📍")
 
 
 def test_unknown_text_asks_again_and_never_uses_the_shared_location(client) -> None:
@@ -102,7 +103,7 @@ def test_unknown_text_asks_again_and_never_uses_the_shared_location(client) -> N
     to_location_step(client)
     sim(client).shared[HANDLE] = COLLEGETOWN  # sharing, but typed something unknown
     for _ in range(2):
-        assert dm(client, "my dorm").startswith("I couldn't find that place.")
+        assert dm(client, "my dorm").startswith("couldn't find that one")
     assert stored_label(client, HANDLE) is None  # nothing stored, no default
 
 
@@ -110,7 +111,7 @@ def test_location_command_resends_the_card(client) -> None:
     to_location_step(client)
     for text in ["olin", "yes"]:
         dm(client, text)
-    assert dm(client, "location").startswith("Where are you starting from?")
+    assert dm(client, "location").startswith("where are you starting from?")
     assert sim(client).location_requests == [HANDLE, HANDLE]
 
 
@@ -118,7 +119,7 @@ def test_shared_location_label_never_contains_coordinates(client) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = FAR_AWAY
     reply = dm(client, "done")
-    assert reply == "Got it: your live location. Right? (yes/no)"
+    assert reply == "your live location, right?"
     assert not any(ch.isdigit() for ch in reply)
 
 
@@ -172,9 +173,9 @@ def test_already_sharing_skips_the_card(client) -> None:
     for text in ["start", "Maya", "MAYA1"]:
         dm(client, text)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, "yes") == "Got it: your live location. Right? (yes/no)"
+    assert dm(client, "yes") == "your live location, right?"
     assert sim(client).location_requests == []  # nothing to tap: they already share
-    assert dm(client, "yes").startswith("You're set!")
+    assert dm(client, "yes").startswith("you're all set!")
 
 
 def stored_label(client: TestClient, handle: str) -> str | None:
@@ -234,22 +235,19 @@ def test_where_from_is_asked_after_how_unless_sharing(client) -> None:
     sim(client).location_requests.clear()
 
     started = dm(client, "@plan")
-    assert started.endswith(
-        "Reply car, bike, walk, uber, or neither "
-        "(walking, and I'll suggest a ride if that gets you there with everyone)."
-    )
+    assert started.endswith(copy.ASK_TRIP_MODES)
     assert "Where are you starting from" not in started  # one question at a time
-    assert dm(client, "bike").startswith("Got it. I'll plan from your live location")
+    assert dm(client, "bike").startswith("bet, I'll use your live location")
 
     code = re.search(r"join ([A-Z0-9]{4})", started).group(1)
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
     assert "Where are you starting from" not in all_texts(client, sam)[-1]
     client.post("/sim/message", json={"sender_handle": sam, "text": "neither"})
-    assert all_texts(client, sam)[-1].startswith("Where are you starting from this time?")
+    assert all_texts(client, sam)[-1].startswith("where are you starting from?")
     assert sim(client).location_requests == [sam]  # the Find My card, with the question
     client.post("/sim/message", json={"sender_handle": sam, "text": "same"})
-    assert all_texts(client, sam)[-1] == "Got it. Now tell me what you're in the mood for!"
-    assert "Looking at options" in dm(client, "@go")
+    assert all_texts(client, sam)[-1] == "bet. what are you in the mood for?"
+    assert "for everyone" in dm(client, "@go")
 
 
 def test_typed_place_this_plan_beats_live_location_at_go(client, caplog) -> None:
@@ -259,8 +257,8 @@ def test_typed_place_this_plan_beats_live_location_at_go(client, caplog) -> None
     code = re.search(r"join ([A-Z0-9]{4})", dm(client, "@plan")).group(1)
     dm(client, "bike")
     dm(client, "location")  # ...but types where she'll start from instead
-    assert dm(client, "olin") == "Got it: Olin Library. Right? (yes/no)"
-    assert dm(client, "yes") == "Got it. Now tell me what you're in the mood for!"
+    reply = dm(client, "olin")  # obvious match: no "right?"
+    assert reply == "got it, Olin Library 📍\nbet. what are you in the mood for?"
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
     for text in ["neither", "same"]:
         client.post("/sim/message", json={"sender_handle": sam, "text": text})
@@ -286,10 +284,10 @@ def test_go_waits_for_where_from_and_commands_still_work_mid_question(client) ->
         dm(client, text)
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
     client.post("/sim/message", json={"sender_handle": sam, "text": "neither"})  # not "where"
-    assert dm(client, "@go") == "Still waiting on Sam to answer my questions."
-    assert all_texts(client, sam)[-1].startswith("Where are you starting from this time?")
+    assert dm(client, "@go") == "still waiting on Sam ⏳"
+    assert all_texts(client, sam)[-1].startswith("where are you starting from?")
     client.post("/sim/message", json={"sender_handle": sam, "text": "@cancel"})
-    assert all_texts(client, sam)[-1].startswith("Plan cancelled.")
+    assert all_texts(client, sam)[-1].startswith("plan cancelled")
 
 
 async def test_photon_old_location_counts_as_not_sharing() -> None:
@@ -330,16 +328,16 @@ def test_modes_are_asked_every_plan_and_unanswered_means_walking(client) -> None
     assert stored_modes(client, HANDLE) is None  # setup no longer asks
 
     started = dm(client, "@plan")
-    assert "How are you getting there this time?" in started
+    assert "how're you getting there?" in started
     code = re.search(r"join ([A-Z0-9]{4})", started).group(1)
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
-    assert dm(client, "I'm driving").startswith("Where are you starting from this time?")
-    assert dm(client, "same") == "Got it. Now tell me what you're in the mood for!"
+    assert dm(client, "I'm driving").startswith("where are you starting from?")
+    assert dm(client, "same") == "bet. what are you in the mood for?"
 
     # Sam never answered: @go plans him as walking and tells him so.
-    assert "Looking at options" in dm(client, "@go")
+    assert "for everyone" in dm(client, "@go")
     assert any(
-        t.startswith("You didn't say how you're getting there") for t in all_texts(client, sam)
+        t.startswith("you didn't say how you're getting there") for t in all_texts(client, sam)
     )
     assert json.loads(stored_modes(client, sam)) == {
         "walk": True,
@@ -350,7 +348,7 @@ def test_modes_are_asked_every_plan_and_unanswered_means_walking(client) -> None
 
     # Next plan: last time's answer is forgotten and asked again.
     dm(client, "@cancel")
-    assert "How are you getting there this time?" in dm(client, "@plan")
+    assert "how're you getting there?" in dm(client, "@plan")
     assert stored_modes(client, HANDLE) is None
 
 
@@ -358,5 +356,5 @@ def test_cancel_while_asked_for_modes_does_not_strand_you(client) -> None:
     for text in ["start", "Maya", "MAYA1", "yes", "olin", "yes"]:
         dm(client, text)
     dm(client, "@plan")
-    assert dm(client, "@cancel").startswith("Plan cancelled.")
+    assert dm(client, "@cancel").startswith("plan cancelled")
     assert "join <code>" in dm(client, "help")  # back to normal, not "Reply car, bike..."

@@ -1,62 +1,66 @@
-"""All user-facing strings and message templates (§7.4). Short, warm, no jargon."""
+"""All user-facing strings and message templates (§7.4).
+
+Voice: a friend texting. Lowercase-ish, short, one idea per message, emoji sparingly.
+Plain words work for commands ("go", "nvm"); the @ versions still work too.
+"""
 
 from datetime import datetime
 from decimal import Decimal
 
 from app.models.outbound import GroupPlanOption
 
-BOT_NAME = "Huddle"  # product name (§19 open decision 4)
+BOT_NAME = "Huddle"
+
+# Tapbacks (iMessage reactions) the bot uses instead of "got it" messages.
+REACT_OK = "👍"
+REACT_LOVE = "❤️"
+REACT_HUH = "❓"
 
 # --- Virtual group (v3: every message is a DM) --------------------------------
 
 WELCOME = (
-    f"Hi! I'm {BOT_NAME}. I help friends pick a plan everyone can afford and reach, and I "
-    "get you there at the same time. Let's set you up. It's private: I never share your "
-    "money or location with anyone."
+    f"hey! I'm {BOT_NAME} 👋 I find a spot your whole group can afford and reach, "
+    "and get everyone there at the same time. your money + location stay private, always."
 )
 
 
 def plan_started(code: str) -> str:
-    return (
-        f"Plan started! 🎉 Tell your friends to text me: join {code}\n"
-        "Meanwhile, tell me what you're in the mood for. Only I see it. "
-        "Say @go when everyone's in."
-    )
+    return f"let's do it 🎉 tell your friends to text me: join {code} (say go when everyone's in)"
 
 
 def already_in_plan(code: str) -> str:
-    return f"You're already in a plan (code {code}). Say @cancel to start over."
+    return f"you're already in a plan (code {code}). say nvm to start over"
 
 
 def setup_first(code: str) -> str:
-    return f"Let's get you set up first, then send join {code} again."
+    return f"quick setup first, then send join {code} again"
 
 
 def joined(name: str, member_count: int) -> str:
-    return f"✅ {name} joined ({member_count} people)."
+    return f"{name} is in ✅ ({member_count} of you)"
 
 
-YOU_JOINED = (
-    "You're in! Tell me what you're in the mood for. Only I see it. Say @go when everyone's in."
-)
-UNKNOWN_CODE = "I don't know that code. Check it and try again."
-PLAN_ALREADY_STARTED = "That plan already started. Ask them to @plan again."
+YOU_JOINED = "you're in!"
+UNKNOWN_CODE = "hmm I don't know that code. double check it?"
+PLAN_ALREADY_STARTED = "that plan already started. ask them to start a new one"
 
 
 def plan_full(max_members: int) -> str:
-    return f"That plan is full ({max_members} people max)."
+    return f"that plan's full ({max_members} max)"
 
 
-NOTED = "Got it 👍 Keep going, or say @go when everyone's ready."
+# Fallback when a tapback can't be sent (the reaction is the usual acknowledgment).
+NOTED = "got it 👍"
+GO_HINT = "say go when everyone's in"
 
 
 def need_two(code: str) -> str:
-    return f"I need at least 2 people. Share code {code} first."
+    return f"need at least 2 people! share code {code} first"
 
 
-NOT_IN_PLAN = "You're not in a plan yet. Say @plan to start one, or join <code> to join a friend's."
-LOOKING = "🔎 Looking at options…"
-PIPELINE_FAILED = "Couldn't finish — say @go to retry."
+NOT_IN_PLAN = "you're not in a plan yet. say plan to start one, or join <code> for a friend's"
+LOOKING = "on it 🔎"  # fallback when the typing indicator can't be shown
+PIPELINE_FAILED = "ugh something broke on my end. say go to try again"
 
 
 def loosen_hint(field: str, polarity: str, value: str | None) -> str:
@@ -64,43 +68,38 @@ def loosen_hint(field: str, polarity: str, value: str | None) -> str:
     if field == "novelty":
         target = "somewhere familiar" if polarity == "want" else "somewhere new"
     elif value is None:
-        return "Loosening a preference could help."
+        return "maybe loosen up one ask?"
     else:
         target = f"more than {value}" if polarity == "want" else value
-    return f"Being open to {target} could help."
+    return f"being open to {target} could help."
 
 
 NO_PLACES = (
-    "I couldn't find any places for that nearby. Try something a bit broader "
-    '(like "something sporty" or "food"), then say @go again.'
+    "couldn't find anywhere for that nearby 😕 try something broader "
+    '(like "something sporty" or "food") and say go again'
 )
 
 
 def nothing_fits(hint: str | None) -> str:
-    middle = hint or "Try loosening a preference."
-    return f"Nothing fits everyone right now. {middle} Then say @go again."
+    middle = hint or "maybe loosen up one ask?"
+    return f"nothing works for everyone rn. {middle} then say go again"
 
 
-NEED_MORE_PEOPLE = (
-    "I need at least 2 people who are fully set up. Share the code and try @go again."
-)
-CANCELLED = "Plan cancelled. Say @plan whenever you want to start again."
+NEED_MORE_PEOPLE = "need at least 2 people who are all set up. share the code and say go again"
+CANCELLED = "plan cancelled 👋 say plan whenever"
 
-PRIVACY_HELD_BACK = (
-    "I held back an update to protect someone's privacy. Say @go to try again, or @cancel."
-)
+PRIVACY_HELD_BACK = "held back an update to keep someone's info private. say go to retry, or nvm"
 PRIVACY_HELD_BACK_PRIVATE = (
-    "I held back your details because they touched someone else's private info. "
-    "Text help if you need anything."
+    "held back your details bc they touched someone else's private info. text help if stuck"
 )
 
 
 def votes_progress(voted: int, total: int) -> str:
-    return f"🗳️ {voted} of {total} voted"
+    return f"🗳️ {voted}/{total} voted"
 
 
 def plan_blurb(max_travel_min: int) -> str:
-    return f"Fits everyone's budget; longest trip {max_travel_min} min."
+    return f"fits everyone's budget, longest trip {max_travel_min} min"
 
 
 def _price_text(option: GroupPlanOption) -> str:
@@ -124,16 +123,14 @@ def _option_line(option: GroupPlanOption) -> str:
 def poll_message(options: list[GroupPlanOption]) -> str:
     count = len(options)
     header = (
-        "Here's the plan that fits everyone's constraints:"
-        if count == 1
-        else f"Here are {count} plans that fit everyone's constraints:"
+        "ok here's what works for everyone 👇" if count > 1 else "ok this one works for everyone 👇"
     )
     lines = [header]
     for option in options:
         lines.append(_option_line(option))
         lines.append(option.blurb)
     labels = [o.label for o in options]
-    lines.append(f"Reply {_join_names_or(labels)}.")
+    lines.append(f"reply {_join_names_or(labels)}")
     return "\n".join(lines)
 
 
@@ -148,131 +145,110 @@ def clock_time(dt: datetime) -> str:
     return f"{dt.hour % 12 or 12}:{dt.minute:02d}"
 
 
+def day_word(local: datetime) -> str:
+    """ "tonight" from 5 PM, otherwise "today"."""
+    return "tonight" if local.hour >= 17 else "today"
+
+
 def confirmation(label: str, venue: str, arrive_local: datetime) -> str:
     return (
-        f"🎉 Plan {label}: {venue}. Everyone arrives around {clock_time(arrive_local)}. "
-        "Your route is below 👇"
+        f"🎉 it's {label}: {venue}! everyone gets there around {clock_time(arrive_local)}. "
+        "your route's coming 👇"
     )
 
 
 # --- DM onboarding ------------------------------------------------------------
 
-ASK_NAME = "What's your first name?"
+ASK_NAME = "what should I call you?"
 
 
 def ask_bank_code(name: str) -> str:
-    greeting = f"Nice to meet you, {name}!" if name else "Welcome!"
+    greeting = f"nice to meet you {name}!" if name else "nice to meet you!"
     return (
-        f"{greeting} To keep plans affordable, link your (sandbox) bank: reply with your "
-        "bank code, like MAYA1. I never share money details with anyone."
+        f"{greeting} to keep plans affordable, send your (sandbox) bank code, like MAYA1. "
+        "I never share money stuff with anyone"
     )
 
 
-BANK_CODE_INVALID = "I don't recognize that code. Try again (it looks like MAYA1)."
+BANK_CODE_INVALID = "hmm don't recognize that one. it looks like MAYA1"
 
 
-def confirm_limit(amount: Decimal) -> str:
-    return f"About {usd(amount)} looks comfortable tonight. Use that? (yes / or type a number)"
+def confirm_limit(amount: Decimal, when: str = "today") -> str:
+    return f"looks like ~{usd(amount)} is comfy {when}. cool? (or send a number)"
 
 
-LIMIT_INVALID = "Reply yes, or type a number like 25."
+LIMIT_INVALID = "say yes, or send a number like 25"
 ASK_LOCATION = (
-    "Where are you starting from? Share your location with me (tap the card, then say "
-    '"done"), or type a landmark like "Olin Library" or "Collegetown".'
+    "where are you starting from? share your location with me (tap the card, then say "
+    '"done") or type a place like "Collegetown Bagels"'
 )
 LOCATION_NOT_FOUND = (
-    "I couldn't find that place. Try the name of a business or building near you, "
-    'like "Collegetown Bagels", or share your location with me and say "done".'
+    "couldn't find that one 🤔 try a business or building near you, "
+    'like "Collegetown Bagels", or share your location and say "done"'
 )
 LIVE_LOCATION_LABEL = "your live location"
+LOCATION_UNCLEAR = (
+    "is that a yes? if not, send me the place you're starting from (or share your location "
+    'and say "done")'
+)
 LOCATION_FIRST = (
-    'Almost done! First, where are you starting from? Share your location and say "done", '
-    'or type a landmark like "Olin Library".'
+    'almost done! where are you starting from? share your location and say "done", '
+    'or type a place like "Collegetown Bagels"'
 )
 SHARE_NOT_SEEN = (
-    'I can\'t see your location yet. Give it a few seconds and say "done" again, '
-    'or type a landmark like "Olin Library".'
+    'can\'t see your location yet. give it a sec and say "done" again, '
+    'or type a place like "Collegetown Bagels"'
 )
 
 
 def confirm_location(label: str) -> str:
-    return f"Got it: {label}. Right? (yes/no)"
+    return f"{label}, right?"
+
+
+def location_set(label: str) -> str:
+    """When Google's match is clearly what they typed: no yes/no needed."""
+    return f"got it, {label} 📍"
 
 
 ASK_MODES = (
-    "Last one: do you have a car or a bike with you? Reply car, bike, both, or neither. "
-    '(Add "no rideshare" if you\'d rather not take one.)'
+    "last one: do you have a car or a bike with you? car, bike, both, or neither. "
+    '(add "no rideshare" if you\'d rather not take one)'
 )
-ASK_TRIP_MODES = (
-    "How are you getting there this time? Reply car, bike, walk, uber, or neither "
-    "(walking, and I'll suggest a ride if that gets you there with everyone)."
-)
-MODES_INVALID = "Reply car, bike, walk, uber, or neither."
-MODES_FIRST = "First, how are you getting there this time? Reply car, bike, walk, uber, or neither."
-NO_BUS_YET = "I can't plan bus trips yet. Reply car, bike, walk, uber, or neither."
+ASK_TRIP_MODES = "how're you getting there? 🚗 car, 🚲 bike, 🚶 walk, 🚕 uber, or neither"
+MODES_INVALID = "car, bike, walk, uber, or neither?"
+MODES_FIRST = "first, how're you getting there? car, bike, walk, uber, or neither"
+NO_BUS_YET = "can't do bus routes yet 😅 car, bike, walk, uber, or neither?"
 DEFAULT_WALK = (
-    "You didn't say how you're getting there, so I'm planning you as walking. "
-    "Tell me if you're driving (e.g. \"I'm driving\")."
+    "you didn't say how you're getting there so I've got you walking 🚶 text me if you're driving"
 )
 
 
 def mode_changed(modes_text: str) -> str:
-    return f"Got it, {modes_text}. I'll use that for this plan."
+    return f"got it, {modes_text} 👍"
 
 
-TRIP_MODES_SET = "Got it. Now tell me what you're in the mood for!"
+TRIP_MODES_SET = "bet. what are you in the mood for?"
 TRIP_LIVE_LOCATION = (
-    "Got it. I'll plan from your live location "
-    '(text "location" to use a different spot). Now tell me what you\'re in the mood for!'
+    'bet, I\'ll use your live location 📍 (say "location" to pick a different spot). '
+    "what are you in the mood for?"
 )
 ASK_TRIP_LOCATION = (
-    "Where are you starting from this time? Share your location with me (tap the card, "
-    'then say "done"), type a place like "Olin Library", or say "same" to start where '
-    "you did last time."
+    'where are you starting from? share your location (tap the card, then say "done"), '
+    'type a place, or say "same" for last time\'s spot'
 )
 
 
 def waiting_on(names: list[str]) -> str:
-    return f"Still waiting on {', '.join(names)} to answer my questions."
+    return f"still waiting on {', '.join(names)} ⏳"
 
 
-YOU_ARE_SET = "You're set! Start a plan with @plan, or join a friend's with join <code>."
-
-# --- Web signup, finished by text (app/onboarding/web_claim.py) -----------------
-
-
-def claim_linked(name: str, limit: Decimal) -> str:
-    return (
-        f"Thanks, {name}! Your demo bank is linked. About {usd(limit)} looks comfortable "
-        "tonight. Use that? (yes / or type a number)"
-    )
-
-
-def web_intro(name: str) -> str:
-    return (
-        f"Hi {name}! You're set up. Start a plan with @plan, or join a friend's with join <code>."
-    )
-
-
-def web_signup_nudge(name: str, token: str) -> str:
-    return f"Hi {name}! To finish signing up, reply: start {token}"
-
-
-CLAIM_UNKNOWN = "I couldn't find that signup code. Check it, or sign up again on the website."
-CLAIM_USED = "That signup code was already used."
-CLAIM_EXPIRED = "That signup code expired. Please sign up again on the website."
-CLAIM_WRONG_PHONE = (
-    "That code was made for a different phone number. Text it from the phone you signed up with."
-)
-CLAIM_ALREADY_SET = "You're already set up. Text help for options."
-CLAIM_BANK_GONE = "I couldn't link that demo bank. Please sign up again on the website."
-
-ALREADY_SET = "You're already set. Text help for options."
-UPDATED = "Updated."
+YOU_ARE_SET = "you're all set! say plan to start one, or join <code> for a friend's"
+ALREADY_SET = "you're already set! text help if you need anything"
+UPDATED = "updated 👍"
 HELP = (
-    "Plans: @plan to start one, join <code> to join a friend's, @go when everyone's in, "
-    "A/B/C to vote, @cancel to stop.\n"
-    "Settings: budget <amount>, location, car yes / car no."
+    "say plan to start one, join <code> for a friend's, go when everyone's in, "
+    "A/B/C to vote, nvm to cancel.\n"
+    "settings: budget <amount>, location, car yes / car no"
 )
 
 # --- Personal itinerary DM ----------------------------------------------------
@@ -288,8 +264,8 @@ def approx_usd(amount: Decimal) -> str:
     return f"~${amount.quantize(Decimal(1)):.0f}"
 
 
-def itinerary_header(venue: str, address: str) -> str:
-    return f"Your plan for tonight: {venue}, {address}."
+def itinerary_header(venue: str, address: str, when: str = "today") -> str:
+    return f"your plan {when}: {venue}, {address}"
 
 
 def leave_line(
@@ -297,16 +273,21 @@ def leave_line(
 ) -> str:
     t = clock_time(leave_local)
     if mode == "walk":
-        return f"🚶 Leave by {t} and walk about {travel_min} min."
+        return f"🚶 leave by {t}, it's about a {travel_min} min walk"
     if mode == "bike":
-        return f"🚲 Leave by {t} and bike about {travel_min} min."
+        return f"🚲 leave by {t}, about {travel_min} min on the bike"
     if mode == "drive":
-        return f"🚗 Leave by {t} and drive about {travel_min} min (including parking)."
-    return f"🚗 Request a ride by {t} (about {pickup_min} min pickup + {ride_min} min drive)."
+        return f"🚗 leave by {t}, about {travel_min} min drive (incl. parking)"
+    return f"🚕 request a ride by {t} (~{pickup_min} min pickup + {ride_min} min drive)"
 
 
 def maps_line(url: str) -> str:
-    return f"🗺️ Directions: {url}"
+    return f"🗺️ {url}"
+
+
+def leave_nudge(mode: str, minutes: int) -> str:
+    verb = {"walk": "walking", "bike": "biking", "drive": "driving", "rideshare": "getting a ride"}
+    return f"heads up, leave in {minutes} if you're {verb.get(mode, 'heading over')} 👀"
 
 
 def cost_line(
@@ -316,11 +297,11 @@ def cost_line(
     if food is None:  # Google has no price for this venue
         fare_name = "ride" if mode == "rideshare" else "gas + parking"
         travel = f"{fare_name} {approx_usd(fare)} + " if fare > 0 else ""
-        return f"Arrive ~{clock_time(arrive_local)}. Cost: {travel}{what} (price unknown)."
+        return f"you'll get there ~{clock_time(arrive_local)}. cost: {travel}{what} (price unknown)"
     total = approx_usd(food + fare)
     if fare > 0:
         fare_name = "ride" if mode == "rideshare" else "gas + parking"
         parts = f"{what} {approx_usd(food)} + {fare_name} {approx_usd(fare)}"
     else:
         parts = what
-    return f"Arrive ~{clock_time(arrive_local)}. Estimated total: {total} ({parts})."
+    return f"you'll get there ~{clock_time(arrive_local)}. about {total} total ({parts})"

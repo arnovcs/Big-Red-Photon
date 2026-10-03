@@ -109,7 +109,7 @@ def stored(client: TestClient, handle: str) -> tuple | None:
 def to_location_step(client: TestClient, handle: str, name: str, code: str) -> None:
     for text in ["start", name, code]:
         dm(client, handle, text)
-    assert dm(client, handle, "yes").startswith("Where are you starting from?")
+    assert dm(client, handle, "yes").startswith("where are you starting from?")
 
 
 H1 = "+16075550101"
@@ -120,7 +120,7 @@ def test_2_nonsense_asks_again_and_never_defaults(client) -> None:
     client.app.state.deps.messaging.shared[H1] = COLLEGETOWN  # sharing doesn't matter here
     for _ in range(3):
         reply = dm(client, H1, "asdkjh qwe zzz")
-        assert reply.startswith("I couldn't find that place.")
+        assert reply.startswith("couldn't find that one")
         assert "Olin" not in reply.split("like")[0]  # no default place is offered as theirs
     assert stored(client, H1) == (None, None)
 
@@ -128,17 +128,16 @@ def test_2_nonsense_asks_again_and_never_defaults(client) -> None:
 def test_3_yes_saves_no_reasks_new_name_looks_up_again(client) -> None:
     places = client.app.state.deps.places
     to_location_step(client, H1, "Maya", "MAYA1")
-    assert dm(client, H1, "olin") == "Got it: Olin Library. Right? (yes/no)"
-    assert dm(client, H1, "no").startswith("Where are you starting from?")
+    # Not an obvious match ("north campus" → Robert Purcell): asked once.
+    assert dm(client, H1, "meet me at north campus") == ("Robert Purcell Community Center, right?")
+    assert dm(client, H1, "no").startswith("where are you starting from?")
     assert stored(client, H1) == (None, None)  # "no" clears it
-    # A different place name is a fresh lookup (and replaces the first one).
-    assert dm(client, H1, "meet me at north campus") == (
-        "Got it: Robert Purcell Community Center. Right? (yes/no)"
-    )
-    assert places.lookups == ["olin", "meet me at north campus"]
-    assert dm(client, H1, "yes").startswith("You're set!")
-    assert stored(client, H1) == ("Robert Purcell Community Center", "stub:north campus")
-    assert dm(client, H1, "help").startswith("Plans:")  # stopped asking
+    # A different place name is a fresh lookup; this one is obvious, so no "right?".
+    reply = dm(client, H1, "olin")
+    assert reply.startswith("got it, Olin Library 📍") and "you're all set!" in reply
+    assert places.lookups == ["meet me at north campus", "olin"]
+    assert stored(client, H1) == ("Olin Library", "stub:olin")
+    assert dm(client, H1, "help").startswith("say plan to start one")  # stopped asking
 
 
 # --- 5: three people, three origins, three routes -----------------------------------------
@@ -170,20 +169,21 @@ def test_5_each_member_gets_their_own_origin_and_directions(client) -> None:
     for _, handle, _, _, modes in PEOPLE:
         dm(client, handle, modes)
         dm(client, handle, "same")
-    assert "Looking at options" in dm(client, PEOPLE[0][1], "@go")
+    assert "for everyone" in dm(client, PEOPLE[0][1], "@go")
     dm(client, PEOPLE[0][1], "A")
     dm(client, PEOPLE[1][1], "A")
 
     # One Routes call per member, each from that member's own starting point.
     assert len(calls) == 3 and len(set(calls)) == 3
-    itineraries = {}
+    itineraries, links = {}, set()
     for name, handle, *_ in PEOPLE:
-        texts = [m for m in client.get(f"/sim/outbox/{handle}").json() if m["kind"] == "private"]
-        itineraries[name] = next(m["text"] for m in texts if m["text"].startswith("Your plan"))
+        sent = client.get(f"/sim/outbox/{handle}").json()
+        texts = [m for m in sent if m["kind"] == "private"]
+        itineraries[name] = next(m["text"] for m in texts if m["text"].startswith("your plan"))
+        links |= {m["text"] for m in sent if m["kind"] == "link"}  # Maps preview cards
     venues = {t.splitlines()[0] for t in itineraries.values()}
     assert len(venues) == 1  # same venue...
     assert len(set(itineraries.values())) == 3  # ...different directions for each person
-    links = {re.search(r"https://\S+", t).group(0) for t in itineraries.values()}
     assert len(links) == 3 and all("origin=" in link for link in links)
 
 

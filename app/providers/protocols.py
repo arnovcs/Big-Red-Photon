@@ -27,6 +27,19 @@ class MessagingProvider(Protocol):
         Private: only onboarding may store it, through the vault (§11)."""
         ...
 
+    async def react(self, handle: str, message_id: str, emoji: str) -> bool:
+        """A tapback (❤️ 👍 👎 😂 ‼️ ❓) on one of their messages. True if it landed;
+        callers fall back to a short text when it didn't. Never raises."""
+        ...
+
+    async def typing(self, handle: str, on: bool) -> None:
+        """Show / clear the typing indicator in their DM. Best effort, never raises."""
+        ...
+
+    async def send_link(self, handle: str, url: str) -> bool:
+        """A link preview card (e.g. Google Maps directions). True if sent. Never raises."""
+        ...
+
 
 class UserDirectoryProvider(Protocol):
     """Who may text the bot. On Photon's shared line pool, a number must be registered as a

@@ -138,7 +138,7 @@ def test_blocked_poll_title_falls_back_to_a_notice() -> None:
         copy.votes_progress(2, 3),
         "🎉 Plan A: Collegetown Bagels. Everyone arrives around 6:30. Your route is below 👇",
         "A: Viva Taqueria — Mexican · ≤30 min for everyone · $$ · arrive together",
-        copy.nothing_fits("Being open to more than thai could help."),
+        copy.nothing_fits("being open to more than thai could help."),
         copy.CANCELLED,
     ],
 )

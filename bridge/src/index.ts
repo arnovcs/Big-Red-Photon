@@ -1,7 +1,18 @@
 // Photon relay (ARCHITECTURE.md §9.1). Holds no state and makes no decisions:
 // inbound iMessage events → POST to the backend; backend → /send* → iMessage.
-import { Spectrum, UnsupportedError, poll, type Message, type Space } from "spectrum-ts";
-import { imessage } from "spectrum-ts/providers/imessage";
+import {
+  Spectrum,
+  UnsupportedError,
+  poll,
+  reaction,
+  richlink,
+  type Message,
+  type Space,
+} from "spectrum-ts";
+import { effect, imessage } from "spectrum-ts/providers/imessage";
+
+// Screen effects the backend may ask for (iMessage only; others see plain text).
+const EFFECTS = imessage.effect.message as Record<string, string>;
 
 const PROJECT_ID = process.env.PHOTON_PROJECT_ID ?? "";
 const PROJECT_SECRET = process.env.PHOTON_PROJECT_SECRET ?? "";
@@ -125,9 +136,36 @@ Bun.serve({
       }
 
       if (path === "/send_dm") {
+        // Optional `effect`: "confetti", "fireworks", ... (a screen effect on receive).
         const space = await im.space.create(body.handle);
-        await space.send(body.text);
-        console.log(`[out] dm ${tail(body.handle)}`);
+        const named = body.effect ? EFFECTS[body.effect] : undefined;
+        await space.send(named ? effect(body.text, named as any) : body.text);
+        console.log(`[out] dm ${tail(body.handle)}${named ? ` effect=${body.effect}` : ""}`);
+        return json({ ok: true });
+      }
+
+      if (path === "/react") {
+        // A tapback (❤️ 👍 👎 😂 ‼️ ❓) on one of the person's own messages.
+        const space = await im.space.create(body.handle);
+        const target = await space.getMessage(body.message_id);
+        if (!target) return json({ error: "message not found" }, 404);
+        await space.send(reaction(body.emoji, target));
+        console.log(`[out] react ${tail(body.handle)} ${body.emoji}`);
+        return json({ ok: true });
+      }
+
+      if (path === "/typing") {
+        const space = await im.space.create(body.handle);
+        if (body.state === "stop") await space.stopTyping();
+        else await space.startTyping();
+        return json({ ok: true });
+      }
+
+      if (path === "/send_link") {
+        // A link preview card (iMessage unfurls it on the phone).
+        const space = await im.space.create(body.handle);
+        await space.send(richlink(body.url));
+        console.log(`[out] link ${tail(body.handle)}`);
         return json({ ok: true });
       }
 

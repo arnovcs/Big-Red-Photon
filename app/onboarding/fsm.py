@@ -1,5 +1,8 @@
 """DM onboarding state machine (§7.2) and READY-state settings commands (§7.1)."""
 
+import re
+from zoneinfo import ZoneInfo
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversation import copy
@@ -15,10 +18,12 @@ from app.db.tables import UserRow
 from app.deps import Deps
 from app.logging import get_logger, kv
 from app.messaging.outbound import send_private
+from app.models.candidates import ResolvedPlace
 from app.models.identity import OnboardingState
 from app.models.outbound import PrivateMessage
 from app.models.private import LatLng, TravelModes
 from app.private import vault
+from app.providers.mock.routing import haversine_mi
 
 # Short replies that mean "I shared my location" rather than a place name.
 log = get_logger(__name__)
@@ -47,6 +52,37 @@ def is_share_reply(text: str) -> bool:
     return normalized in SHARE_REPLIES or bool(words & SHARE_WORDS)
 
 
+# Words people put around a place name ("I'm at", "near") that aren't part of it.
+_FILLER = {"im", "i", "am", "at", "near", "by", "the", "from", "in", "starting", "outside"}
+CLEAR_MATCH_MAX_MILES = 10.0
+
+
+def is_clear_match(typed: str, place: ResolvedPlace, near: LatLng) -> bool:
+    """Google's result is plainly what they typed ("young boys barbershop" → "Young Boys
+    barbershop", "olin" → "Olin Library"), and nearby: confirm without asking."""
+    words = {
+        w for w in re.findall(r"[a-z0-9]+", typed.lower().replace("'", "")) if w not in _FILLER
+    }
+    name = set(re.findall(r"[a-z0-9]+", place.name.lower().replace("'", "")))
+    if not words or not words <= name:
+        return False
+    return haversine_mi(near, place.location) <= CLEAR_MATCH_MAX_MILES
+
+
+# Messages that are chat, not a place: never sent to Google as a place search.
+CHATTER = {
+    "lol", "lmao", "bro", "what", "wat", "huh", "hmm", "hm", "idk", "wait", "um", "uh",
+    "ok so", "omg", "bruh", "dude", "help", "why", "haha", "nvm", "not sure", "im not sure",
+}  # fmt: skip
+
+
+def is_chatter(text: str) -> bool:
+    words = re.findall(r"[a-z]+", text.lower())
+    if not words:
+        return True  # emoji / punctuation only
+    return " ".join(words) in CHATTER or all(w in CHATTER for w in words)
+
+
 SAME_REPLIES = {"same", "same place", "same as before", "same as last time"}
 
 MIN_LIMIT_USD = 1
@@ -56,6 +92,7 @@ MAX_LIMIT_USD = 1000
 class Onboarding:
     def __init__(self, deps: Deps) -> None:
         self.deps = deps
+        self._message_id: str | None = None  # the message being answered (for tapbacks)
 
     async def _reply(self, user: UserRow, text: str) -> None:
         await send_private(self.deps.messaging, user.handle, PrivateMessage(text=text))
@@ -87,8 +124,27 @@ class Onboarding:
             return None
         return coords, copy.LIVE_LOCATION_LABEL
 
-    async def handle_dm(self, db: AsyncSession, user: UserRow, text: str, first_dm: bool) -> None:
+    async def _react(self, user: UserRow, emoji: str) -> bool:
+        """Tapback on the message being answered. False if it couldn't be sent."""
+        if not self._message_id:
+            return False
+        return await self.deps.messaging.react(user.handle, self._message_id, emoji)
+
+    async def _huh(self, user: UserRow, text: str) -> None:
+        """Didn't get that: a ❓ tapback plus a short nudge."""
+        await self._react(user, copy.REACT_HUH)
+        await self._reply(user, text)
+
+    async def handle_dm(
+        self,
+        db: AsyncSession,
+        user: UserRow,
+        text: str,
+        first_dm: bool,
+        message_id: str | None = None,
+    ) -> None:
         """Advance a not-yet-READY user by one step."""
+        self._message_id = message_id
         state = OnboardingState(user.onboarding_state)
         text = text.strip()
 
@@ -116,11 +172,11 @@ class Onboarding:
         elif state == OnboardingState.AWAITING_BANK_CODE:
             await self._reply(user, copy.ask_bank_code(user.display_name))
         elif state == OnboardingState.AWAITING_LIMIT_CONFIRM:
-            await self._reply(user, copy.LIMIT_INVALID)
+            await self._huh(user, copy.LIMIT_INVALID)
         elif state == OnboardingState.AWAITING_LOCATION:
             await self._reply(user, copy.ASK_LOCATION)
         elif state == OnboardingState.AWAITING_MODES:
-            await self._reply(user, copy.ASK_MODES)
+            await self._reply(user, copy.ASK_TRIP_MODES)
 
     async def _new(self, user: UserRow, text: str, first_dm: bool) -> None:
         if not user.display_name:
@@ -139,16 +195,17 @@ class Onboarding:
     async def _bank_code(self, db: AsyncSession, user: UserRow, text: str) -> None:
         limit = await vault.link_customer(db, user.id, text, self.deps.finance)
         if limit is None:
-            await self._reply(user, copy.BANK_CODE_INVALID)
+            await self._huh(user, copy.BANK_CODE_INVALID)
             return
         user.onboarding_state = OnboardingState.AWAITING_LIMIT_CONFIRM
-        await self._reply(user, copy.confirm_limit(limit))
+        local = self.deps.clock().astimezone(ZoneInfo(self.deps.settings.demo_timezone))
+        await self._reply(user, copy.confirm_limit(limit, copy.day_word(local)))
 
     async def _limit_confirm(self, db: AsyncSession, user: UserRow, text: str) -> None:
         if not is_yes(text):
             amount = parse_amount(text)
             if amount is None or not MIN_LIMIT_USD <= amount <= MAX_LIMIT_USD:
-                await self._reply(user, copy.LIMIT_INVALID)
+                await self._huh(user, copy.LIMIT_INVALID)
                 return
             await vault.set_limit(db, user.id, amount, "user_override")
         if await queries.claimed_signup_for(db, user.id) is not None:
@@ -164,17 +221,7 @@ class Onboarding:
         place is stored, then confirmed yes/no."""
         if is_yes(text) or " ".join(text.lower().split()).strip(".!") in SAME_REPLIES:
             # "yes" confirms the place just found; "same" keeps last time's starting point.
-            status = await vault.confirm_origin(db, user.id)
-            if status == "complete":
-                # Re-entry (a plan's location question, or the "location" command).
-                user.onboarding_state = OnboardingState.READY
-                in_plan = await queries.active_group_for_user(db, user.id) is not None
-                await self._reply(user, copy.TRIP_MODES_SET if in_plan else copy.UPDATED)
-                return
-            if status == "needs_modes":
-                # Travel modes are asked per plan (at @plan / join), not during setup.
-                user.onboarding_state = OnboardingState.READY
-                await self._reply(user, copy.YOU_ARE_SET)
+            if await self._confirm_location(db, user):
                 return
             if not is_share_reply(text):  # "ok" may mean "I shared it": checked below
                 await self._reply(user, copy.ASK_LOCATION)  # "yes" with nothing to confirm
@@ -184,6 +231,10 @@ class Onboarding:
             await self._reply(user, copy.ASK_LOCATION)
             return
 
+        if is_chatter(text):
+            # "lol", "what", "huh?": talking, not a place. Never search Google for it.
+            await self._huh(user, copy.LOCATION_UNCLEAR)
+            return
         if text.strip().startswith("@"):
             # A command (e.g. @plan) sent mid-setup is not a place name.
             await self._reply(user, copy.LOCATION_FIRST)
@@ -211,13 +262,34 @@ class Onboarding:
             place = None
         if place is None:
             log.info(kv("origin_not_found", user=user.id.hex[:8]))
-            await self._reply(user, copy.LOCATION_NOT_FOUND)
+            await self._huh(user, copy.LOCATION_NOT_FOUND)
             return
         await vault.set_origin(
             db, user.id, place.location, place.label, typed=True, place_id=place.place_id
         )
         log.info(kv("origin_stored", user=user.id.hex[:8], source="typed"))
+        if is_clear_match(text, place, center):
+            # Google found exactly what they typed, nearby: no "right?" needed.
+            await self._reply(user, copy.location_set(place.label))
+            await self._confirm_location(db, user)
+            return
         await self._reply(user, copy.confirm_location(place.label))
+
+    async def _confirm_location(self, db: AsyncSession, user: UserRow) -> bool:
+        """The stored place is theirs: move on to the next step. False if none is stored."""
+        status = await vault.confirm_origin(db, user.id)
+        if status == "complete":
+            # Re-entry (a plan's location question, or the "location" command).
+            user.onboarding_state = OnboardingState.READY
+            in_plan = await queries.active_group_for_user(db, user.id) is not None
+            await self._reply(user, copy.TRIP_MODES_SET if in_plan else copy.UPDATED)
+            return True
+        if status == "needs_modes":
+            # Travel modes are asked per plan (at @plan / join), not during setup.
+            user.onboarding_state = OnboardingState.READY
+            await self._reply(user, copy.YOU_ARE_SET)
+            return True
+        return False
 
     async def ask_trip_modes(self, db: AsyncSession, user: UserRow) -> None:
         """At @plan / join: forget last time's answer and ask how they're getting there."""
@@ -245,7 +317,7 @@ class Onboarding:
         modes = parse_modes(text)
         if modes is None:
             no_bus = "bus" in text.lower() or "transit" in text.lower()
-            await self._reply(user, copy.NO_BUS_YET if no_bus else copy.MODES_INVALID)
+            await self._huh(user, copy.NO_BUS_YET if no_bus else copy.MODES_INVALID)
             return
         await vault.set_modes(db, user.id, modes)
         log.info(kv("trip_modes", user=user.id.hex[:8], modes=modes_text(modes), source="answer"))
@@ -266,7 +338,7 @@ class Onboarding:
         if command.name == "budget":
             amount = parse_amount(command.arg)
             if amount is None or not MIN_LIMIT_USD <= amount <= MAX_LIMIT_USD:
-                await self._reply(user, copy.LIMIT_INVALID)
+                await self._huh(user, copy.LIMIT_INVALID)
                 return True
             await vault.set_limit(db, user.id, amount, "user_override")
             await self._reply(user, copy.UPDATED)

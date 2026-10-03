@@ -26,6 +26,7 @@ class GroupPlanOption(BaseModel):
 class GroupSafeMessage(BaseModel):
     text: str
     poll: list[GroupPlanOption] | None = None
+    effect: str | None = None  # iMessage screen effect, e.g. "confetti" (else plain text)
 
 
 class PersonalItinerary(BaseModel):

@@ -318,7 +318,7 @@ def test_nothing_fits_hint_names_the_narrowest_soft_venue_preference() -> None:
         pref("p1", F.CUISINE, "sushi", K.VETO, polarity="avoid"),  # not SOFT
     )
     hint = nothing_fits_hint(preferences, venues)
-    assert hint == "Being open to more than thai could help."
+    assert hint == "being open to more than thai could help."
     assert nothing_fits_hint(prefs(pref("p1", F.MAX_TRAVEL_MIN, 10, K.SOFT)), venues) is None
     # Values that aren't plain words (numbers, money) are never echoed.
     odd = prefs(pref("p1", F.CUISINE, "$30 max", K.SOFT))

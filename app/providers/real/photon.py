@@ -46,7 +46,7 @@ class PhotonMessaging:
         # msg.text already contains the rendered poll options (copy.poll_message).
         for handle in handles:
             try:
-                await self._send_dm(handle, msg.text)
+                await self._send_dm(handle, msg.text, msg.effect)
             except Exception:
                 # One member's failure must not stop the others from getting the message.
                 log.exception(kv("photon_send_group_member_failed", handle=mask_handle(handle)))
@@ -94,7 +94,31 @@ class PhotonMessaging:
         async with httpx.AsyncClient(timeout=self.timeout) as client:
             return await client.post(f"{self.bridge_url}{path}", json=body)
 
-    async def _send_dm(self, handle: str, text: str) -> None:
+    async def react(self, handle: str, message_id: str, emoji: str) -> bool:
+        try:
+            response = await self._post(
+                "/react", {"handle": handle, "message_id": message_id, "emoji": emoji}
+            )
+            return response.status_code == 200
+        except Exception:
+            log.warning(kv("photon_react_failed", handle=mask_handle(handle)))
+            return False
+
+    async def typing(self, handle: str, on: bool) -> None:
+        try:
+            await self._post("/typing", {"handle": handle, "state": "start" if on else "stop"})
+        except Exception:
+            log.warning(kv("photon_typing_failed", handle=mask_handle(handle)))
+
+    async def send_link(self, handle: str, url: str) -> bool:
+        try:
+            response = await self._post("/send_link", {"handle": handle, "url": url})
+            return response.status_code == 200
+        except Exception:
+            log.warning(kv("photon_send_link_failed", handle=mask_handle(handle)))
+            return False
+
+    async def _send_dm(self, handle: str, text: str, effect: str | None = None) -> None:
         start = time.monotonic()
         async for attempt in AsyncRetrying(
             stop=stop_after_attempt(2),
@@ -103,9 +127,10 @@ class PhotonMessaging:
         ):
             with attempt:
                 async with httpx.AsyncClient(timeout=self.timeout) as client:
-                    response = await client.post(
-                        f"{self.bridge_url}/send_dm", json={"handle": handle, "text": text}
-                    )
+                    body = {"handle": handle, "text": text}
+                    if effect:
+                        body["effect"] = effect
+                    response = await client.post(f"{self.bridge_url}/send_dm", json=body)
                     response.raise_for_status()
         log.info(
             kv(

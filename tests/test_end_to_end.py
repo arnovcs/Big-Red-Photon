@@ -130,18 +130,21 @@ def dm(client: TestClient, handle: str, text: str) -> str:
 def answer_modes(client: TestClient, persona: tuple) -> None:
     """Per-plan questions, one at a time: how (modes), then where from (nobody shares in
     the sim, so "same" keeps the starting point from setup)."""
-    assert "Where are you starting from this time?" in dm(client, persona[1], persona[-1])
-    assert "Got it" in dm(client, persona[1], "same")
+    assert "where are you starting from?" in dm(client, persona[1], persona[-1])
+    assert "what are you in the mood for" in dm(client, persona[1], "same")
 
 
 def onboard(client: TestClient, persona: tuple) -> None:
     name, handle, code, limit, start, label, modes = persona
-    assert "What's your first name?" in dm(client, handle, "start")
+    assert "what should I call you?" in dm(client, handle, "start")
     assert "bank code" in dm(client, handle, name)
     assert f"${limit}" in dm(client, handle, code)
-    assert "Where are you starting" in dm(client, handle, "yes")
-    assert f"Got it: {label}" in dm(client, handle, start)
-    assert "join <code>" in dm(client, handle, "yes")  # modes come later, per plan
+    assert "where are you starting" in dm(client, handle, "yes")
+    reply = dm(client, handle, start)
+    assert label in reply
+    if reply.endswith("right?"):  # ambiguous match: confirm it
+        reply = dm(client, handle, "yes")
+    assert "join <code>" in reply  # obvious matches skip "right?"; modes come per plan
 
 
 def without_venue_names(text: str) -> str:
@@ -186,22 +189,25 @@ def test_demo_scenario(harness, caplog: pytest.LogCaptureFixture) -> None:
 
     # Form the virtual group.
     started = dm(client, MAYA[1], "@plan")
-    assert "How are you getting there this time?" in started
+    assert "how're you getting there?" in started
     code = re.search(r"join ([A-Z0-9]{4})", started).group(1)
     assert not re.search(r"[01OI]", code)
-    assert "You're in!" in dm(client, SAM[1], f"join {code.lower()}")
-    assert "You're in!" in dm(client, JORDAN[1], f"ok join {code}")
+    assert "you're in!" in dm(client, SAM[1], f"join {code.lower()}")
+    assert "you're in!" in dm(client, JORDAN[1], f"ok join {code}")
     for persona in PERSONAS:
         answer_modes(client, persona)
     for handle in handles:
-        assert any(m["text"] == "✅ Jordan joined (3 people)." for m in outbox(client, handle))
+        assert any(m["text"] == "Jordan is in ✅ (3 of you)" for m in outbox(client, handle))
 
-    # Preferences, privately. Only each member's first message gets "Got it".
+    # Preferences, privately. Each gets a 👍 tapback on that message, not a "got it" text.
+    sim = client.app.state.deps.messaging
     for handle, texts in PREFERENCES.items():
+        before = len(sim.reactions)
         for text in texts:
             dm(client, handle, text)
-        noted = [m for m in outbox(client, handle) if m["text"].startswith("Got it 👍")]
-        assert len(noted) == 1
+        added = sim.reactions[before:]
+        assert [(h, e) for h, _, e in added] == [(handle, "👍")]  # first message only
+        assert not any(m["text"].startswith("got it 👍") for m in outbox(client, handle))
 
     dm(client, MAYA[1], "@go")
 
@@ -216,7 +222,9 @@ def test_demo_scenario(harness, caplog: pytest.LogCaptureFixture) -> None:
     polls = []
     for handle in handles:
         msgs = outbox(client, handle)
-        assert any(m["text"] == "🔎 Looking at options…" for m in msgs)
+        # Typing dots while planning (on, then off), instead of a "looking…" message.
+        events = [on for h, on in client.app.state.deps.messaging.typing_events if h == handle]
+        assert events[:2] == [True, False]
         (poll_msg,) = [m for m in msgs if m.get("poll")]
         assert poll_msg["kind"] == "group"
         polls.append(poll_msg)
@@ -224,28 +232,29 @@ def test_demo_scenario(harness, caplog: pytest.LogCaptureFixture) -> None:
     options = polls[0]["poll"]
     assert 1 <= len(options) <= 3
     assert all("Plum Tree" not in o["title"] for o in options)  # sushi veto respected
-    assert polls[0]["text"].endswith("Reply A, B, or C.")
+    assert polls[0]["text"].endswith("reply A, B, or C")
 
     # Votes are DM replies; 2 of 3 decide.
-    assert dm(client, MAYA[1], "A") == "🗳️ 1 of 3 voted"
+    assert dm(client, MAYA[1], "A") == "🗳️ 1/3 voted"
     dm(client, SAM[1], "a")
 
     # Each member: group confirmation, then their own itinerary right under it.
     itineraries = {}
     for handle in handles:
-        *_, confirmation, itinerary = outbox(client, handle)
-        assert confirmation["kind"] == "group"
-        assert confirmation["text"].startswith("🎉 Plan A:")
-        assert confirmation["text"].endswith("Your route is below 👇")
+        *_, confirmation, itinerary, link = outbox(client, handle)
+        assert confirmation["kind"] == "group" and confirmation["effect"] == "confetti"
+        assert confirmation["text"].startswith("🎉 it's A:")
+        assert confirmation["text"].endswith("your route's coming 👇")
         assert itinerary["kind"] == "private"
-        assert itinerary["text"].startswith("Your plan for tonight:")
+        assert itinerary["text"].startswith("your plan tonight:")
+        assert link["kind"] == "link" and link["text"].startswith("https://www.google.com/maps")
         itineraries[handle] = itinerary["text"]
     assert len(set(itineraries.values())) == len(PERSONAS)
     # Different modes, same arrival: Sam (far, $50) rides, Maya bikes, Jordan ($15) walks.
-    assert "Request a ride by" in itineraries[SAM[1]]
-    assert "bike about" in itineraries[MAYA[1]]
-    assert "walk about" in itineraries[JORDAN[1]]
-    arrivals = {re.search(r"Arrive ~(\d+:\d\d)", t).group(1) for t in itineraries.values()}
+    assert "request a ride by" in itineraries[SAM[1]]
+    assert "on the bike" in itineraries[MAYA[1]]
+    assert "min walk" in itineraries[JORDAN[1]]
+    arrivals = {re.search(r"get there ~(\d+:\d\d)", t).group(1) for t in itineraries.values()}
     assert len(arrivals) == 1
     assert arrivals.pop() in confirmation["text"]
 
@@ -287,9 +296,7 @@ def test_demo_scenario(harness, caplog: pytest.LogCaptureFixture) -> None:
         assert a.total_cost_usd <= limit_by_handle[pid_to_handle[a.pid]]
 
     # The session is over: the code is retired and a new @plan gets a new one.
-    assert (
-        dm(client, JORDAN[1], f"join {code}") == "I don't know that code. Check it and try again."
-    )
+    assert dm(client, JORDAN[1], f"join {code}") == "hmm I don't know that code. double check it?"
     assert code not in dm(client, MAYA[1], "@plan")
 
 
@@ -301,22 +308,22 @@ def test_join_rules(harness) -> None:
     assert "not in a plan" in dm(client, MAYA[1], "@go")
     code = re.search(r"join ([A-Z0-9]{4})", dm(client, MAYA[1], "@plan")).group(1)
     assert code in dm(client, MAYA[1], "@plan")  # already in a plan
-    assert dm(client, MAYA[1], "@go") == f"I need at least 2 people. Share code {code} first."
+    assert dm(client, MAYA[1], "@go") == f"need at least 2 people! share code {code} first"
     assert "don't know that code" in dm(client, SAM[1], "join ZZZZ")
 
     # A join from someone not set up yet starts onboarding instead.
     newcomer = "+16075550199"
     client.post("/sim/message", json={"sender_handle": newcomer, "text": f"join {code}"})
     first, second = (m["text"] for m in outbox(client, newcomer))
-    assert first == f"Let's get you set up first, then send join {code} again."
-    assert "What's your first name?" in second
+    assert first == f"quick setup first, then send join {code} again"
+    assert "what should I call you?" in second
 
     # Any member can cancel; everyone hears about it and the code is retired.
     dm(client, SAM[1], f"join {code}")
     answer_modes(client, SAM)
     dm(client, SAM[1], "@cancel")
     for handle in (MAYA[1], SAM[1]):
-        assert outbox(client, handle)[-1]["text"].startswith("Plan cancelled.")
+        assert outbox(client, handle)[-1]["text"].startswith("plan cancelled")
     assert "don't know that code" in dm(client, SAM[1], f"join {code}")
 
 
@@ -333,12 +340,12 @@ def test_nothing_fits_returns_to_collecting_with_a_safe_hint(harness) -> None:
     dm(client, MAYA[1], "@go")
 
     expected = (
-        "Nothing fits everyone right now. Being open to more than korean could help. "
-        "Then say @go again."
+        "nothing works for everyone rn. being open to more than korean could help. "
+        "then say go again"
     )
     for handle in (MAYA[1], JORDAN[1]):
         assert outbox(client, handle)[-1] == {"kind": "group", "text": expected, "poll": None}
     # Back to COLLECTING: @go runs again (and Jordan's HARD limit still rules everything out).
     assert dm(client, MAYA[1], "@go").endswith(expected)
-    texts = [m["text"] for m in outbox(client, MAYA[1])]
-    assert texts.count("🔎 Looking at options…") == 2
+    typing = [on for h, on in client.app.state.deps.messaging.typing_events if h == MAYA[1]]
+    assert typing == [True, False, True, False]  # planned twice

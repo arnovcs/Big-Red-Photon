@@ -97,7 +97,7 @@ class Router:
                 if parsed and parsed.command == SessionCommand.JOIN and parsed.arg:
                     await self.onboarding.join_before_ready(user, parsed.arg, first_dm)
                 else:
-                    await self.onboarding.handle_dm(db, user, msg.text, first_dm)
+                    await self.onboarding.handle_dm(db, user, msg.text, first_dm, msg.message_id)
             elif await self.sessions.handle_command(db, user, msg):
                 pass
             elif await self.onboarding.handle_settings(db, user, msg.text):

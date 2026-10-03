@@ -13,11 +13,19 @@ class SimMessaging:
         # Simulated Find My: tests set shared[handle] to "share" a location.
         self.shared: dict[str, LatLng] = {}
         self.location_requests: list[str] = []
+        # Tapbacks / typing as (handle, message_id, emoji) / (handle, on). Tests can set
+        # reactions_work = False to simulate a line without tapbacks (text fallback).
+        self.reactions: list[tuple[str, str, str]] = []
+        self.typing_events: list[tuple[str, bool]] = []
+        self.reactions_work = True
 
     async def send_group(self, handles: list[str], msg: GroupSafeMessage) -> None:
         poll = [option.model_dump() for option in msg.poll] if msg.poll else None
         for handle in handles:
-            self.outbox[handle].append({"kind": "group", "text": msg.text, "poll": poll})
+            entry = {"kind": "group", "text": msg.text, "poll": poll}
+            if msg.effect:
+                entry["effect"] = msg.effect
+            self.outbox[handle].append(entry)
 
     async def send_private(self, handle: str, msg: PrivateMessage) -> None:
         self.outbox[handle].append(
@@ -31,6 +39,19 @@ class SimMessaging:
     async def shared_location(self, handle: str) -> LatLng | None:
         return self.shared.get(handle)
 
+    async def react(self, handle: str, message_id: str, emoji: str) -> bool:
+        if not self.reactions_work:
+            return False
+        self.reactions.append((handle, message_id, emoji))
+        return True
+
+    async def typing(self, handle: str, on: bool) -> None:
+        self.typing_events.append((handle, on))
+
+    async def send_link(self, handle: str, url: str) -> bool:
+        self.outbox[handle].append({"kind": "link", "text": url})
+        return True
+
     def messages(self, handle: str) -> list[dict[str, Any]]:
         return list(self.outbox.get(handle, []))
 
@@ -38,3 +59,5 @@ class SimMessaging:
         self.outbox.clear()
         self.shared.clear()
         self.location_requests.clear()
+        self.reactions.clear()
+        self.typing_events.clear()

@@ -220,14 +220,16 @@ def run_plan(client: TestClient, answers: dict[str, str | None], chat: list[tupl
             dm(client, handle, "same")
     for name, text in chat:
         dm(client, people[name][1], text)
-    assert "Looking at options" in dm(client, MAYA[1], "@go")
+    assert "for everyone" in dm(client, MAYA[1], "@go")
     dm(client, MAYA[1], "A")
     dm(client, SAM[1], "A")
     result = {}
     starts = {"Maya": (42.456, -76.4777), "Sam": (42.4393, -76.4977)}  # stub landmarks
     for name, (_, handle, _, _) in people.items():
-        texts = [m["text"] for m in client.get(f"/sim/outbox/{handle}").json()]
-        itinerary = next(t for t in texts if t.startswith("Your plan"))
+        sent = client.get(f"/sim/outbox/{handle}").json()
+        texts = [m["text"] for m in sent]
+        link = next(m["text"] for m in sent if m["kind"] == "link")
+        itinerary = next(t for t in texts if t.startswith("your plan")) + "\n" + link
         result[name] = (modes.get(starts[name], []), itinerary, texts)
     return result
 
@@ -252,7 +254,7 @@ def test_7_no_answer_means_walking_and_they_are_told(client) -> None:
     out = run_plan(client, {"Maya": "car", "Sam": None})
     route_modes, itinerary, texts = out["Sam"]
     assert route_modes == [Mode.WALK]
-    assert any(t.startswith("You didn't say how you're getting there") for t in texts)
+    assert any(t.startswith("you didn't say how you're getting there") for t in texts)
     assert "walk" in itinerary.lower()
 
 
@@ -263,7 +265,7 @@ def test_8_actually_ill_drive_switches_the_next_route(client) -> None:
         chat=[("Maya", "let's get food"), ("Maya", "actually I'll drive")],
     )
     route_modes, itinerary, texts = out["Maya"]
-    assert any(t.startswith("Got it, driving.") for t in texts)
+    assert any(t.startswith("got it, driving") for t in texts)
     assert route_modes == [Mode.DRIVE]
     assert "🚗" in itinerary
 

@@ -86,6 +86,8 @@ class Settings(BaseSettings):
     http_timeout_sec: float = 10.0
     # A Find My location older than this counts as "not sharing" (they likely stopped).
     shared_location_max_age_min: int = 120
+    # "heads up, leave in N" DM before each person's leave time (0 = off).
+    leave_nudge_min: int = 5
 
     # Web signup (app/web/). Who signed up is visible in Photon's dashboard (Users tab).
     app_name: str = "Huddle"  # product name shown on the web pages

@@ -9,6 +9,7 @@ import asyncio
 import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Coroutine
+from datetime import timedelta
 from enum import StrEnum
 from typing import Any
 
@@ -16,7 +17,12 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversation import copy
-from app.conversation.commands import SessionCommand, parse_mode_change, parse_session_command
+from app.conversation.commands import (
+    GO_IN_SENTENCE,
+    SessionCommand,
+    parse_mode_change,
+    parse_session_command,
+)
 from app.db import queries
 from app.db.session import session_factory
 from app.db.tables import GroupRow, SessionMessageRow, SessionRow, UserRow
@@ -63,8 +69,12 @@ class PlanningSessions:
         self._run_locked = run_locked
         self._spawn = spawn
         self._poll_timers: dict[uuid.UUID, asyncio.Task[None]] = {}
+        self._nudges: set[asyncio.Task[None]] = set()
 
     # --- messaging helpers ----------------------------------------------------
+
+    async def _reply_handle(self, handle: str, text: str) -> None:
+        await send_private(self.deps.messaging, handle, PrivateMessage(text=text))
 
     async def _reply(self, user: UserRow, text: str) -> None:
         await send_private(self.deps.messaging, user.handle, PrivateMessage(text=text))
@@ -114,6 +124,10 @@ class PlanningSessions:
         if parsed.command == SessionCommand.CANCEL:
             await self._cancel(db, group, session)
         elif parsed.command == SessionCommand.GO:
+            if parsed.arg == GO_IN_SENTENCE and state == SessionState.COLLECTING:
+                # "ok that's all, somewhere cheap pls, show us": keep what they said as a
+                # preference too, then go.
+                await self.store_message(db, user, msg, quiet=True)
             await self._go(db, user, group, session)
         elif parsed.command == SessionCommand.PICK:
             if state == SessionState.POLLING:
@@ -126,16 +140,19 @@ class PlanningSessions:
             await self._vote(db, group, session, user, parsed.arg)
         return True
 
-    async def store_message(self, db: AsyncSession, user: UserRow, msg: InboundMessage) -> bool:
+    async def store_message(
+        self, db: AsyncSession, user: UserRow, msg: InboundMessage, quiet: bool = False
+    ) -> bool:
         """Keep a preference DM while COLLECTING. Nothing is relayed to other members."""
         group = await queries.active_group_for_user(db, user.id)
         session = await queries.active_session(db, group) if group else None
         if session is None or session.state != SessionState.COLLECTING:
             return False
-        if (modes := parse_mode_change(msg.text)) is not None:
+        mode_change = parse_mode_change(msg.text)
+        if mode_change is not None:
             # "actually I'll drive": their mode for this plan changes now. The message is
             # still kept below (it may say more, e.g. "I'm driving, let's get tacos").
-            await Onboarding(self.deps).change_trip_modes(db, user, modes)
+            await Onboarding(self.deps).change_trip_modes(db, user, mode_change)
         earlier = await db.scalar(
             select(func.count())
             .select_from(SessionMessageRow)
@@ -153,8 +170,12 @@ class PlanningSessions:
                 ts=msg.ts,
             )
         )
-        if not earlier:
-            await self._reply(user, copy.NOTED)  # only the first one, to keep the DM quiet
+        # Only their first message in a plan gets a 👍 ("heard you"), like a friend would;
+        # after that, quiet. No tapback when a text reply already went out (mode change).
+        # If tapbacks don't work on this line, a short "got it" instead.
+        if not earlier and mode_change is None and not quiet:
+            if not await self.deps.messaging.react(user.handle, msg.message_id, copy.REACT_OK):
+                await self._reply(user, copy.NOTED)
         return True
 
     # --- transitions ----------------------------------------------------------
@@ -223,7 +244,9 @@ class PlanningSessions:
             return
         session.state = SessionState.RUNNING
         await db.commit()
-        await self._tell_group(db, group.id, session.id, copy.LOOKING)
+        # Typing dots while planning ("…"), the way a friend would look things up.
+        for handle in await _handles(db, group.id):
+            await self.deps.messaging.typing(handle, True)
         self._spawn(self._run_pipeline(group.id, session.id))
 
     async def _run_pipeline(self, group_id: uuid.UUID, session_id: uuid.UUID) -> None:
@@ -239,6 +262,8 @@ class PlanningSessions:
         self, group_id: uuid.UUID, session_id: uuid.UUID, result: PlanningResult | None
     ) -> None:
         async with session_factory()() as db:
+            for handle in await _handles(db, group_id):
+                await self.deps.messaging.typing(handle, False)
             session = await db.get(SessionRow, session_id)
             if session is None or session.state != SessionState.RUNNING:
                 return  # cancelled while the pipeline ran
@@ -354,6 +379,31 @@ class PlanningSessions:
             await itinerary.send(self.deps, handles, confirmation, personal, guard)
             session.state = SessionState.DONE
             await self._close(db, group, session)
+            self._schedule_leave_nudges(personal)
+
+    def _schedule_leave_nudges(self, personal: list[itinerary.Itinerary]) -> None:
+        """ "heads up, leave in 5" to each person, at their own leave time."""
+        if self.deps.settings.leave_nudge_min <= 0:
+            return
+        lead = timedelta(minutes=self.deps.settings.leave_nudge_min)
+        now = self.deps.clock()
+        for item in personal:
+            if item.leave_by is None:
+                continue
+            delay = (item.leave_by - lead - now).total_seconds()
+            if delay <= 0:
+                continue  # leaving too soon for a nudge to help
+            task = asyncio.create_task(self._leave_nudge(item, delay))
+            self._nudges.add(task)
+            task.add_done_callback(self._nudges.discard)
+
+    async def _leave_nudge(self, item: itinerary.Itinerary, delay: float) -> None:
+        await asyncio.sleep(delay)
+        text = copy.leave_nudge(item.mode, self.deps.settings.leave_nudge_min)
+        try:
+            await self._reply_handle(item.handle, text)
+        except Exception:
+            log.warning(kv("leave_nudge_failed"))
 
     async def _close(self, db: AsyncSession, group: GroupRow, session: SessionRow) -> None:
         """End the session: drop collected DMs (§11 retention) and retire the join code."""
@@ -392,6 +442,9 @@ class PlanningSessions:
             await self._finish(db, group, session, label)
 
     def shutdown(self) -> None:
+        for task in self._nudges:
+            task.cancel()
+        self._nudges.clear()
         for task in self._poll_timers.values():
             task.cancel()
         self._poll_timers.clear()

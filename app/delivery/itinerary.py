@@ -2,6 +2,7 @@
 
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
@@ -55,7 +56,9 @@ def itinerary_text(
     tz: ZoneInfo,
     pickup_wait_min: int,
     origin: LatLng | None = None,
+    link_separately: bool = False,
 ) -> str:
+    """`link_separately`: leave the Maps link out (it's sent as its own preview card)."""
     venue = plan.candidate
     leave_local = assignment.leave_by.astimezone(tz)
     arrive_local = assignment.arrive_at.astimezone(tz)
@@ -68,12 +71,13 @@ def itinerary_text(
         ride = travel
 
     lines = [
-        copy.itinerary_header(venue.name, venue.address),
+        copy.itinerary_header(venue.name, venue.address, copy.day_word(arrive_local)),
         copy.leave_line(assignment.mode.value, leave_local, travel, pickup_wait_min, ride),
     ]
     if assignment.mode != Mode.RIDESHARE:
         lines.extend(f"• {step.instruction}" for step in steps[:MAX_STEPS_SHOWN])
-    lines.append(copy.maps_line(directions_url(venue.location, assignment.mode, origin)))
+    if not link_separately:
+        lines.append(copy.maps_line(directions_url(venue.location, assignment.mode, origin)))
     food = _food_cost(plan, assignment)
     what = "entry" if venue.category in ("activity", "sports", "event") else "food"
     lines.append(
@@ -104,6 +108,9 @@ class Itinerary:
     handle: str
     message: PrivateMessage
     own_amounts: frozenset[int]  # exempt from the guard's "other member's limit" check
+    maps_url: str | None = None  # sent as a link preview card right after the message
+    mode: str = ""
+    leave_by: datetime | None = None  # for the "leave in 5" nudge
 
 
 async def prepare(deps: Deps, session_id: uuid.UUID, plan: Plan) -> list[Itinerary]:
@@ -153,17 +160,32 @@ async def prepare(deps: Deps, session_id: uuid.UUID, plan: Plan) -> list[Itinera
                 kv("member_route_origin", user=user.id.hex[:8], lat=origin.lat, lng=origin.lng)
             )
         text = itinerary_text(
-            plan, assignment, steps, tz, deps.settings.rideshare_pickup_wait_min, origin
+            plan,
+            assignment,
+            steps,
+            tz,
+            deps.settings.rideshare_pickup_wait_min,
+            origin,
+            link_separately=True,
         )
         personal.append(
-            Itinerary(user.handle, PrivateMessage(text=text), own_amounts(plan, assignment))
+            Itinerary(
+                user.handle,
+                PrivateMessage(text=text),
+                own_amounts(plan, assignment),
+                maps_url=directions_url(plan.candidate.location, assignment.mode, origin),
+                mode=assignment.mode.value,
+                leave_by=assignment.leave_by,
+            )
         )
     return personal
 
 
 def confirmation_message(deps: Deps, plan: Plan, label: str) -> GroupSafeMessage:
     arrive_local = plan.target_arrival.astimezone(ZoneInfo(deps.settings.demo_timezone))
-    return GroupSafeMessage(text=copy.confirmation(label, plan.candidate.name, arrive_local))
+    return GroupSafeMessage(
+        text=copy.confirmation(label, plan.candidate.name, arrive_local), effect="confetti"
+    )
 
 
 async def send(
@@ -180,3 +202,7 @@ async def send(
     await send_group(deps.messaging, handles, confirmation, guard)
     for item in personal:
         await send_private(deps.messaging, item.handle, item.message, guard, item.own_amounts)
+        if item.maps_url and not await deps.messaging.send_link(item.handle, item.maps_url):
+            # No preview card on this line: the plain link instead.
+            link = PrivateMessage(text=copy.maps_line(item.maps_url))
+            await send_private(deps.messaging, item.handle, link, guard, item.own_amounts)
