@@ -22,6 +22,9 @@ MODERATE_WALK_MAX_MIN = 20
 
 def _title(plan: Plan) -> str:
     cand = plan.candidate
+    if cand.extra_stops:  # combo: "Reis Tennis Center + Kung Fu Tea — Pickleball + Boba"
+        kinds = cand.cuisines[: 1 + len(cand.extra_stops)]
+        return f"{cand.name} — {' + '.join(k.replace('_', ' ').title() for k in kinds)}"
     if cand.cuisines:
         return f"{cand.name} — {cand.cuisines[0].replace('_', ' ').title()}"
     return cand.name

@@ -41,6 +41,11 @@ class Candidate(BaseModel):
     typical_duration_min: int  # category default: food 60, cafe 45, dessert 30, bar 90, activity 90
     rating: float | None = None
     source: Literal["google", "event"]
+    # A combo plan ("pickleball + boba"): the stops after this one, walked in order.
+    extra_stops: list["Candidate"] = []
+
+
+Candidate.model_rebuild()
 
 
 class ResolvedPlace(BaseModel):

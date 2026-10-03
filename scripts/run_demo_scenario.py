@@ -133,6 +133,7 @@ def main() -> None:
             dm(client, handles[name], "same")
         for name, text in PREFERENCES:
             dm(client, handles[name], text)
+        dm(client, handles["Sam"], "go")  # more than half the group must say go
         dm(client, handles["Maya"], "@go")
         dm(client, handles["Maya"], "A")
         dm(client, handles["Sam"], "A")

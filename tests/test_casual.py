@@ -268,3 +268,42 @@ def test_hi_gets_a_friendly_reply_for_where_you_are(client) -> None:
     from app.conversation.commands import is_greeting
 
     assert not is_greeting("hi I want tacos")
+
+
+# --- several messages while collecting: each one counts, each gets a fitting tapback ------
+
+
+def test_several_preference_messages_all_count_and_each_gets_a_tapback(client) -> None:
+    sam = "+16075550102"
+    for text in ["start", "Maya", "MAYA1", "yes", "olin"]:
+        send(client, text)
+    for text in ["start", "Sam", "SAM1", "yes", "olin"]:
+        client.post("/sim/message", json={"sender_handle": sam, "text": text})
+    code = __import__("re").search(r"join ([A-Z0-9]{4})", " ".join(send(client, "plan"))).group(1)
+    client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
+    for who, text in [(H, "bike"), (H, "same"), (sam, "walk"), (sam, "same")]:
+        client.post("/sim/message", json={"sender_handle": who, "text": text})
+
+    sim = client.app.state.deps.messaging
+    before = len(sim.reactions)
+    messages = ["I'm starving", "NO SUSHI", "lol idk", "somewhere with a patio"]
+    for text in messages:
+        assert send(client, text) == []  # no text spam, just tapbacks
+    assert [e for _, _, e in sim.reactions[before:]] == ["❤️", "‼️", "😂", "👍"]
+
+    llm_saw = []
+
+    class SeeingLLM:
+        async def extract_preferences(self, transcript, now_local):
+            from app.models.conversation import GroupPreferences
+
+            llm_saw.extend(m.text for m in transcript)
+            return GroupPreferences(constraints=[], group_intent="food")
+
+        async def phrase_explanations(self, facts):
+            return ["" for _ in facts]
+
+    client.app.state.deps.llm = SeeingLLM()
+    client.post("/sim/message", json={"sender_handle": sam, "text": "go"})
+    send(client, "go")
+    assert llm_saw == messages  # every message reached the planner

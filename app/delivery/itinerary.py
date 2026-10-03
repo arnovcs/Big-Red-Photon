@@ -20,6 +20,7 @@ from app.models.plans import PersonAssignment, Plan
 from app.models.private import LatLng
 from app.models.routing import Mode, RouteStep
 from app.optimizer.arrival import whole_minutes
+from app.planning import combos
 from app.planning.pipeline import load_pid_map
 from app.private import vault
 from app.providers.costs import DRIVE_PARKING_MIN
@@ -76,6 +77,11 @@ def itinerary_text(
     ]
     if assignment.mode != Mode.RIDESHARE:
         lines.extend(f"• {step.instruction}" for step in steps[:MAX_STEPS_SHOWN])
+    previous = venue
+    for stop in venue.extra_stops:  # combo plan: walk on to the next place together
+        minutes = combos.walk_minutes_between(previous, stop)
+        lines.append(copy.next_stop_line(stop.name, stop.address, minutes))
+        previous = stop
     if not link_separately:
         lines.append(copy.maps_line(directions_url(venue.location, assignment.mode, origin)))
     food = _food_cost(plan, assignment)

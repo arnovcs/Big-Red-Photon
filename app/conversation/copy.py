@@ -15,6 +15,8 @@ BOT_NAME = "Huddle"
 REACT_OK = "👍"
 REACT_LOVE = "❤️"
 REACT_HUH = "❓"
+REACT_STRONG = "‼️"
+REACT_LAUGH = "😂"
 
 # --- Virtual group (v3: every message is a DM) --------------------------------
 
@@ -337,6 +339,10 @@ def leave_line(
     if mode == "drive":
         return f"🚗 leave by {t}, about {travel_min} min drive (incl. parking)"
     return f"🚕 request a ride by {t} (~{pickup_min} min pickup + {ride_min} min drive)"
+
+
+def next_stop_line(name: str, address: str, walk_min: int) -> str:
+    return f"then 🚶 ~{walk_min} min walk together to {name}, {address}"
 
 
 def maps_line(url: str) -> str:

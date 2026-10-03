@@ -119,6 +119,32 @@ def is_greeting(text: str) -> bool:
     return bool(_GREETING.match(_plain(text)))
 
 
+_LAUGH = re.compile(r"\b(lol+|lmao+|lmfao|haha+|hehe+|rofl|dead|im crying)\b")
+_LOVE = re.compile(
+    r"\b(love|loveee+|obsessed|craving|starving|starved|famished|yum+|yummy|so good|"
+    r"bestie|amazing|yesss+|lets gooo+|cant wait|excited|hype|hyped)\b"
+)
+_STRONG = re.compile(
+    r"^(no|not|nothing|never|nope|hate|cant|cannot|dont|absolutely not)\b|"
+    r"\b(hate|allergic|cant do|can't do|dealbreaker|no way|absolutely|must|need to|have to)\b"
+)
+
+
+def reaction_for(text: str) -> str:
+    """The tapback a friend would give a preference message: 😂 for a joke, ‼️ for a
+    strong ask or a no-go, ❤️ for excitement or a craving, 👍 otherwise."""
+    plain = _plain(text)
+    if _LAUGH.search(plain) or any(e in text for e in ("😂", "🤣", "💀")):
+        return "😂"
+    letters = [ch for ch in text if ch.isalpha()]
+    shouting = len(letters) >= 4 and all(ch.isupper() for ch in letters)
+    if shouting or "!!" in text or _STRONG.search(plain):
+        return "‼️"
+    if _LOVE.search(plain) or any(e in text for e in ("🤤", "😍", "❤️", "🥰", "🔥")):
+        return "❤️"
+    return "👍"
+
+
 def is_go_sentence(text: str) -> bool:
     plain = _plain(text)
     return any(p.search(plain) for p in _GO_SENTENCE)

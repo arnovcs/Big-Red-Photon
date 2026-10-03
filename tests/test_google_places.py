@@ -261,3 +261,11 @@ def test_activities_get_their_kind_for_variety_and_the_poll() -> None:
         "types": ["state_park", "park"],
     }
     assert to_candidate(place, "activity", SAT_6PM).cuisines == ["state_park"]
+
+
+def test_shops_that_just_sell_the_thing_are_not_venues() -> None:
+    real = {"businessStatus": "OPERATIONAL", "userRatingCount": 500}
+    loc = {"displayName": {"text": "x"}, "location": {"latitude": 42.4, "longitude": -76.5}}
+    for primary in ("sporting_goods_store", "supermarket", "shopping_mall"):
+        assert to_candidate({**real, **loc, "primaryType": primary}, "sports", SAT_6PM) is None
+    assert to_candidate({**real, **loc, "primaryType": "tennis_court"}, "sports", SAT_6PM)

@@ -35,6 +35,7 @@ from app.optimizer import OptimizerParams, facts
 from app.optimizer import cuisines as cuisine_families
 from app.optimizer.enumerate import EstimateIndex
 from app.optimizer.feasibility import allowed_modes
+from app.planning import combos
 from app.planning.explain import explain
 from app.private import vault
 from app.providers.mock.routing import haversine_mi
@@ -304,7 +305,17 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
         activities=wanted_activities,
     )
     found = len(candidates)
-    candidates = _shortlist(candidates, wanted_cuisines, wanted_activities, center)
+    mixed_wants = None  # set when the poll must take turns between very different asks
+    wants = combos.asks_by_person(preferences)
+    if combos.needs_combos(candidates, wants):
+        # Very different asks ("pickleball" + "boba"), nothing covers everyone: chain a
+        # stop for each, walkable; else take turns between them. Fair to every ask.
+        chained = combos.build(candidates, wants)
+        mixed_wants = wants if not chained else None
+        candidates = chained or combos.mixed(candidates, wants, MAX_CANDIDATES)
+        log.info(kv("combo_plans", chained=len(chained), options=len(candidates)))
+    else:
+        candidates = _shortlist(candidates, wanted_cuisines, wanted_activities, center)
     log.info(kv("venues_filtered", found=found, shortlisted=len(candidates)))
 
     # 4. Route
@@ -319,7 +330,7 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
     # 5. Optimize
     params = OptimizerParams(lam=settings.optimizer_lambda)
     ranked = optimizer.rank(candidates, index, constraints, preferences, now_local, params)
-    top = optimizer.select(ranked, k=3)
+    top = combos.pick_mixed(ranked, mixed_wants) if mixed_wants else optimizer.select(ranked, k=3)
     log.info(kv("pipeline_ranked", candidates=len(candidates), feasible=len(ranked)))
 
     # 6. Explain (LLM phrasing → number check → template fallback)
@@ -375,4 +386,5 @@ async def build_guard(
 
 def venue_terms(plans: list[Plan]) -> list[str]:
     """Public venue names and addresses, exempt from the guard's scan."""
-    return [t for p in plans for t in (p.candidate.name, p.candidate.address)]
+    stops = [s for p in plans for s in (p.candidate, *p.candidate.extra_stops)]
+    return [t for s in stops for t in (s.name, s.address)]

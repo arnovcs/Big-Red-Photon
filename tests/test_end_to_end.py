@@ -206,7 +206,7 @@ def test_demo_scenario(harness, caplog: pytest.LogCaptureFixture) -> None:
         for text in texts:
             dm(client, handle, text)
         added = sim.reactions[before:]
-        assert [(h, e) for h, _, e in added] == [(handle, "👍")]  # first message only
+        assert [h for h, _, _ in added] == [handle] * len(texts)  # each message, a tapback
         assert not any(m["text"].startswith("got it 👍") for m in outbox(client, handle))
 
     # More than half must say go (2 of 3). Everyone hears who's ready.

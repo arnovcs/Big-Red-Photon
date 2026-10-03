@@ -23,6 +23,7 @@ from app.conversation.commands import (
     is_greeting,
     parse_mode_change,
     parse_session_command,
+    reaction_for,
 )
 from app.db import queries
 from app.db.session import session_factory
@@ -188,12 +189,15 @@ class PlanningSessions:
                 ts=msg.ts,
             )
         )
-        # Only their first message in a plan gets a 👍 ("heard you"), like a friend would;
-        # after that, quiet. No tapback when a text reply already went out (mode change).
-        # If tapbacks don't work on this line, a short "got it" instead.
-        if not earlier and mode_change is None and not quiet:
-            if not await self.deps.messaging.react(user.handle, msg.message_id, copy.REACT_OK):
-                await self._reply(user, copy.NOTED)
+        # Every preference message counts (all go to the planner together) and gets a
+        # tapback that fits it (❤️ craving, ‼️ no-go, 😂 joke, 👍 else), like a friend
+        # would. No tapback when a text reply already went out (mode change). If tapbacks
+        # don't work on this line, a short "got it" on the first message only.
+        if mode_change is None and not quiet:
+            emoji = reaction_for(msg.text)
+            if not await self.deps.messaging.react(user.handle, msg.message_id, emoji):
+                if not earlier:
+                    await self._reply(user, copy.NOTED)
         return True
 
     # --- transitions ----------------------------------------------------------

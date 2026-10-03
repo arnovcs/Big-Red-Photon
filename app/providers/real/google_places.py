@@ -128,6 +128,15 @@ CATEGORY_TYPES: dict[str, list[str]] = {
 # Categories that aren't food or drink: restaurants and bars are never results here.
 NON_FOOD_CATEGORIES = {"activity", "sports"}
 FOOD_AND_DRINK_TYPES = ["restaurant", "bar", "pub", "cafe", "fast_food_restaurant"]
+# Food / drink types beyond our category lists (boba shops, tea houses, juice bars...).
+FOOD_KIND_TYPES = {
+    "tea_house",
+    "juice_shop",
+    "food",
+    "meal_takeaway",
+    "bakery",
+    "dessert_restaurant",
+}
 # Spectator venues: somewhere to watch a game on game day, not somewhere to go do something.
 SPECTATOR_TYPES = ["stadium", "arena"]
 # "restaurant" matches every kind of restaurant (italian_restaurant, ...), so food
@@ -292,9 +301,18 @@ def _dedupe(items: list[str]) -> list[str]:
 
 
 def category_of(place: dict) -> str:
-    """For a place found by a free-text activity search: sports or activity."""
-    types = {place.get("primaryType") or "", *(place.get("types") or [])}
-    return "sports" if types & set(CATEGORY_TYPES["sports"]) else "activity"
+    """For a place found by free-text search ("pickleball", "boba"): sports, a food or
+    drink kind (cafe / dessert / bar / food), or activity."""
+    primary = place.get("primaryType") or ""
+    types = {primary, *(place.get("types") or [])}
+    if types & set(CATEGORY_TYPES["sports"]):
+        return "sports"
+    if _is_food_or_drink(place) or types & FOOD_KIND_TYPES:
+        for category in ("cafe", "dessert", "bar"):
+            if types & set(CATEGORY_TYPES[category]):
+                return category
+        return "food"
+    return "activity"
 
 
 def cuisine_types(wanted: list[str]) -> list[str]:
@@ -383,6 +401,30 @@ def to_resolved_place(place: dict) -> ResolvedPlace | None:
     )
 
 
+# Shops that merely SELL the thing (a paddle at a sporting goods store, bubble tea in a
+# supermarket): text search finds them, but they aren't somewhere to go do it.
+RETAIL_TYPES = {
+    "store",
+    "sporting_goods_store",
+    "supermarket",
+    "grocery_store",
+    "convenience_store",
+    "department_store",
+    "discount_store",
+    "warehouse_store",
+    "shopping_mall",
+    "clothing_store",
+    "hardware_store",
+    "home_goods_store",
+    "electronics_store",
+    "drugstore",
+    "pharmacy",
+    "gas_station",
+    "hotel",
+    "lodging",
+}
+
+
 def to_candidate(
     place: dict, category: str, at: datetime, tags: list[str] | None = None
 ) -> Candidate | None:
@@ -393,6 +435,8 @@ def to_candidate(
         return None
     if category in NON_FOOD_CATEGORIES and _is_food_or_drink(place):
         return None  # an activity search never suggests a restaurant or bar
+    if (place.get("primaryType") or "") in RETAIL_TYPES:
+        return None  # sells it, isn't somewhere to go do it
     location = place.get("location") or {}
     name = (place.get("displayName") or {}).get("text")
     if not name or "latitude" not in location or "longitude" not in location:
@@ -504,6 +548,11 @@ class GooglePlaces:
         for activity in activities or []:
             body = self._text_body(activity, center, MAX_RESULTS)
             searches.append((f"activity:{activity}", None, [activity], TEXT_SEARCH_URL, body))
+        for cuisine in cuisines or []:
+            # No Google restaurant type for it ("boba", "poke"): search it by name.
+            if not cuisine_types([cuisine]):
+                body = self._text_body(cuisine, center, MAX_RESULTS)
+                searches.append((f"cuisine:{cuisine}", None, [cuisine], TEXT_SEARCH_URL, body))
         types = cuisine_types(cuisines or [])
         if types:
             body = self._nearby_body(center, "food", types, MAX_RESULTS)

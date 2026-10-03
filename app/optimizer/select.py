@@ -4,8 +4,11 @@ from app.models.plans import Plan
 
 
 def _kind(plan: Plan) -> tuple[str, str | None]:
-    """Category plus primary cuisine, e.g. ("food", "sushi")."""
+    """Category plus primary cuisine, e.g. ("food", "sushi"). For a combo plan (court +
+    boba) every option has the same kinds, so its first stop is what varies."""
     cand = plan.candidate
+    if cand.extra_stops:
+        return "combo", cand.candidate_id.split("+")[0]
     return cand.category.lower(), (cand.cuisines[0].lower() if cand.cuisines else None)
 
 

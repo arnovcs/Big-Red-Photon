@@ -138,5 +138,11 @@ async def test_wanted_cuisine_gets_its_own_search_first() -> None:
 async def test_no_cuisine_no_extra_search() -> None:
     g = StubGoogle()
     await g.search_nearby(CENTER, 2500, ["food"], SAT_6PM)
-    await g.search_nearby(CENTER, 2500, ["food"], SAT_6PM, cuisines=["martian"])
-    assert [b["includedTypes"] for b in g.bodies] == [["restaurant"], ["restaurant"]]
+    assert [b["includedTypes"] for b in g.bodies] == [["restaurant"]]
+
+
+async def test_a_cuisine_with_no_google_type_is_searched_by_name() -> None:
+    g = StubGoogle()  # "boba" has no restaurant type: Text Search for it, then the category
+    await g.search_nearby(CENTER, 2500, ["food"], SAT_6PM, cuisines=["boba"])
+    assert g.bodies[0]["textQuery"] == "boba"
+    assert g.bodies[1]["includedTypes"] == ["restaurant"]
