@@ -1,0 +1,9 @@
+{"description": "Chatter, a claim about someone not in the chat, and two real constraints. Nothing should be attributed to p1 or p2 for m1/m2.",
+ "now_local": "2026-10-03T20:00:00-04:00",
+ "messages": [{"message_id": "m1", "pid": "p1", "text": "my roommate says she hates thai food lol"},
+              {"message_id": "m2", "pid": "p2", "text": "honestly anything works for me"},
+              {"message_id": "m3", "pid": "p3", "text": "max 20 minutes of travel please"},
+              {"message_id": "m4", "pid": "p2", "text": "let's get dessert"}],
+ "expected": [{"pid": "p3", "field": "max_travel_minutes", "value": 20, "kind": "hard"},
+              {"pid": "p2", "field": "category", "value": "dessert", "kind": "soft"}],
+ "must_not": [{"pid": "p1", "field": "cuisine", "value": "thai"}]}

@@ -1,0 +1,10 @@
+{"description": "The §18 demo conversation.",
+ "now_local": "2026-10-03T18:00:00-04:00",
+ "messages": [{"message_id": "m1", "pid": "p1", "text": "I'm starving"},
+              {"message_id": "m2", "pid": "p2", "text": "no sushi pls"},
+              {"message_id": "m3", "pid": "p3", "text": "I have to be back by 9, and nothing too far"},
+              {"message_id": "m4", "pid": "p2", "text": "something we haven't tried?"}],
+ "expected": [{"pid": "p1", "field": "category", "value": "food", "kind": "inferred"},
+              {"pid": "p2", "field": "cuisine", "value": "sushi", "polarity": "avoid", "kind": "veto"},
+              {"pid": "p3", "field": "available_until", "value": "21:00", "kind": "hard"},
+              {"pid": "p2", "field": "novelty", "value": 1.0, "kind": "soft"}]}

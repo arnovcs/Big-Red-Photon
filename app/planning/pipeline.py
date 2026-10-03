@@ -34,6 +34,7 @@ from app.models.private import LatLng, PrivateConstraints
 from app.optimizer import OptimizerParams, facts
 from app.optimizer.enumerate import EstimateIndex
 from app.optimizer.feasibility import allowed_modes
+from app.planning.explain import explain
 from app.private import vault
 
 log = get_logger(__name__)
@@ -144,6 +145,7 @@ class PlanningResult:
     plans: list[Plan]  # top 3, best first; [] if nothing fits
     facts: list[dict] = field(default_factory=list)  # group-safe, one per plan (§13.8)
     hint: str | None = None  # "nothing fits" suggestion, when plans is []
+    blurbs: list[str] = field(default_factory=list)  # checked explanations (§13.8)
 
 
 async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> PlanningResult:
@@ -198,12 +200,16 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
     ranked = optimizer.rank(candidates, index, constraints, preferences, now_local, params)
     top = optimizer.select(ranked, k=3)
     log.info(kv("pipeline_ranked", candidates=len(candidates), feasible=len(ranked)))
+
+    # 6. Explain (LLM phrasing → number check → template fallback)
+    plan_facts = facts.plan_facts(top, preferences)
     return PlanningResult(
         pid_map=pid_map,
         preferences=preferences,
         plans=top,
-        facts=facts.plan_facts(top, preferences),
+        facts=plan_facts,
         hint=None if top else facts.nothing_fits_hint(preferences, candidates),
+        blurbs=await explain(deps, plan_facts),
     )
 
 

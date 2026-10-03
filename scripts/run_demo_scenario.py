@@ -10,8 +10,9 @@ With --live, CACHE_MODE from .env decides the network use:
 The clock is pinned (--now) so opening hours, venues, and therefore the ORS
 requests are identical between runs; that's what makes replay hit every time.
 Messaging is always the simulator and Nessie is off (personas use their fixture
-limits), so the only network traffic is routing/geocoding. Also the backup demo
-if iMessage fails.
+limits). Gemini reads the preferences when GEMINI_API_KEY is set (and is
+recorded/replayed like routing); without a key, planning uses no preferences.
+Also the backup demo if iMessage fails.
 """
 
 import argparse

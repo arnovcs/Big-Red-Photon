@@ -1,0 +1,10 @@
+{"description": "Cuisine want and veto, a mode preference, an earliest start time.",
+ "now_local": "2026-10-03T17:00:00-04:00",
+ "messages": [{"message_id": "m1", "pid": "p1", "text": "can we do korean?"},
+              {"message_id": "m2", "pid": "p2", "text": "I'd rather walk than take a car"},
+              {"message_id": "m3", "pid": "p3", "text": "I'm only free after 7:30"},
+              {"message_id": "m4", "pid": "p1", "text": "also no pizza, had it for lunch"}],
+ "expected": [{"pid": "p1", "field": "cuisine", "value": "korean", "kind": "soft"},
+              {"pid": "p2", "field": "mode_preference", "value": "walk", "kind": "soft"},
+              {"pid": "p3", "field": "available_from", "value": "19:30", "kind": "hard"},
+              {"pid": "p1", "field": "cuisine", "value": "pizza", "polarity": "avoid", "kind": "veto"}]}
