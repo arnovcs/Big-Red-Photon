@@ -57,11 +57,36 @@ def need_two(code: str) -> str:
 NOT_IN_PLAN = "You're not in a plan yet. Say @plan to start one, or join <code> to join a friend's."
 LOOKING = "🔎 Looking at options…"
 PIPELINE_FAILED = "Couldn't finish — say @go to retry."
-NOTHING_FITS = "Nothing fits everyone right now. Try loosening a preference, then say @go again."
+
+
+def loosen_hint(field: str, polarity: str, value: str | None) -> str:
+    """Suggest relaxing one venue preference. `value` is a plain word, never a number."""
+    if field == "novelty":
+        target = "somewhere familiar" if polarity == "want" else "somewhere new"
+    elif value is None:
+        return "Loosening a preference could help."
+    else:
+        target = f"more than {value}" if polarity == "want" else value
+    return f"Being open to {target} could help."
+
+
+def nothing_fits(hint: str | None) -> str:
+    middle = hint or "Try loosening a preference."
+    return f"Nothing fits everyone right now. {middle} Then say @go again."
+
+
 NEED_MORE_PEOPLE = (
     "I need at least 2 people who are fully set up. Share the code and try @go again."
 )
 CANCELLED = "Plan cancelled. Say @plan whenever you want to start again."
+
+PRIVACY_HELD_BACK = (
+    "I held back an update to protect someone's privacy. Say @go to try again, or @cancel."
+)
+PRIVACY_HELD_BACK_PRIVATE = (
+    "I held back your details because they touched someone else's private info. "
+    "Text help if you need anything."
+)
 
 
 def votes_progress(voted: int, total: int) -> str:

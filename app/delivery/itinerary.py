@@ -1,6 +1,8 @@
 """Winner delivery (§10): the group confirmation, then one private itinerary DM each."""
 
 import uuid
+from dataclasses import dataclass
+from decimal import Decimal
 from zoneinfo import ZoneInfo
 
 from app.conversation import copy
@@ -9,6 +11,7 @@ from app.db.session import session_factory
 from app.db.tables import SessionRow
 from app.deps import Deps
 from app.logging import get_logger, kv
+from app.messaging.guard import PrivacyGuard
 from app.messaging.outbound import send_group, send_private
 from app.models.outbound import GroupSafeMessage, PrivateMessage
 from app.models.plans import PersonAssignment, Plan
@@ -47,19 +50,33 @@ def itinerary_text(
     ]
     if assignment.mode != Mode.RIDESHARE:
         lines.extend(f"• {step.instruction}" for step in steps[:MAX_STEPS_SHOWN])
-    food = (
-        venue.est_cost_pp.value
-        if venue.est_cost_pp.value is not None
-        else assignment.venue_cost_usd
-    )
+    food = _food_cost(plan, assignment)
     lines.append(copy.cost_line(arrive_local, food, assignment.fare_usd, assignment.mode.value))
     return "\n".join(lines)
 
 
-async def prepare(
-    deps: Deps, session_id: uuid.UUID, plan: Plan
-) -> list[tuple[str, PrivateMessage]]:
-    """Build each member's itinerary DM: (handle, message). Runs outside the router lock.
+def _food_cost(plan: Plan, assignment: PersonAssignment) -> Decimal:
+    value = plan.candidate.est_cost_pp.value
+    return value if value is not None else assignment.venue_cost_usd
+
+
+def own_amounts(plan: Plan, assignment: PersonAssignment) -> frozenset[int]:
+    """The whole-dollar amounts this person's own itinerary shows (food, fare, total)."""
+    food = _food_cost(plan, assignment)
+    return frozenset(
+        int(x.quantize(Decimal(1))) for x in (food, assignment.fare_usd, food + assignment.fare_usd)
+    )
+
+
+@dataclass(frozen=True)
+class Itinerary:
+    handle: str
+    message: PrivateMessage
+    own_amounts: frozenset[int]  # exempt from the guard's "other member's limit" check
+
+
+async def prepare(deps: Deps, session_id: uuid.UUID, plan: Plan) -> list[Itinerary]:
+    """Build each member's itinerary DM. Runs outside the router lock.
 
     If detailed routing fails for someone, their DM falls back to the screening estimate.
     """
@@ -89,7 +106,9 @@ async def prepare(
             except Exception:
                 log.warning(kv("route_detail_failed", mode=assignment.mode.value), exc_info=True)
         text = itinerary_text(plan, assignment, steps, tz, deps.settings.rideshare_pickup_wait_min)
-        personal.append((user.handle, PrivateMessage(text=text)))
+        personal.append(
+            Itinerary(user.handle, PrivateMessage(text=text), own_amounts(plan, assignment))
+        )
     return personal
 
 
@@ -102,9 +121,13 @@ async def send(
     deps: Deps,
     handles: list[str],
     confirmation: GroupSafeMessage,
-    personal: list[tuple[str, PrivateMessage]],
+    personal: list[Itinerary],
+    guard: PrivacyGuard,
 ) -> None:
-    """Group confirmation first, so each person's route lands right under it (§7.3)."""
-    await send_group(deps.messaging, handles, confirmation)
-    for handle, message in personal:
-        await send_private(deps.messaging, handle, message)
+    """Group confirmation first, so each person's route lands right under it (§7.3).
+
+    Every itinerary is checked for other members' private values before it goes out.
+    """
+    await send_group(deps.messaging, handles, confirmation, guard)
+    for item in personal:
+        await send_private(deps.messaging, item.handle, item.message, guard, item.own_amounts)

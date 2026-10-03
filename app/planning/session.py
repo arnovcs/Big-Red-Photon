@@ -24,6 +24,7 @@ from app.decision import poll
 from app.delivery import itinerary
 from app.deps import Deps
 from app.logging import get_logger, kv
+from app.messaging.guard import PrivacyGuard
 from app.messaging.outbound import send_group, send_private
 from app.models.conversation import InboundMessage
 from app.models.outbound import GroupSafeMessage, PrivateMessage
@@ -64,11 +65,23 @@ class PlanningSessions:
     async def _reply(self, user: UserRow, text: str) -> None:
         await send_private(self.deps.messaging, user.handle, PrivateMessage(text=text))
 
-    async def _tell_group(self, db: AsyncSession, group_id: uuid.UUID, text: str) -> None:
-        """Same group-safe message to every member's DM."""
-        await send_group(
-            self.deps.messaging, await _handles(db, group_id), GroupSafeMessage(text=text)
-        )
+    async def _tell_group(
+        self,
+        db: AsyncSession,
+        group_id: uuid.UUID,
+        session_id: uuid.UUID,
+        msg: GroupSafeMessage | str,
+        guard: PrivacyGuard | None = None,
+    ) -> None:
+        """Same group-safe message to every member's DM, through the PrivacyGuard.
+
+        Pass `guard` when the session's DMs are about to be deleted (cancel/close).
+        """
+        if isinstance(msg, str):
+            msg = GroupSafeMessage(text=msg)
+        if guard is None:
+            guard = await pipeline.build_guard(db, group_id, session_id)
+        await send_group(self.deps.messaging, await _handles(db, group_id), msg, guard)
 
     # --- entry points (called under the router lock, READY users only) --------
 
@@ -171,7 +184,9 @@ class PlanningSessions:
             return
         await queries.add_member(db, group.id, user.id)
         await db.commit()
-        await self._tell_group(db, group.id, copy.joined(user.display_name or "Someone", count + 1))
+        await self._tell_group(
+            db, group.id, session.id, copy.joined(user.display_name or "Someone", count + 1)
+        )
         await self._reply(user, copy.YOU_JOINED)
 
     async def _go(
@@ -184,7 +199,7 @@ class PlanningSessions:
             return
         session.state = SessionState.RUNNING
         await db.commit()
-        await self._tell_group(db, group.id, copy.LOOKING)
+        await self._tell_group(db, group.id, session.id, copy.LOOKING)
         self._spawn(self._run_pipeline(group.id, session.id))
 
     async def _run_pipeline(self, group_id: uuid.UUID, session_id: uuid.UUID) -> None:
@@ -210,25 +225,29 @@ class PlanningSessions:
                 notice = copy.NEED_MORE_PEOPLE
             elif not result.plans:
                 pipeline.save_result(session, result)
-                notice = copy.NOTHING_FITS
+                notice = copy.nothing_fits(result.hint)
             else:
                 pipeline.save_result(session, result)
                 session.state = SessionState.POLLING
                 await db.commit()
-                poll_message = poll.build_poll_message(result.plans)
-                await send_group(self.deps.messaging, await _handles(db, group_id), poll_message)
+                guard = await pipeline.build_guard(
+                    db, group_id, session_id, pipeline.venue_terms(result.plans)
+                )
+                poll_message = poll.build_poll_message(result.plans, result.facts)
+                await self._tell_group(db, group_id, session_id, poll_message, guard)
                 self._start_poll_timer(group_id, session_id)
                 return
 
             session.state = SessionState.COLLECTING
             await db.commit()
-            await self._tell_group(db, group_id, notice)
+            await self._tell_group(db, group_id, session_id, notice)
 
     async def _cancel(self, db: AsyncSession, group: GroupRow, session: SessionRow) -> None:
         self._stop_poll_timer(group.id)
+        guard = await pipeline.build_guard(db, group.id, session.id)  # before DMs are deleted
         session.state = SessionState.CANCELLED
         await self._close(db, group, session)
-        await self._tell_group(db, group.id, copy.CANCELLED)
+        await self._tell_group(db, group.id, session.id, copy.CANCELLED, guard)
 
     async def _vote(
         self, db: AsyncSession, group: GroupRow, session: SessionRow, user: UserRow, label: str
@@ -246,7 +265,7 @@ class PlanningSessions:
         else:
             await db.commit()
             await self._tell_group(
-                db, group.id, copy.votes_progress(sum(counts.values()), len(pid_map))
+                db, group.id, session.id, copy.votes_progress(sum(counts.values()), len(pid_map))
             )
 
     async def _pick(
@@ -286,15 +305,19 @@ class PlanningSessions:
         session_id: uuid.UUID,
         plan: Plan,
         label: str,
-        personal: list[tuple[str, PrivateMessage]],
+        personal: list[itinerary.Itinerary],
     ) -> None:
         async with session_factory()() as db:
             group = await db.get(GroupRow, group_id)
             session = await db.get(SessionRow, session_id)
             if group is None or session is None or session.state != SessionState.DELIVERING:
                 return
+            guard = await pipeline.build_guard(
+                db, group_id, session_id, pipeline.venue_terms([plan])
+            )
             confirmation = itinerary.confirmation_message(self.deps, plan, label)
-            await itinerary.send(self.deps, await _handles(db, group_id), confirmation, personal)
+            handles = await _handles(db, group_id)
+            await itinerary.send(self.deps, handles, confirmation, personal, guard)
             session.state = SessionState.DONE
             await self._close(db, group, session)
 

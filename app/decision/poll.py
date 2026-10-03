@@ -11,10 +11,10 @@ from app.conversation import copy
 from app.db.tables import VoteRow
 from app.models.outbound import GroupPlanOption, GroupSafeMessage
 from app.models.plans import Plan
-from app.optimizer.arrival import whole_minutes
+from app.optimizer.facts import OPTION_LABELS
 from app.providers.costs import tier_for_cost
 
-LABELS = ("A", "B", "C")
+LABELS = OPTION_LABELS
 # Group-facing walking level from the longest walk in the plan (minutes).
 LOW_WALK_MAX_MIN = 10
 MODERATE_WALK_MAX_MIN = 20
@@ -36,27 +36,29 @@ def _walking_level(plan: Plan) -> str:
     return "high"
 
 
-def build_options(plans: list[Plan]) -> list[GroupPlanOption]:
-    """Aggregate, group-safe view of each plan: no per-person values."""
+def build_options(plans: list[Plan], facts: list[dict]) -> list[GroupPlanOption]:
+    """Aggregate, group-safe view of each plan: no per-person values.
+
+    Blurbs are the fact-based template until Stage 3 adds LLM phrasing + number check.
+    """
     options = []
-    for label, plan in zip(LABELS, plans, strict=False):
-        max_travel = whole_minutes(max(a.travel_min for a in plan.assignments))
+    for plan, fact in zip(plans, facts, strict=True):
         options.append(
             GroupPlanOption(
-                label=label,
+                label=fact["label"],
                 title=_title(plan),
-                max_travel_min=max_travel,
+                max_travel_min=fact["max_travel_min"],
                 walking_level=_walking_level(plan),
                 price_tier=tier_for_cost(plan.candidate.est_cost_pp.value or 0),
-                arrival_window_min=round(plan.score.arrival_spread_min),
-                blurb=copy.plan_blurb(max_travel),
+                arrival_window_min=fact["arrival_window_min"],
+                blurb=copy.plan_blurb(fact["max_travel_min"]),
             )
         )
     return options
 
 
-def build_poll_message(plans: list[Plan]) -> GroupSafeMessage:
-    options = build_options(plans)
+def build_poll_message(plans: list[Plan], facts: list[dict]) -> GroupSafeMessage:
+    options = build_options(plans, facts)
     return GroupSafeMessage(text=copy.poll_message(options), poll=options)
 
 
