@@ -15,6 +15,7 @@ from tenacity import (
 
 from app.logging import get_logger, kv, mask_handle
 from app.models.outbound import GroupSafeMessage, PrivateMessage
+from app.models.private import LatLng
 from app.settings import Settings
 
 log = get_logger(__name__)
@@ -50,6 +51,31 @@ class PhotonMessaging:
 
     async def send_private(self, handle: str, msg: PrivateMessage) -> None:
         await self._send_dm(handle, msg.text)
+
+    async def request_location(self, handle: str) -> bool:
+        """Sends Apple's Find My "share your location" card. Best effort: never raises."""
+        try:
+            response = await self._post("/request_location", {"handle": handle})
+            return response.status_code == 200 and response.json().get("status") == "sent"
+        except Exception:
+            log.warning(kv("photon_request_location_failed", handle=mask_handle(handle)))
+            return False
+
+    async def shared_location(self, handle: str) -> LatLng | None:
+        """The person's Find My location, if shared with the bot. Never logs coordinates."""
+        try:
+            response = await self._post("/location", {"handle": handle})
+            if response.status_code != 200:
+                return None
+            data = response.json()
+            return LatLng(lat=float(data["lat"]), lng=float(data["lng"]))
+        except Exception:
+            log.warning(kv("photon_shared_location_failed", handle=mask_handle(handle)))
+            return None
+
+    async def _post(self, path: str, body: dict) -> httpx.Response:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            return await client.post(f"{self.bridge_url}{path}", json=body)
 
     async def _send_dm(self, handle: str, text: str) -> None:
         start = time.monotonic()

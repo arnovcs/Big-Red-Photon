@@ -17,6 +17,10 @@ from app.models.identity import OnboardingState
 from app.models.outbound import PrivateMessage
 from app.models.private import LatLng
 from app.private import vault
+from app.providers.mock.places import load_demo_locations, near_label
+
+# Short replies that mean "I shared my location" rather than a place name.
+SHARE_REPLIES = {"done", "shared", "shared it", "sent", "sent it", "here", "i shared", "ok done"}
 
 MIN_LIMIT_USD = 1
 MAX_LIMIT_USD = 1000
@@ -28,6 +32,23 @@ class Onboarding:
 
     async def _reply(self, user: UserRow, text: str) -> None:
         await send_private(self.deps.messaging, user.handle, PrivateMessage(text=text))
+
+    async def _ask_location(self, user: UserRow) -> None:
+        """Ask where they're starting, and send the Find My share card alongside."""
+        await self._reply(user, copy.ASK_LOCATION)
+        try:
+            await self.deps.messaging.request_location(user.handle)
+        except Exception:
+            pass  # the typed-landmark path still works
+
+    async def _shared_location(self, user: UserRow) -> tuple[LatLng, str] | None:
+        try:
+            coords = await self.deps.messaging.shared_location(user.handle)
+        except Exception:
+            coords = None
+        if coords is None:
+            return None
+        return coords, near_label(coords, load_demo_locations())
 
     async def handle_dm(self, db: AsyncSession, user: UserRow, text: str, first_dm: bool) -> None:
         """Advance a not-yet-READY user by one step."""
@@ -90,10 +111,11 @@ class Onboarding:
                 return
             await vault.set_limit(db, user.id, amount, "user_override")
         user.onboarding_state = OnboardingState.AWAITING_LOCATION
-        await self._reply(user, copy.ASK_LOCATION)
+        await self._ask_location(user)
 
     async def _location(self, db: AsyncSession, user: UserRow, text: str) -> None:
-        """Typed landmarks only (v3). A geocoded place is stored, then confirmed yes/no."""
+        """A typed landmark, or the person's shared (Find My) location. Either way the
+        place is stored, then confirmed yes/no."""
         if is_yes(text):
             status = await vault.confirm_origin(db, user.id)
             if status == "complete":
@@ -110,15 +132,24 @@ class Onboarding:
             await self._reply(user, copy.ASK_LOCATION)
             return
 
-        settings = self.deps.settings
-        center = LatLng(lat=settings.demo_center_lat, lng=settings.demo_center_lng)
-        try:
-            found = await self.deps.places.geocode(text, center)
-        except Exception:
-            found = None
-        if found is None:
-            await self._reply(user, copy.LOCATION_NOT_FOUND)
-            return
+        if " ".join(text.lower().split()).strip(".!") in SHARE_REPLIES:
+            found = await self._shared_location(user)
+            if found is None:
+                await self._reply(user, copy.SHARE_NOT_SEEN)
+                return
+        else:
+            settings = self.deps.settings
+            center = LatLng(lat=settings.demo_center_lat, lng=settings.demo_center_lng)
+            try:
+                found = await self.deps.places.geocode(text, center)
+            except Exception:
+                found = None
+            if found is None:
+                # Not a place we know; maybe they shared their location instead.
+                found = await self._shared_location(user)
+            if found is None:
+                await self._reply(user, copy.LOCATION_NOT_FOUND)
+                return
         coords, label = found
         await vault.set_origin(db, user.id, coords, label)
         await self._reply(user, copy.confirm_location(label))
@@ -147,7 +178,7 @@ class Onboarding:
         elif command.name == "location":
             await vault.clear_origin(db, user.id)
             user.onboarding_state = OnboardingState.AWAITING_LOCATION
-            await self._reply(user, copy.ASK_LOCATION)
+            await self._ask_location(user)
         elif command.name == "car":
             await vault.set_drive(db, user.id, is_yes(command.arg))
             await self._reply(user, copy.UPDATED)

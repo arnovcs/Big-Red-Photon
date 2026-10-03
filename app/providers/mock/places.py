@@ -58,6 +58,24 @@ def match_demo_location(text: str, locations: list[dict]) -> tuple[LatLng, str] 
     return LatLng(lat=loc["lat"], lng=loc["lng"]), loc["name"]
 
 
+NEAR_LANDMARK_MAX_M = 400
+
+
+def load_demo_locations(fixtures_dir: Path = FIXTURES_DIR) -> list[dict]:
+    return json.loads((fixtures_dir / "demo_locations.json").read_text(encoding="utf-8"))
+
+
+def near_label(point: LatLng, locations: list[dict]) -> str:
+    """A friendly label for raw coordinates: "near <landmark>" if one is close, else a
+    generic phrase. Never includes the coordinates themselves."""
+    best: tuple[float, str] | None = None
+    for loc in locations:
+        meters = haversine_mi(point, LatLng(lat=loc["lat"], lng=loc["lng"])) * METERS_PER_MILE
+        if meters <= NEAR_LANDMARK_MAX_M and (best is None or meters < best[0]):
+            best = (meters, loc["name"])
+    return f"near {best[1]}" if best else "your shared location"
+
+
 class MockPlaces:
     def __init__(self, fixtures_dir: Path = FIXTURES_DIR, venues_path: Path | None = None) -> None:
         self.venues = load_venues(venues_path or fixtures_dir / "venues.json")

@@ -94,6 +94,19 @@ async function handleInbound(space: Space, message: Message): Promise<void> {
 
 const json = (body: unknown, status = 200) => Response.json(body, { status });
 
+// --- Find My location (spike) ---------------------------------------------------------
+// Uses the Advanced iMessage client that Spectrum already authenticated. On the free
+// shared pool there is one client labelled "shared"; on dedicated lines, one per phone.
+type RemoteClient = { phone: string; client: any };
+
+function advancedClient(phone: string): any {
+  const clients = (app.__internal.platforms.get("imessage")?.client ?? []) as RemoteClient[];
+  if (clients.length === 1 && clients[0].phone === "shared") return clients[0].client;
+  const match = clients.find((c) => c.phone === phone);
+  if (!match) throw new Error("no iMessage client for this line");
+  return match.client;
+}
+
 Bun.serve({
   port: PORT,
   async fetch(req) {
@@ -123,6 +136,30 @@ Bun.serve({
         const sent = await space.send(poll(body.title, body.options));
         console.log(`[out] poll ${tail(body.chat_id)} options=${body.options.length}`);
         return json({ poll_id: sent?.id ?? null });
+      }
+
+      if (path === "/request_location") {
+        // Sends Apple's "Share your location" (Find My) card into the person's DM.
+        const space = imessage(await im.space.create(body.handle));
+        const receipt = await advancedClient(space.phone).locations.request(space.id, body.handle);
+        console.log(`[out] location request ${tail(body.handle)} status=${receipt.status}`);
+        return json({ status: receipt.status, reason: receipt.reason ?? null });
+      }
+
+      if (path === "/location") {
+        // The person's shared location, if they share it with the bot. Never logged.
+        const space = imessage(await im.space.create(body.handle));
+        const loc = await advancedClient(space.phone).locations.get(body.handle);
+        const has = typeof loc?.latitude === "number" && typeof loc?.longitude === "number";
+        console.log(`[out] location lookup ${tail(body.handle)} found=${has}`);
+        if (!has) return json({ error: "no shared location" }, 404);
+        return json({
+          lat: loc.latitude,
+          lng: loc.longitude,
+          label: loc.shortAddress ?? loc.name ?? null,
+          accuracy_m: loc.accuracy ?? null,
+          at: loc.locationTimestamp ?? null,
+        });
       }
 
       if (path === "/send_image") {

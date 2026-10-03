@@ -165,9 +165,17 @@ def confirm_limit(amount: Decimal) -> str:
 
 LIMIT_INVALID = "Reply yes, or type a number like 25."
 ASK_LOCATION = (
-    'Where are you starting from? A landmark works, like "Olin Library" or "Collegetown".'
+    "Where are you starting from? Share your location with me (tap the card, then say "
+    '"done"), or type a landmark like "Olin Library" or "Collegetown".'
 )
-LOCATION_NOT_FOUND = 'I couldn\'t find that. Try a nearby landmark, like "Olin Library".'
+LOCATION_NOT_FOUND = (
+    'I couldn\'t find that. Share your location with me and say "done", or try a nearby '
+    'landmark like "Olin Library".'
+)
+SHARE_NOT_SEEN = (
+    'I can\'t see your location yet. Give it a few seconds and say "done" again, '
+    'or type a landmark like "Olin Library".'
+)
 
 
 def confirm_location(label: str) -> str:
@@ -216,6 +224,10 @@ def leave_line(
     if mode == "drive":
         return f"🚗 Leave by {t} and drive about {travel_min} min (including parking)."
     return f"🚗 Request a ride by {t} (about {pickup_min} min pickup + {ride_min} min drive)."
+
+
+def maps_line(url: str) -> str:
+    return f"🗺️ Directions: {url}"
 
 
 def cost_line(arrive_local: datetime, food: Decimal, fare: Decimal, mode: str) -> str:
