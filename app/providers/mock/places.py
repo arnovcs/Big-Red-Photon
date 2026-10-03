@@ -59,8 +59,8 @@ def match_demo_location(text: str, locations: list[dict]) -> tuple[LatLng, str] 
 
 
 class MockPlaces:
-    def __init__(self, fixtures_dir: Path = FIXTURES_DIR) -> None:
-        self.venues = load_venues(fixtures_dir / "venues.json")
+    def __init__(self, fixtures_dir: Path = FIXTURES_DIR, venues_path: Path | None = None) -> None:
+        self.venues = load_venues(venues_path or fixtures_dir / "venues.json")
         self.locations: list[dict] = json.loads(
             (fixtures_dir / "demo_locations.json").read_text(encoding="utf-8")
         )

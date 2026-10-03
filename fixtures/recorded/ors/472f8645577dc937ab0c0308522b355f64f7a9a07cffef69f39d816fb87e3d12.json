@@ -1,0 +1,156 @@
+{
+ "method": "directions",
+ "provider": "ors",
+ "request": {
+  "body": {
+   "coordinates": [
+    [
+     -76.4977,
+     42.4393
+    ],
+    [
+     -76.4971,
+     42.4397
+    ]
+   ],
+   "instructions": true,
+   "units": "mi"
+  },
+  "path": "/v2/directions/foot-walking"
+ },
+ "response": {
+  "bbox": [
+   -76.497707,
+   42.43948,
+   -76.496939,
+   42.439685
+  ],
+  "metadata": {
+   "attribution": "openrouteservice.org | OpenStreetMap contributors",
+   "engine": {
+    "build_date": "2026-08-13T11:53:14Z",
+    "graph_date": "2026-09-20T06:31:34Z",
+    "osm_date": "2026-09-13T23:59:59Z",
+    "version": "9.10.0"
+   },
+   "query": {
+    "coordinates": [
+     [
+      -76.4977,
+      42.4393
+     ],
+     [
+      -76.4971,
+      42.4397
+     ]
+    ],
+    "format": "json",
+    "instructions": true,
+    "profile": "foot-walking",
+    "profileName": "foot-walking",
+    "units": "mi"
+   },
+   "service": "routing",
+   "timestamp": 1791015068166
+  },
+  "routes": [
+   {
+    "bbox": [
+     -76.497707,
+     42.43948,
+     -76.496939,
+     42.439685
+    ],
+    "geometry": "w}_bGt}{qMA{@U@A_BM??^",
+    "segments": [
+     {
+      "distance": 0.06,
+      "duration": 69.7,
+      "steps": [
+       {
+        "distance": 0.015,
+        "duration": 17.4,
+        "instruction": "Head east on Ithaca Commons",
+        "name": "Ithaca Commons",
+        "type": 11,
+        "way_points": [
+         0,
+         1
+        ]
+       },
+       {
+        "distance": 0.007,
+        "duration": 8.7,
+        "instruction": "Turn left onto Home Dairy Alley",
+        "name": "Home Dairy Alley",
+        "type": 0,
+        "way_points": [
+         1,
+         2
+        ]
+       },
+       {
+        "distance": 0.024,
+        "duration": 28.3,
+        "instruction": "Turn right onto East State Street",
+        "name": "East State Street",
+        "type": 1,
+        "way_points": [
+         2,
+         3
+        ]
+       },
+       {
+        "distance": 0.005,
+        "duration": 6.0,
+        "instruction": "Turn left onto Ithaca Commons",
+        "name": "Ithaca Commons",
+        "type": 0,
+        "way_points": [
+         3,
+         4
+        ]
+       },
+       {
+        "distance": 0.008,
+        "duration": 9.3,
+        "instruction": "Turn left onto Ithaca Commons",
+        "name": "Ithaca Commons",
+        "type": 0,
+        "way_points": [
+         4,
+         5
+        ]
+       },
+       {
+        "distance": 0.0,
+        "duration": 0.0,
+        "instruction": "Arrive at Ithaca Commons, on the right",
+        "name": "-",
+        "type": 10,
+        "way_points": [
+         5,
+         5
+        ]
+       }
+      ]
+     }
+    ],
+    "summary": {
+     "distance": 0.06,
+     "duration": 69.7
+    },
+    "warnings": [
+     {
+      "code": 4,
+      "message": "Extra info requested but not available: roadaccessrestrictions"
+     }
+    ],
+    "way_points": [
+     0,
+     5
+    ]
+   }
+  ]
+ }
+}

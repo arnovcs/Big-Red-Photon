@@ -1,0 +1,22 @@
+{
+  "bbox": [-76.4855, 42.4418, -76.4840, 42.4479],
+  "routes": [
+    {
+      "summary": {"distance": 0.45, "duration": 540.0},
+      "segments": [
+        {
+          "distance": 0.45,
+          "duration": 540.0,
+          "steps": [
+            {"distance": 0.1, "duration": 120.0, "type": 11, "instruction": "Head south on Ho Plaza", "name": "Ho Plaza", "way_points": [0, 3]},
+            {"distance": 0.35, "duration": 420.0, "type": 0, "instruction": "Turn left onto College Avenue", "name": "College Avenue", "way_points": [3, 9]},
+            {"distance": 0.0, "duration": 0.0, "type": 10, "instruction": "Arrive at College Avenue, on the right", "name": "-", "way_points": [9, 9]}
+          ]
+        }
+      ],
+      "geometry": "a~l~Fjk~uOwHJy@P",
+      "way_points": [0, 9]
+    }
+  ],
+  "metadata": {"service": "routing", "query": {"profile": "foot-walking", "units": "mi"}}
+}

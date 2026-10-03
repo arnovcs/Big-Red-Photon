@@ -101,6 +101,7 @@ def harness(tmp_path):
         # Pin these so shell variables (e.g. PROVIDER_MESSAGING=photon) can't leak in.
         provider_messaging="sim",
         nessie_api_key="",
+        venues_path="tests/fixtures/venues_test.json",
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'e2e.db'}",
         poll_timeout_sec=3600,
     )
@@ -134,7 +135,7 @@ def onboard(client: TestClient, persona: tuple) -> None:
     assert "join <code>" in dm(client, handle, modes)
 
 
-VENUE_NAMES = [v["name"] for v in json.loads(Path("fixtures/venues.json").read_text())]
+VENUE_NAMES = [v["name"] for v in json.loads(Path("tests/fixtures/venues_test.json").read_text())]
 
 
 def without_venue_names(text: str) -> str:

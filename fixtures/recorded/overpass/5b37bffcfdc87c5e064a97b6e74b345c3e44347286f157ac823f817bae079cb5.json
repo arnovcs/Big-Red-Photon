@@ -1,0 +1,3578 @@
+{
+ "method": "interpreter",
+ "provider": "overpass",
+ "request": {
+  "query": "[out:json][timeout:60];\n(\n  nwr[\"name\"][\"amenity\"~\"^(restaurant|fast_food|cafe|bar|pub|ice_cream|cinema)$\"](around:2500,42.444,-76.483);\n  nwr[\"name\"][\"leisure\"~\"^(bowling_alley|escape_game|miniature_golf|amusement_arcade)$\"](around:2500,42.444,-76.483);\n);\nout center;"
+ },
+ "response": {
+  "elements": [
+   {
+    "id": 977202200,
+    "lat": 42.4421961,
+    "lon": -76.4876165,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "424",
+     "addr:interpolation": "even",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Eddy Street",
+     "amenity": "restaurant",
+     "cuisine": "indian",
+     "email": "info@sangamindianrestaurantithaca.com",
+     "fax": "+1-607-319-4513",
+     "name": "Sangam",
+     "opening_hours": "11:30-15:00; 17:00-22:00",
+     "phone": "+1-607-273-1006",
+     "website": "https://sangamindianrestaurantithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 977202978,
+    "lat": 42.4422537,
+    "lon": -76.4854725,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "420",
+     "addr:interpolation": "odd",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "College Avenue",
+     "amenity": "fast_food",
+     "cuisine": "bagel",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Collegetown Bagels",
+     "opening_hours": "Mo-Su 07:00-21:00",
+     "outdoor_seating": "yes",
+     "phone": "+1-607-273-0982",
+     "toilets:wheelchair": "no",
+     "website": "https://www.collegetownbagels.com/",
+     "wheelchair": "no"
+    },
+    "type": "node"
+   },
+   {
+    "id": 977203388,
+    "lat": 42.4415095,
+    "lon": -76.4862265,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "139",
+     "addr:interpolation": "odd",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "cuisine": "pizza",
+     "name": "Ned's Pizza",
+     "phone": "+1-607-219-3238",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1151424710,
+    "lat": 42.4444636,
+    "lon": -76.4994478,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "430",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Cayuga Street",
+     "alt_name": "Gimme Coffee",
+     "amenity": "cafe",
+     "cuisine": "coffee_shop",
+     "indoor_seating": "yes",
+     "internet_access": "yes",
+     "internet_access:fee": "no",
+     "name": "Gimme! Coffee",
+     "nysgissam:nysaddresspointid": "TOMP025019",
+     "opening_hours": "07:00-19:00",
+     "outdoor_seating": "yes",
+     "phone": "+1-607-277-8393",
+     "smoking": "no",
+     "website": "https://www.gimmecoffee.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1219032903,
+    "lat": 42.4394643,
+    "lon": -76.4950788,
+    "tags": {
+     "addr:country": "US",
+     "addr:housenumber": "301",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "fast_food",
+     "cuisine": "sandwich;bagel",
+     "internet_access": "yes",
+     "internet_access:fee": "no",
+     "name": "Collegetown Bagels",
+     "opening_hours": "Su-We 06:30-20:00; Th-Sa 06:30-22:00",
+     "operator": "Ithaca Bakery",
+     "phone": "+1-607-273-2848",
+     "smoking": "no",
+     "website": "https://www.collegetownbagels.com/",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1219032943,
+    "lat": 42.4406316,
+    "lon": -76.4986321,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "215",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Cayuga Street",
+     "amenity": "restaurant",
+     "cuisine": "local",
+     "diet:vegan": "yes",
+     "diet:vegetarian": "yes",
+     "email": "moose@moosewoodrestaurant.com",
+     "name": "Moosewood Restaurant",
+     "opening_hours": "We-Su 11:30-14:30, 17:00-21:00",
+     "phone": "+1 607-273-9610",
+     "website": "https://www.moosewoodrestaurant.com/",
+     "wikidata": "Q6908690",
+     "wikipedia": "en:Moosewood Restaurant"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1219032966,
+    "lat": 42.4403705,
+    "lon": -76.4958318,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "126",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Aurora Street",
+     "amenity": "restaurant",
+     "cuisine": "korean;japanese",
+     "diet:vegetarian": "yes",
+     "fax": "+1-607-256-8815",
+     "indoor_seating": "yes",
+     "name": "Asia Cuisine",
+     "nysgissam:nysaddresspointid": "TOMP030690",
+     "outdoor_seating": "no",
+     "phone": "+1-607-256-8818"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1221372469,
+    "lat": 42.4389256,
+    "lon": -76.497232,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "120",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East Green Street",
+     "amenity": "cinema",
+     "check_date": "2026-05-01",
+     "name": "Cinemapolis",
+     "phone": "+1-607-277-6115",
+     "screen": "5",
+     "url": "http://www.cinemapolis.org/",
+     "wheelchair": "yes",
+     "wikidata": "Q43039926"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1264187771,
+    "lat": 42.4522761,
+    "lon": -76.494817,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "302",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Lake Street",
+     "amenity": "pub",
+     "check_date": "2026-07-18",
+     "check_date:opening_hours": "2026-07-18",
+     "name": "Fall Creek House",
+     "opening_hours": "Mo-Sa 11:00-01:00; Su 12:00-01:00",
+     "phone": "+1-607-272-9562"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1312151155,
+    "lat": 42.4426598,
+    "lon": -76.5087461,
+    "tags": {
+     "addr:housenumber": "400",
+     "addr:street": "North Meadow Street",
+     "amenity": "cafe",
+     "check_date": "2026-07-13",
+     "check_date:opening_hours": "2026-07-13",
+     "diet:vegetarian": "yes",
+     "name": "Ithaca Bakery",
+     "opening_hours": "Mo-Su 06:30-20:00",
+     "phone": "+1-607-273-7110",
+     "shop": "bakery",
+     "website": "https://www.ithacabakery.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1676910076,
+    "lat": 42.4530617,
+    "lon": -76.4972578,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "202",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East Falls Street",
+     "amenity": "restaurant",
+     "cuisine": "regional",
+     "email": "info@northstarpub.com",
+     "name": "Northstar House",
+     "opening_hours": "Mo-Tu 16:00-20:30; Th 16:00-20:30; Fr-Sa 16:00-21:00",
+     "phone": "+1-607-216-8580",
+     "website": "https://www.northstarpub.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1676946836,
+    "lat": 42.4397495,
+    "lon": -76.495788,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "224",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "cuisine": "american",
+     "diet:vegetarian": "yes",
+     "name": "Simeon's American Bistro",
+     "opening_hours": "We-Fr 11:30-21:00; Sa 11:00-21:00; Su 11:00-21:00",
+     "phone": "+1-607-272-2212",
+     "reservation": "recommended",
+     "website": "https://www.simeonsithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1676946840,
+    "lat": 42.4463624,
+    "lon": -76.4858057,
+    "tags": {
+     "amenity": "cinema",
+     "name": "Cornell Cinema",
+     "opening_hours": "Mo-Fr 09:00-17:00",
+     "wikidata": "Q43039941"
+    },
+    "type": "node"
+   },
+   {
+    "id": 1676946851,
+    "lat": 42.4406983,
+    "lon": -76.4970271,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "130",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East Seneca Street",
+     "amenity": "pub",
+     "check_date": "2026-07-18",
+     "contact:facebook": "https://www.facebook.com/people/Tavern-On-The-Commons/61566646869730/",
+     "email": "TavernOnTheCommons@gmail.com",
+     "name": "Tavern on the Commons",
+     "opening_hours": "Mo-We 11:00-23:00; Th 11:00-01:00; Fr 11:00-13:00; Sa-Su 12:00-01:00",
+     "phone": "+1-607-219-3012",
+     "website": "https://www.tavernonthecommons.com/home-1",
+     "website:menu": "https://www.tavernonthecommons.com/menus"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095822763,
+    "lat": 42.4533598,
+    "lon": -76.4812249,
+    "tags": {
+     "amenity": "fast_food",
+     "cuisine": "american;pizza;sandwich",
+     "drive_through": "no",
+     "name": "Louie's Lunch",
+     "website": "https://www.louieslunch.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095822851,
+    "lat": 42.4532608,
+    "lon": -76.4822066,
+    "tags": {
+     "amenity": "restaurant",
+     "cuisine": "american",
+     "name": "Risley Dining"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095832605,
+    "lat": 42.449071,
+    "lon": -76.4833193,
+    "tags": {
+     "amenity": "cafe",
+     "changing_table": "no",
+     "diet:vegetarian": "yes",
+     "name": "Temple of Zeus",
+     "opening_hours": "Mo-Fr 08:00-17:00",
+     "outdoor_seating": "no",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095832647,
+    "lat": 42.4508701,
+    "lon": -76.4842129,
+    "tags": {
+     "amenity": "cafe",
+     "name": "The Green Dragon"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095832657,
+    "lat": 42.4465778,
+    "lon": -76.4857954,
+    "tags": {
+     "amenity": "restaurant",
+     "name": "Okenshields",
+     "opening_hours": "Mo-Fr 11:00-14:30"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095832671,
+    "lat": 42.4479489,
+    "lon": -76.4846903,
+    "tags": {
+     "air_conditioning": "yes",
+     "amenity": "cafe",
+     "diet:vegan": "yes",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "internet_access": "yes",
+     "internet_access:fee": "no",
+     "name": "Amit Bhatia Libe Caf\u00e9",
+     "opening_hours": "Mo-Th 08:00-22:00; Fr 08:00-17:00; Sa 10:00-17:00; Su 10:00-22:00",
+     "outdoor_seating": "no",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095834016,
+    "lat": 42.447945,
+    "lon": -76.4790952,
+    "tags": {
+     "amenity": "restaurant",
+     "name": "Trillium"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095834018,
+    "lat": 42.4502091,
+    "lon": -76.4791167,
+    "tags": {
+     "amenity": "fast_food",
+     "name": "Martha's"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095834019,
+    "lat": 42.4501265,
+    "lon": -76.4814047,
+    "tags": {
+     "amenity": "fast_food",
+     "name": "Goldies"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2095834022,
+    "lat": 42.44785,
+    "lon": -76.4794439,
+    "tags": {
+     "amenity": "cafe",
+     "cuisine": "bagel",
+     "diet:vegetarian": "yes",
+     "name": "Bus Stop Bagels",
+     "opening_hours": "Mo-Fr 07:00-15:00",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2108337074,
+    "lat": 42.4535179,
+    "lon": -76.4759957,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "186",
+     "addr:postcode": "14853",
+     "addr:state": "NY",
+     "addr:street": "Cradit Farm Drive",
+     "amenity": "restaurant",
+     "name": "North Star Dining"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2108342502,
+    "lat": 42.4559956,
+    "lon": -76.4777169,
+    "tags": {
+     "amenity": "restaurant",
+     "name": "Robert Purcell Marketplace Eatery",
+     "opening_hours:covid19": "off"
+    },
+    "type": "node"
+   },
+   {
+    "id": 2108342530,
+    "lat": 42.45318,
+    "lon": -76.4793192,
+    "tags": {
+     "amenity": "cafe",
+     "cuisine": "coffee_shop",
+     "internet_access": "wlan",
+     "internet_access:fee": "no",
+     "internet_access:ssid": "Cornell-Visitor",
+     "name": "Carol's Cafe",
+     "opening_hours:covid19": "off",
+     "outdoor_seating": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 3509359373,
+    "lat": 42.4411639,
+    "lon": -76.5086726,
+    "tags": {
+     "amenity": "restaurant",
+     "check_date": "2026-06-13",
+     "contact:website": "http://www.joesithaca.com/",
+     "cuisine": "italian",
+     "fixme": "Google Street View shows nothing there, but satellite imagery shows a building.",
+     "name": "Joe's",
+     "source": "survey, bing"
+    },
+    "type": "node"
+   },
+   {
+    "id": 3683053646,
+    "lat": 42.4396236,
+    "lon": -76.5005842,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "140",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "fast_food",
+     "contact:phone": "+1-607-272-7350",
+     "contact:website": "http://www.capitalcornerithaca.com/",
+     "cuisine": "chinese",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Capital Corner",
+     "outdoor_seating": "no"
+    },
+    "type": "node"
+   },
+   {
+    "id": 3758970266,
+    "lat": 42.4394497,
+    "lon": -76.4974906,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "143",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Ithaca Commons;East State Street",
+     "amenity": "cafe",
+     "check_date": "2026-07-13",
+     "check_date:opening_hours": "2026-07-13",
+     "cuisine": "american",
+     "diet:vegan": "yes",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Yellow Deli",
+     "nysgissam:nysaddresspointid": "TOMP033292",
+     "opening_hours": "Su-We 10:00-21:00; Th 10:00-14:00; Fr 10:00-15:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-236-3772",
+     "website": "https://yellowdeli.com/ithaca-ny"
+    },
+    "type": "node"
+   },
+   {
+    "id": 3834718457,
+    "lat": 42.4418427,
+    "lon": -76.5122811,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "319",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Taughannock Boulevard",
+     "amenity": "restaurant",
+     "cuisine": "american;regional",
+     "name": "Kelly's Dock-Side Cafe",
+     "phone": "+1-607-277-8709",
+     "website": "http://kellysdock-sidecafe.com"
+    },
+    "type": "node"
+   },
+   {
+    "id": 3840051820,
+    "lat": 42.4510624,
+    "lon": -76.4842285,
+    "tags": {
+     "amenity": "restaurant",
+     "cuisine": "vietnamese",
+     "name": "Franny's",
+     "opening_hours": "Mo-Fr 11:00-16:00",
+     "website": "https://scl.cornell.edu/frannys"
+    },
+    "type": "node"
+   },
+   {
+    "id": 4221840489,
+    "lat": 42.4410938,
+    "lon": -76.4753234,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "143",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Maple Avenue",
+     "amenity": "cafe",
+     "cuisine": "cake;sandwich;fish_and_chips;american;breakfast;coffee_shop;crepe;bagel;diner",
+     "diet:vegan": "yes",
+     "diet:vegetarian": "yes",
+     "internet_access": "wlan",
+     "name": "Coal Yard Cafe",
+     "opening_hours": "Mo-Fr 08:00-15:00; Sa,Su 09:00-15:00",
+     "phone": "+1 607 277 0734",
+     "website": "https://www.thecoalyardcafe.com"
+    },
+    "type": "node"
+   },
+   {
+    "id": 4444567489,
+    "lat": 42.4383397,
+    "lon": -76.4649064,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "381",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Pine Tree Road",
+     "amenity": "restaurant",
+     "cuisine": "southwestern;farm-to-table",
+     "name": "Agava",
+     "website": "https://www.agavarestaurant.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 4444583773,
+    "lat": 42.4365261,
+    "lon": -76.4636838,
+    "tags": {
+     "amenity": "fast_food",
+     "brand": "Burger King",
+     "brand:wikidata": "Q177054",
+     "cuisine": "burger",
+     "delivery": "no",
+     "drive_through": "yes",
+     "name": "Burger King",
+     "takeaway": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 4482618704,
+    "lat": 42.4447323,
+    "lon": -76.4824213,
+    "tags": {
+     "amenity": "cafe",
+     "cuisine": "breakfast;sandwich",
+     "internet_access": "wlan",
+     "name": "Mattin's Cafe"
+    },
+    "type": "node"
+   },
+   {
+    "id": 4482618705,
+    "lat": 42.4435955,
+    "lon": -76.4862929,
+    "tags": {
+     "amenity": "cafe",
+     "name": "Fork and Gavel"
+    },
+    "type": "node"
+   },
+   {
+    "id": 4508822070,
+    "lat": 42.4387358,
+    "lon": -76.4993682,
+    "tags": {
+     "addr:housenumber": "106",
+     "addr:postcode": "14850",
+     "addr:street": "West Green Street",
+     "amenity": "restaurant",
+     "contact:website": "http://newdelhidiamonds.com/",
+     "cuisine": "indian",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "New Delhi Diamond\u2019s Indian Cuisine",
+     "opening_hours": "We-Mo 11:30-14:30, 16:15-21:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-272-4508",
+     "source:name": "photo",
+     "wheelchair": "no"
+    },
+    "type": "node"
+   },
+   {
+    "id": 4938706211,
+    "lat": 42.4400115,
+    "lon": -76.4958021,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "110",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Aurora Street",
+     "amenity": "restaurant",
+     "cuisine": "french",
+     "diet:vegetarian": "yes",
+     "name": "Le Caf\u00e9 Cent-Dix",
+     "opening_hours": "Tu-Sa 17:30-21:00",
+     "phone": "+1-607-319 - 0750",
+     "website": "https://www.lecafecentdix.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 5311062768,
+    "lat": 42.4481543,
+    "lon": -76.5059456,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "435",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Franklin Street",
+     "addr:unit": "207",
+     "amenity": "fast_food",
+     "branch": "Franklin St",
+     "brand": "Papa John's",
+     "brand:wikidata": "Q2759586",
+     "cuisine": "pizza",
+     "drive_through": "no",
+     "name": "Papa John's",
+     "opening_hours": "Mo-Th 09:00-24:00; Fr-Sa 09:00-01:00; Su 09:00-24:00",
+     "phone": "+1 607-273-7272",
+     "takeaway": "yes",
+     "website": "https://locations.papajohns.com/united-states/ny/14850/ithaca/435-franklin-street"
+    },
+    "type": "node"
+   },
+   {
+    "id": 5423329397,
+    "lat": 42.4372604,
+    "lon": -76.4881804,
+    "tags": {
+     "addr:housenumber": "115",
+     "addr:street": "South Quarry Street",
+     "amenity": "cafe",
+     "name": "Gola Osteria"
+    },
+    "type": "node"
+   },
+   {
+    "id": 5482867047,
+    "lat": 42.4472807,
+    "lon": -76.4705563,
+    "tags": {
+     "amenity": "cafe",
+     "cuisine": "ice_cream",
+     "email": "dairybar@cornell.edu",
+     "name": "Cornell Dairy Bar",
+     "opening_hours": "Mo-Th 08:00-18:00; Fr 08:00-19:30; Sa 12:00-19:30; Su 12:00-18:00",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "phone": "+1-607-255-7660",
+     "website": "https://scl.cornell.edu/cornell-dairy-bar"
+    },
+    "type": "node"
+   },
+   {
+    "id": 5840567907,
+    "lat": 42.4419764,
+    "lon": -76.489998,
+    "tags": {
+     "amenity": "restaurant",
+     "diet:vegetarian": "yes",
+     "name": "El Chamo"
+    },
+    "type": "node"
+   },
+   {
+    "id": 6398578945,
+    "lat": 42.4477148,
+    "lon": -76.4657543,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "606",
+     "addr:postcode": "14853",
+     "addr:state": "NY",
+     "addr:street": "Tower Road",
+     "amenity": "cafe",
+     "cuisine": "coffee_shop",
+     "name": "Vet School Cafe",
+     "website": "https://cornellvetdining.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 6412467162,
+    "lat": 42.4399782,
+    "lon": -76.4954828,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "109-111",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Aurora Street",
+     "amenity": "restaurant",
+     "cuisine": "american;pizza",
+     "diet:vegetarian": "yes",
+     "email": "info@revelryyards.com",
+     "name": "Revelry Yards",
+     "opening_hours": "Mo-Th 11:00-22:00; Fr 11:00-23:00; Sa 10:00-23:00; Su 10:00-22:00",
+     "phone": "+1-607-793-4132",
+     "website": "https://www.revelryyards.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 6412469013,
+    "lat": 42.4391644,
+    "lon": -76.4956576,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "120",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Aurora Street",
+     "amenity": "restaurant",
+     "cuisine": "american",
+     "diet:vegetarian": "yes",
+     "name": "Monks on the Commons",
+     "opening_hours": "Mo-Su 06:30-11:00; Mo-Su 12:00-14:00; Mo-Su 17:00-22:00",
+     "phone": "+1-607-272-2222",
+     "website": "https://www.monksonthecommons.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 6899370038,
+    "lat": 42.4399533,
+    "lon": -76.495796,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "108",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Aurora Street",
+     "amenity": "restaurant",
+     "diet:vegetarian": "yes",
+     "email": "mercatobk@gmail.com",
+     "name": "Mercato Bar & Kitchen",
+     "opening_hours": "Tu-Sa 17:30-21:00",
+     "phone": "+1-607-319-5171",
+     "reservation": "no",
+     "website": "http://mercatobarandkitchen.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 7243574915,
+    "lat": 42.4417399,
+    "lon": -76.485118,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "401",
+     "addr:state": "NY",
+     "addr:street": "College Avenue",
+     "air_conditioning": "yes",
+     "amenity": "restaurant",
+     "cuisine": "japanese",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Oishii Bowl",
+     "opening_hours": "Mo-Sa 11:00-21:00; Su 00:00-21:00",
+     "outdoor_seating": "no"
+    },
+    "type": "node"
+   },
+   {
+    "id": 7243574916,
+    "lat": 42.4415134,
+    "lon": -76.4856981,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "159",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "cuisine": "chinese",
+     "email": "xianstreetfoodusa@gmail.com",
+     "name": "Xi'an Street Food",
+     "opening_hours": "12:00-21:00",
+     "phone": "+1-607-219-3211",
+     "website": "https://xianstreetfoodusa.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 7581419413,
+    "lat": 42.4415043,
+    "lon": -76.485969,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "143",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "cafe",
+     "brand": "Kung Fu Tea",
+     "brand:wikidata": "Q66023886",
+     "cuisine": "bubble_tea",
+     "name": "Kung Fu Tea",
+     "opening_hours": "13:00-20:00",
+     "opening_hours:covid19": "Mo-Su 13:00-20:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-319-0304",
+     "takeaway": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8421842645,
+    "lat": 42.4394263,
+    "lon": -76.5068455,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "512",
+     "addr:postcode": "14850",
+     "addr:street": "West State Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-13",
+     "cuisine": "korean",
+     "diet:vegetarian": "yes",
+     "name": "Maru Korea",
+     "phone": "+1-607-339-0329",
+     "website": "https://www.marukorea.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8444746032,
+    "lat": 42.443941,
+    "lon": -76.5016509,
+    "tags": {
+     "amenity": "cafe",
+     "name": "Sultana Cafe"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8557401130,
+    "lat": 42.442172,
+    "lon": -76.4851322,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "405",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "College Avenue",
+     "amenity": "restaurant",
+     "cuisine": "asian;chinese;japanese",
+     "diet:healthy": "yes",
+     "name": "Fusia Bento Bar",
+     "opening_hours": "Mo-Sa 11:00-22:30; Su 11:30-22:00",
+     "phone": "+1-607-319-4558",
+     "website": "https://www.fusiabento.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8570097168,
+    "lat": 42.4390663,
+    "lon": -76.4941552,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "311",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East Green Street",
+     "amenity": "fast_food",
+     "brand": "Domino's",
+     "brand:wikidata": "Q839466",
+     "cuisine": "pizza",
+     "diet:vegetarian": "yes",
+     "name": "Domino's",
+     "opening_hours": "Su-Th 10:30-00:00; Fr-Sa 10:30-01:00",
+     "phone": "+1 607-256-4000",
+     "ref": "3401",
+     "takeaway": "yes",
+     "website": "https://pizza.dominos.com/new-york/ithaca/311-e-green-st"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8570165381,
+    "lat": 42.4396341,
+    "lon": -76.4996958,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "116",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "restaurant",
+     "cuisine": "sandwich",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Gorgers",
+     "opening_hours": "Mo-Sa 11:00-20:00",
+     "outdoor_seating": "yes",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "phone": "+1-607-319-5046",
+     "website": "https://www.gorgers.com/gorgers-ithaca-home",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8570197875,
+    "lat": 42.439636,
+    "lon": -76.4997374,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "118",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-13",
+     "check_date:opening_hours": "2026-07-13",
+     "cuisine": "thai",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Thai Basil",
+     "opening_hours": "Mo-Su 07:30-22:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-319-4722",
+     "website": "https://www.ithacathaibasil.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796617265,
+    "lat": 42.4298129,
+    "lon": -76.506542,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "222",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Elmira Road",
+     "addr:unit": "6",
+     "amenity": "ice_cream",
+     "brand": "Cold Stone Creamery",
+     "brand:wikidata": "Q1094923",
+     "cuisine": "ice_cream",
+     "delivery": "yes",
+     "name": "Cold Stone Creamery",
+     "nysgissam:nysaddresspointid": "TOMP039499",
+     "nysgissam:review": "found > 1 existing matching address",
+     "opening_hours": "Mo-Su 11:00-22:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-319-0432",
+     "takeaway": "yes",
+     "website": "https://www.coldstonecreamery.com/stores/23933",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796618255,
+    "lat": 42.4298251,
+    "lon": -76.5060302,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "222",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Elmira Road",
+     "addr:unit": "12",
+     "amenity": "restaurant",
+     "cuisine": "mexican",
+     "diet:vegetarian": "yes",
+     "name": "Frida's Mexican Grill",
+     "nysgissam:nysaddresspointid": "TOMP042440",
+     "nysgissam:review": "found > 1 existing matching address",
+     "outdoor_seating": "yes",
+     "phone": "+1 607-219-3261"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796623425,
+    "lat": 42.4417032,
+    "lon": -76.4856698,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "120",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "name": "Jack's Collegetown Grill",
+     "not:brand:wikidata": "Q6110826",
+     "nysgissam:nysaddresspointid": "TOMP028000",
+     "opening_hours": "Su-We 11:00-23:00; Th-Sa 11:00-02:00",
+     "phone": "+1-607-256-5225",
+     "website": "https://www.jacksgrillithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796623652,
+    "lat": 42.4419948,
+    "lon": -76.4872992,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "409",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Eddy Street",
+     "amenity": "bar",
+     "email": "hideawayithaca@gmail.com",
+     "name": "Hideaway",
+     "nysgissam:nysaddresspointid": "TOMP012697",
+     "opening_hours": "Tu-Sa 21:00-01:00",
+     "phone": "+1-607-339-0519",
+     "website": "https://www.facebook.com/Hideawayithaca/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796624340,
+    "lat": 42.4388714,
+    "lon": -76.5000647,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "118",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West Green Street",
+     "amenity": "fast_food",
+     "cuisine": "mexican;tacos",
+     "diet:vegetarian": "yes",
+     "name": "Tacos CDMX",
+     "nysgissam:nysaddresspointid": "TOMP021897",
+     "opening_hours": "Tu-Sa 10:00-18:00; Su 10:00-17:00",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796628221,
+    "lat": 42.4394021,
+    "lon": -76.4991972,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "101",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "bar",
+     "check_date": "2026-07-18",
+     "check_date:opening_hours": "2026-07-18",
+     "contact:facebook": "p/The-Chanticleer-100064088497072",
+     "indoor_seating": "yes",
+     "name": "Chanticleer",
+     "nysgissam:nysaddresspointid": "TOMP003671",
+     "nysgissam:review": "repeat address",
+     "opening_hours": "Tu-We, Sa-Su 17:00-01:00; Th-Fr 15:00-01:00",
+     "outdoor_seating": "no",
+     "phone": "+16072729678"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796628240,
+    "lat": 42.4402339,
+    "lon": -76.4958111,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "118",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Aurora Street",
+     "amenity": "cafe",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Hound & Mare",
+     "nysgissam:nysaddresspointid": "TOMP023955",
+     "opening_hours": "We-Su 08:00-14:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-319-4463",
+     "website": "https://www.houndandmare.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796628426,
+    "lat": 42.4390119,
+    "lon": -76.4988365,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "113",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Cayuga Street",
+     "amenity": "restaurant",
+     "cuisine": "african;ethiopian",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Hawi Ethiopian Cuisine",
+     "nysgissam:nysaddresspointid": "TOMP030007",
+     "opening_hours": "Tu-Th 15:00-21:00; Fr-Sa 12:00-21:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-277-4294",
+     "website": "https://ithacahawi.weebly.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796630448,
+    "lat": 42.4398594,
+    "lon": -76.4992936,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "114",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Cayuga Street",
+     "amenity": "restaurant",
+     "cuisine": "mexican",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Bickering Twins",
+     "nysgissam:nysaddresspointid": "TOMP008231",
+     "nysgissam:review": "repeat address",
+     "opening_hours": "Tu-Th,Su 16:00-21:00; Fr,Sa 16:00-21:30",
+     "outdoor_seating": "yes",
+     "website": "https://www.bickeringtwins.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796632039,
+    "lat": 42.4416345,
+    "lon": -76.4866816,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "111",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "addr:unit": "5E",
+     "amenity": "restaurant",
+     "cuisine": "mexican",
+     "name": "Old Mexico Express",
+     "nysgissam:nysaddresspointid": "TOMP042173",
+     "opening_hours": "11:00-22:00",
+     "phone": "+1-607-319-5633",
+     "website": "https://oldmexicoexpress.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796633186,
+    "lat": 42.4422265,
+    "lon": -76.4993569,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "105",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West Court Street",
+     "amenity": "restaurant",
+     "name": "The Rook",
+     "nysgissam:nysaddresspointid": "TOMP032749",
+     "opening_hours": "Tu-Th 17:00-21:00; Fr-Sa 17:00-21:30",
+     "phone": "+1-607-319-0180",
+     "website": "https://www.rookfoodanddrink.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796633265,
+    "lat": 42.4419412,
+    "lon": -76.4876132,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "414",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Eddy Street",
+     "addr:unit": "3",
+     "amenity": "restaurant",
+     "brand": "Shi Miao Dao Yunnan Rice Noodle",
+     "brand:en": "Shi Miao Dao Yunnan Rice Noodle",
+     "brand:wikidata": "Q119118794",
+     "brand:zh": "\u5341\u79d2\u5230\u4e91\u5357\u8fc7\u6865\u7c73\u7ebf",
+     "cuisine": "chinese",
+     "name": "Shi Miao Dao Yunnan Rice Noodle",
+     "name:en": "Shi Miao Dao Yunnan Rice Noodle",
+     "name:zh": "\u5341\u79d2\u5230\u4e91\u5357\u8fc7\u6865\u7c73\u7ebf",
+     "nysgissam:nysaddresspointid": "TOMP046672",
+     "opening_hours": "Tu-Su 11:30-21:30",
+     "phone": "+1-607-319-0102",
+     "website": "https://www.shimiaodaoithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796634878,
+    "lat": 42.4472628,
+    "lon": -76.5049437,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "311",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Third Street",
+     "amenity": "restaurant",
+     "cuisine": "noodle",
+     "delivery": "yes",
+     "name": "HaKaCha",
+     "nysgissam:nysaddresspointid": "TOMP020470",
+     "nysgissam:review": "no matching street nearby",
+     "opening_hours": "Mo-Sa 11:00-14:00; Mo-Th 16:00-21:00; Fr-Sa 16:00-22:00",
+     "phone": "+1-607-319-4006",
+     "takeaway": "yes",
+     "website": "https://www.hakacha.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796635022,
+    "lat": 42.4402826,
+    "lon": -76.4958182,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "122",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Aurora Street",
+     "amenity": "fast_food",
+     "brand": "Jimmy John's",
+     "brand:wikidata": "Q1689380",
+     "cuisine": "sandwich",
+     "diet:vegetarian": "yes",
+     "name": "Jimmy John's",
+     "nysgissam:nysaddresspointid": "TOMP008267;TOMP000541",
+     "official_name": "Jimmy John's Gourmet Sandwiches",
+     "opening_hours": "11:00-21:00",
+     "phone": "+1-607-645-0075",
+     "ref": "541",
+     "takeaway": "yes",
+     "website": "https://locations.jimmyjohns.com/ny/ithaca/sandwiches-541.html"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796635045,
+    "lat": 42.4372125,
+    "lon": -76.5080163,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "307",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Meadow Street",
+     "amenity": "restaurant",
+     "cuisine": "pizza",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Pizza Aroma",
+     "nysgissam:nysaddresspointid": "TOMP006747",
+     "opening_hours": "Mo-Sa 11:00-21:00",
+     "outdoor_seating": "no",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "phone": "+1-607-273-6165",
+     "website": "https://pizzaaromaithacany.com/3032",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796636524,
+    "lat": 42.4400755,
+    "lon": -76.4954944,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "113",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Aurora Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-10",
+     "check_date:opening_hours": "2026-06-25",
+     "cuisine": "american",
+     "diet:vegetarian": "yes",
+     "email": "foodlabithaca@gmail.com",
+     "name": "Food Lab",
+     "nysgissam:nysaddresspointid": "TOMP007960",
+     "opening_hours": "Su-Th 11:00-22:00; Fr-Sa 11:00-00:00",
+     "phone": "+1-607-882-4631",
+     "website": "https://www.foodlabithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796639067,
+    "lat": 42.4398927,
+    "lon": -76.4992218,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "112",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Cayuga Street",
+     "amenity": "cafe",
+     "contact:facebook": "https://www.facebook.com/IthacaAlleyCat/",
+     "contact:instagram": "https://www.instagram.com/alleycatithaca/",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Alley Cat Cafe",
+     "nysgissam:nysaddresspointid": "TOMP015761",
+     "opening_hours": "Tu-Sa 09:00-18:00; Su 10:00-17:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-319-5006",
+     "website": "https://www.alleycatithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796640628,
+    "lat": 42.4417231,
+    "lon": -76.4848633,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "202",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "cuisine": "asian",
+     "name": "BiBiBowl Asian Grill",
+     "nysgissam:nysaddresspointid": "TOMP028214",
+     "opening_hours": "Mo-Sa 11:00-21:30",
+     "phone": "+1-607-319-0188",
+     "website": "https://bibibowlusa.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796641569,
+    "lat": 42.4389342,
+    "lon": -76.5076823,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "527",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "restaurant",
+     "cuisine": "pizza",
+     "diet:vegetarian": "yes",
+     "name": "Franco's Pizzeria",
+     "nysgissam:nysaddresspointid": "TOMP023326",
+     "opening_hours": "Mo-Su 12:00-21:00",
+     "phone": "+1-607-319-5132",
+     "takeaway": "yes",
+     "website": "https://www.francosithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8796641877,
+    "lat": 42.4420342,
+    "lon": -76.4900063,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "310",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Stewart Avenue",
+     "amenity": "restaurant",
+     "name": "Ithaca Ghost Kitchen",
+     "nysgissam:nysaddresspointid": "TOMP057382",
+     "opening_hours": "Mo-Su 11:00-01:30",
+     "phone": "+1-607-375-7934",
+     "website": "https://www.ithacaghostkitchen.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 8917809312,
+    "lat": 42.4519426,
+    "lon": -76.4969321,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "309",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East Lincoln Street",
+     "amenity": "restaurant",
+     "contact:facebook": "https://www.facebook.com/people/Lincoln-St-Diner/100049915524665/",
+     "name": "Lincoln Street Diner",
+     "opening_hours": "Mo-Fr 06:30-13:00; Sa 07:00-12:30",
+     "phone": "+1-607-216-1616"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9116763789,
+    "lat": 42.44056,
+    "lon": -76.5011139,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "200",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West Seneca Street",
+     "amenity": "ice_cream",
+     "contact:facebook": "https://www.facebook.com/sweetmelissasicecreamshop/",
+     "diet:vegan": "yes",
+     "drive_through": "no",
+     "email": "sweetmelissaithaca@gmail.com",
+     "indoor_seating": "no",
+     "name": "Sweet Melissa's Ice Cream",
+     "opening_hours": "Mo-Su 13:00-21:00; Oct-Mar off",
+     "outdoor_seating": "yes",
+     "payment:cash": "yes",
+     "payment:credit_cards": "no",
+     "payment:debit_cards": "no",
+     "phone": "+1-607-277-0090",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9167217824,
+    "lat": 42.4408044,
+    "lon": -76.4985973,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "215",
+     "addr:postcode": "14850",
+     "addr:street": "North Cayuga Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-10",
+     "check_date:opening_hours": "2026-07-10",
+     "cuisine": "coffee_shop",
+     "delivery": "yes",
+     "name": "Caf\u00e9 Dewitt",
+     "opening_hours": "Mo-Su 09:00-14:00",
+     "takeaway": "yes",
+     "website": "https://www.cafedewitt.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9167259016,
+    "lat": 42.4418332,
+    "lon": -76.4851139,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "403",
+     "addr:postcode": "14850",
+     "addr:street": "College Avenue",
+     "air_conditioning": "yes",
+     "amenity": "restaurant",
+     "cuisine": "mexican",
+     "delivery": "yes",
+     "diet:vegetarian": "yes",
+     "email": "hello@dosamigosfood.com",
+     "indoor_seating": "yes",
+     "name": "Dos Amigos",
+     "opening_hours": "Tu,We 11:00-22:00; Th-Su 11:00-23:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-379-5086",
+     "takeaway": "yes",
+     "website": "https://www.dosamigosfood.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9167280113,
+    "lat": 42.4396717,
+    "lon": -76.4948412,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "320",
+     "addr:postcode": "14850",
+     "addr:street": "East State Street",
+     "amenity": "cafe",
+     "delivery": "yes",
+     "diet:vegetarian": "yes",
+     "name": "The Greenhouse Cafe & Cocktail Lounge",
+     "opening_hours": "Mo-Th 15:00-23:00; Fr-Sa 15:00-00:00",
+     "phone": "+1-607-319-0223",
+     "takeaway": "yes",
+     "website": "https://www.thegreenhouseithaca.com/",
+     "wheelchair": "limited"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9167322999,
+    "lat": 42.438828,
+    "lon": -76.5097233,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "619",
+     "addr:postcode": "14850",
+     "addr:street": "West State Street",
+     "addr:unit": "B",
+     "amenity": "bar",
+     "contact:instagram": "ithaca5anddime",
+     "name": "Ithaca 5 & Dime"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9167390231,
+    "lat": 42.4394878,
+    "lon": -76.495865,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "215",
+     "addr:postcode": "14850",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "cuisine": "mexican",
+     "diet:vegetarian": "yes",
+     "email": "vivaithaca@gmail.com",
+     "name": "Viva Taqueria",
+     "opening_hours": "Tu-Th 11:30-21:00; Fr-Sa 11:30-22:00",
+     "phone": "+1-607-277-1752",
+     "reservation": "no",
+     "website": "https://www.vivataqueria.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9170494592,
+    "lat": 42.4418993,
+    "lon": -76.4853983,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "408",
+     "addr:postcode": "14850",
+     "addr:street": "College Ave",
+     "amenity": "restaurant",
+     "brand": "D.P. Dough",
+     "brand:wikidata": "Q22008973",
+     "cuisine": "calzone",
+     "delivery": "yes",
+     "indoor_seating": "yes",
+     "name": "D.P. Dough",
+     "opening_hours": "Mo-Su 16:00-04:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-277-7772",
+     "takeaway": "yes",
+     "website": "https://www.dpdough.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9176400983,
+    "lat": 42.4387272,
+    "lon": -76.5000586,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "118",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West Green Street",
+     "amenity": "cafe",
+     "changing_table": "no",
+     "diet:vegetarian": "yes",
+     "name": "Press Cafe",
+     "opening_hours": "Mo-Fr 08:00-15:00, Sa-Su 09:00-16:00",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9178731303,
+    "lat": 42.4417134,
+    "lon": -76.4845997,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "208A",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "cuisine": "vietnamese",
+     "name": "Pho Time",
+     "opening_hours": "Mo-Th 11:00-22:00; Fr-Sa 11:00-22:30; Su 11:30-22:00",
+     "phone": "+1-607-273-5030",
+     "website": "https://asianchiliphotime.com/photime/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9178762314,
+    "lat": 42.4417132,
+    "lon": -76.4845543,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "208B",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "cuisine": "asian",
+     "name": "Asian Chili Spot",
+     "opening_hours": "Mo-Th 11:00-22:00; Fr-Sa 11:00-22:30; Su 11:30-22:00",
+     "phone": "+1-607-272-1668",
+     "website": "https://asianchiliphotime.com/home/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9178763771,
+    "lat": 42.4394307,
+    "lon": -76.4984326,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "113",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "cuisine": "sushi",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Sushi Osaka",
+     "opening_hours": "Su-Th 11:00-22:00; Fr-Sa 11:00-23:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-379-6128",
+     "website": "https://www.sushiosakaithacany.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9178783712,
+    "lat": 42.4413874,
+    "lon": -76.4873107,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "315",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Eddy Street",
+     "amenity": "restaurant",
+     "contact:facebook": "https://www.facebook.com/people/Souvlaki-House/100063509023218/",
+     "cuisine": "greek",
+     "name": "Souvlaki House",
+     "opening_hours": "Mo-Sa 11:00-21:00",
+     "phone": "+1-607-273-1650"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9178794925,
+    "lat": 42.4414943,
+    "lon": -76.4865529,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "113",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "cuisine": "japanese",
+     "name": "Plum Tree Restaurant",
+     "opening_hours": "Mo-We 11:15-14:15,16:30-21:45; Th 11:15-14:15,16:30-22:15; Fr 11:15-14:15,16:30-22:45; Sa 11:45-14:45,16:30-22:45; Su 11:45-14:45,16:30-21:45",
+     "phone": "+1-607-256-8212",
+     "website": "https://www.goplumtree.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9179789846,
+    "lat": 42.4415276,
+    "lon": -76.484855,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "205",
+     "addr:postcode": "14850",
+     "addr:street": "Dryden Road",
+     "amenity": "cafe",
+     "cuisine": "bubble_tea",
+     "name": "U Tea",
+     "opening_hours": "Mo-Th,Su 11:30-22:30; Fr-Sa 11:30-23:00",
+     "phone": "+1-607-319-4298"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9179793674,
+    "lat": 42.4421437,
+    "lon": -76.4876103,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "422",
+     "addr:postcode": "14850",
+     "addr:street": "Eddy Street",
+     "amenity": "restaurant",
+     "cuisine": "chinese",
+     "delivery": "yes",
+     "name": "De Tasty Hot Pot",
+     "opening_hours": "Mo,We-Su 11:00-21:30",
+     "phone": "+1-607-821-2312",
+     "takeaway": "yes",
+     "website": "http://www.tastyhotpot.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9179809456,
+    "lat": 42.4417385,
+    "lon": -76.4864325,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "104",
+     "addr:postcode": "14850",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "cuisine": "korean",
+     "delivery": "yes",
+     "name": "Gangnam Station",
+     "opening_hours": "Mo 11:00-20:30; Tu-Su 11:00-21:00",
+     "phone": "+1-607-256-3333",
+     "takeaway": "yes",
+     "website": "https://www.gangnamstationithacany.com/order"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9179838063,
+    "lat": 42.4417793,
+    "lon": -76.4876164,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "404",
+     "addr:postcode": "14850",
+     "addr:street": "Eddy Street",
+     "addr:unit": "A",
+     "amenity": "restaurant",
+     "cuisine": "korean",
+     "delivery": "yes",
+     "name": "Four Seasons",
+     "takeaway": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9448536911,
+    "lat": 42.4415092,
+    "lon": -76.486412,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "121",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "fast_food",
+     "cuisine": "wings",
+     "name": "Wings Over Ithaca",
+     "opening_hours": "Mo-Th 11:00-00:00; Fr-Sa 11:00-02:00; Su 11:00-00:00",
+     "phone": "+1 607-319-4664"
+    },
+    "type": "node"
+   },
+   {
+    "id": 9786870677,
+    "lat": 42.4397791,
+    "lon": -76.4960195,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "216",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "cuisine": "thai",
+     "diet:vegetarian": "yes",
+     "name": "Taste of Thai",
+     "opening_hours": "Mo-Fr 11:30-14:30,17:00-22:00; Sa-Su 11:30-22:00",
+     "phone": "+1 607 256-5487",
+     "website": "https://www.tasteofthainy.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 10075676849,
+    "lat": 42.4448918,
+    "lon": -76.4811448,
+    "tags": {
+     "air_conditioning": "yes",
+     "amenity": "cafe",
+     "branch": "Gates Hall",
+     "check_date": "2026-08-28",
+     "cuisine": "pastry",
+     "indoor_seating": "yes",
+     "internet_access": "wlan",
+     "internet_access:fee": "no",
+     "internet_access:ssid": "Cornell-Visitor",
+     "name": "Gimme! Coffee",
+     "opening_hours": "Mo-Fr 08:00-15:00",
+     "outdoor_seating": "yes",
+     "phone": "+1-607-227-5391",
+     "website": "https://www.gimmecoffee.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 11758870634,
+    "lat": 42.4394567,
+    "lon": -76.4976055,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "125",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "air_conditioning": "yes",
+     "amenity": "cafe",
+     "brand": "Paris Baguette",
+     "brand:wikidata": "Q62605260",
+     "check_date": "2026-03-08",
+     "check_date:diet:vegetarian": "2026-03-08",
+     "cuisine": "coffee_shop",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "internet_access": "wlan",
+     "name": "Paris Baguette",
+     "opening_hours": "Mo-Su 07:30-21:00",
+     "outdoor_seating": "no",
+     "payment:cash": "yes",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "shop": "bakery",
+     "website:menu": "https://parisbaguette.com/menu/",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 11758870636,
+    "lat": 42.4396856,
+    "lon": -76.4979587,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "130",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "diet:vegetarian": "yes",
+     "name": "Salt & Pepper"
+    },
+    "type": "node"
+   },
+   {
+    "id": 11795886950,
+    "lat": 42.4396941,
+    "lon": -76.4975301,
+    "tags": {
+     "addr:housenumber": "146",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-13",
+     "check_date:opening_hours": "2026-07-13",
+     "cuisine": "burger;pizza",
+     "diet:vegetarian": "yes",
+     "name": "Komonz Grill",
+     "opening_hours": "Su-Mo, We-Th 11:00-20:45; Fr-Sa 11:00-23:45",
+     "phone": "+1-607-307-3140",
+     "website": "https://www.komonzgrill.com/",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12000042049,
+    "lat": 42.4392946,
+    "lon": -76.4952547,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "301",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "addr:unit": "1",
+     "amenity": "restaurant",
+     "name": "Ithaca Ale House",
+     "opening_hours": "Mo-We 11:00-23:00; Th-Sa 11:00-01:00; Su 11:00-22:00",
+     "phone": "+1-607-256-7977",
+     "website": "http://www.ithacaalehouse.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12000048571,
+    "lat": 42.439747,
+    "lon": -76.4959241,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "222",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "diet:vegetarian": "yes",
+     "name": "Lev Kitchen",
+     "opening_hours": "Mo-Th 10:00-21:00; Fr-Sa 10:00-00:00; Su 10:00-21:00",
+     "phone": "+1-607-319-0262",
+     "website": "https://www.levkitchen.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12008684084,
+    "lat": 42.4465286,
+    "lon": -76.4821629,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "130",
+     "addr:postcode": "14853",
+     "addr:state": "NY",
+     "addr:street": "Statler Drive",
+     "amenity": "restaurant",
+     "cuisine": "italian",
+     "diet:vegetarian": "yes",
+     "email": "ha-tavernabanfi@cornell.edu",
+     "name": "Taverna Banfi",
+     "opening_hours": "Mo-Fr 07:30-10:00,11:30-14:00; Mo-Su 17:30-21:00; Sa-Su 07:00-14:00",
+     "phone": "+1-607-254-2565",
+     "website": "https://statlerhotel.cornell.edu/food-drink/taverna-banfi"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12011180477,
+    "lat": 42.4401969,
+    "lon": -76.4948361,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "324",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "cafe",
+     "diet:vegetarian": "yes",
+     "name": "The Strand Cafe",
+     "opening_hours": "Mo-Su 06:00-23:00; Sa-Su 23:00-01:00",
+     "phone": "+1-607-277-0230",
+     "website": "https://thestrandithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12016026390,
+    "lat": 42.4462673,
+    "lon": -76.4820178,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "130",
+     "addr:postcode": "14853",
+     "addr:state": "NY",
+     "addr:street": "Statler Drive",
+     "amenity": "restaurant",
+     "diet:vegetarian": "yes",
+     "email": "macs_terrace@cornell.edu",
+     "name": "The Terrace Restaurant",
+     "opening_hours": "Mo-Fr 08:00-14:30",
+     "phone": "+1-607-254-2511",
+     "website": "https://statlerhotel.cornell.edu/food-drink/the-terrace-restaurant"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12065676277,
+    "lat": 42.4417145,
+    "lon": -76.4846405,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "206B",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Dryden Road",
+     "amenity": "restaurant",
+     "branch": "Collegetown",
+     "cuisine": "poke",
+     "name": "Pokelava",
+     "opening_hours": "Mo-Th,Su 11:00-21:00; Fr-Sa 11:00-21:30",
+     "phone": "+1-607-339-0322"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12082133671,
+    "lat": 42.4298182,
+    "lon": -76.5063229,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "222",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Elmira Road",
+     "addr:unit": "9",
+     "amenity": "restaurant",
+     "cuisine": "chinese",
+     "name": "Ling Ling",
+     "opening_hours": "Mo-Th 11:00-21:30; Fr-Sa 11:00-22:30",
+     "phone": "+1-607-272-0718"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12106772860,
+    "lat": 42.4396888,
+    "lon": -76.4949871,
+    "tags": {
+     "addr:housenumber": "314",
+     "amenity": "bar",
+     "check_date": "2026-06-22",
+     "check_date:opening_hours": "2026-06-22",
+     "cuisine": "american",
+     "email": "bikebarithaca@gmail.com",
+     "name": "Bike Bar",
+     "opening_hours": "Tu-Th 16:00-23:00; Fr-Sa 16:00-00:00",
+     "website": "http://bikebarithaca.com",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12110807238,
+    "lat": 42.4397451,
+    "lon": -76.4955071,
+    "tags": {
+     "addr:housenumber": "101",
+     "addr:street": "North Aurora Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-13",
+     "check_date:opening_hours": "2026-07-13",
+     "cuisine": "korean",
+     "diet:vegetarian": "yes",
+     "name": "The Lotus",
+     "opening_hours": "Mo-Su 11:30-23:00",
+     "phone": "+1-607-339-0023"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12110836482,
+    "lat": 42.4396224,
+    "lon": -76.4931921,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "408",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "bar",
+     "check_date": "2026-07-18",
+     "check_date:opening_hours": "2026-07-18",
+     "contact:facebook": "barargos",
+     "contact:instagram": "barargos",
+     "indoor_seating": "yes",
+     "name": "Bar Argos",
+     "opening_hours": "Mo-Su 16:00-22:00",
+     "outdoor_seating": "yes",
+     "phone": "+1-607-319-4437",
+     "website": "https://www.argosinn.com/bar"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12142235263,
+    "lat": 42.4290155,
+    "lon": -76.4972872,
+    "tags": {
+     "amenity": "restaurant",
+     "brand": "Sunset Grill",
+     "brand:wikidata": "Q62112489",
+     "cuisine": "american",
+     "name": "Sunset Grill"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12580022534,
+    "lat": 42.4394957,
+    "lon": -76.5054869,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "430",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "cafe",
+     "indoor_seating": "yes",
+     "name": "FairPour Coffee Roasters",
+     "outdoor_seating": "no",
+     "website": "https://www.fairpour.com/hours"
+    },
+    "type": "node"
+   },
+   {
+    "id": 12596448425,
+    "lat": 42.4396948,
+    "lon": -76.4971195,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "154",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "cafe",
+     "cuisine": "coffee_shop",
+     "diet:vegetarian": "yes",
+     "internet_access": "wlan",
+     "name": "Bank Coffee",
+     "opening_hours": "Mo-Su 07:00-19:00",
+     "outdoor_seating": "yes",
+     "phone": "+1-607-333-4435",
+     "website": "https://www.bankcoffee.shop/",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13058625042,
+    "lat": 42.4394402,
+    "lon": -76.5075326,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "526",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-10",
+     "check_date:opening_hours": "2026-04-14",
+     "cuisine": "vietnamese",
+     "email": "saigonkitchen888@gmail.com",
+     "name": "Saigon Kitchen",
+     "opening_hours": "Mo-Fr 11:00-21:30; Sa-Su 11:00-22:30",
+     "phone": "+1-607-257-8881",
+     "website": "https://www.saigonkitchenithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13186265001,
+    "lat": 42.4397139,
+    "lon": -76.4980765,
+    "tags": {
+     "addr:housenumber": "124",
+     "addr:street": "Ithaca Commons",
+     "amenity": "restaurant",
+     "diet:vegetarian": "yes",
+     "name": "Kimchi Korean BBQ",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13186298401,
+    "lat": 42.4391896,
+    "lon": -76.4972163,
+    "tags": {
+     "addr:housenumber": "171",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "cuisine": "chinese",
+     "level": "0",
+     "name": "Tian Jin Foods",
+     "name:zh": "\u5929\u6d25\u5c0f\u5403",
+     "opening_hours": "Tu-We, Sa 09:00-18:00; Th-Fr 09:00-20:00; Su 11:00-17:00"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13186298402,
+    "lat": 42.4392122,
+    "lon": -76.4966348,
+    "tags": {
+     "addr:housenumber": "171",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "cuisine": "caribbean",
+     "level": "0",
+     "name": "Authentic Jerk Restaurant & Grill"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13186298501,
+    "lat": 42.439213,
+    "lon": -76.4969078,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "171",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-13",
+     "cuisine": "mediterranean",
+     "level": "0",
+     "name": "Adam Grill",
+     "phone": "+1-347-679-0942"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13186298601,
+    "lat": 42.4392536,
+    "lon": -76.496592,
+    "tags": {
+     "addr:housenumber": "171",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "cuisine": "asian;japanese",
+     "level": "0",
+     "name": "Tibetan Momo Bar"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13186298602,
+    "lat": 42.4393096,
+    "lon": -76.4971949,
+    "tags": {
+     "addr:housenumber": "171",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-13",
+     "check_date:opening_hours": "2026-07-13",
+     "cuisine": "indian",
+     "level": "1",
+     "name": "Sangam Indian Curry",
+     "opening_hours": "Mo-Su 11:30-15:00, 17:00-22:00",
+     "phone": "+1-607-273-1006",
+     "website": "https://sangamindianrestaurantithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13186315701,
+    "lat": 42.4394395,
+    "lon": -76.4985479,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "109",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-24",
+     "check_date:opening_hours": "2026-07-24",
+     "cuisine": "mediterranean;pizza",
+     "diet:vegetarian": "yes",
+     "indoor_seating": "yes",
+     "name": "Marrakech Pizzeria & Mediterranean Cuisine",
+     "opening_hours": "Su-We 10:00-21:00; Th-Sa 10:30-02:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-272-7777"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13186322101,
+    "lat": 42.4387521,
+    "lon": -76.499598,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "110",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West Green Street",
+     "addr:unit": "2",
+     "amenity": "fast_food",
+     "cuisine": "donut",
+     "diet:vegan": "yes",
+     "email": "angelheartsdonuts@gmail.com",
+     "name": "Angelhearts Donuts",
+     "opening_hours": "We-Su 08:00-14:00",
+     "website": "https://www.angelheartsdonuts.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13295586901,
+    "lat": 42.4405955,
+    "lon": -76.4973285,
+    "tags": {
+     "addr:housenumber": "130",
+     "addr:street": "East Seneca Street",
+     "amenity": "restaurant",
+     "check_date": "2026-08-27",
+     "check_date:opening_hours": "2026-05-28",
+     "cuisine": "asian;bubble_tea;seafood;tea",
+     "diet:vegetarian": "yes",
+     "name": "Dream Tea & Pok\u00e9",
+     "name:zh": "\u8ffd\u68a6\u8336",
+     "opening_hours": "Mo-Tu, Th 11:30-14:30, 15:30-23:00; Fr-Su 11:30-23:00",
+     "payment:cash": "yes",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "phone": "+1-607-793-8802",
+     "website": "https://www.dreamteapoke.com/",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13298062632,
+    "lat": 42.4463543,
+    "lon": -76.4820262,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "130",
+     "addr:postcode": "14853",
+     "addr:state": "NY",
+     "addr:street": "Statler Drive",
+     "amenity": "cafe",
+     "cuisine": "american",
+     "diet:vegetarian": "yes",
+     "name": "Mac's Cafe",
+     "website": "https://statlerhotel.cornell.edu/food-drink/macs-cafe"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13298062633,
+    "lat": 42.4459525,
+    "lon": -76.4833592,
+    "tags": {
+     "amenity": "cafe",
+     "indoor_seating": "yes",
+     "name": "Atrium Cafe",
+     "outdoor_seating": "no",
+     "website": "https://scl.cornell.edu/atrium-cafe"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13298062634,
+    "lat": 42.446787,
+    "lon": -76.4844825,
+    "tags": {
+     "amenity": "cafe",
+     "diet:vegetarian": "yes",
+     "name": "Caf\u00e9 Jennie",
+     "website": "https://scl.cornell.edu/cafe-jennie",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13298062635,
+    "lat": 42.4467228,
+    "lon": -76.4858197,
+    "tags": {
+     "amenity": "cafe",
+     "name": "Straight from the Market",
+     "takeaway": "only",
+     "website": "https://scl.cornell.edu/straight-market"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13298062636,
+    "lat": 42.4540562,
+    "lon": -76.4761584,
+    "tags": {
+     "amenity": "cafe",
+     "name": "Novick's Caf\u00e9",
+     "website": "https://scl.cornell.edu/residential-life/dining/eateries-menus/cafes-food-courts-coffeehouses/novicks-cafe"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13298062637,
+    "lat": 42.4560218,
+    "lon": -76.47926,
+    "tags": {
+     "amenity": "cafe",
+     "cuisine": "sandwich;salad;breakfast",
+     "name": "Crossings Caf\u00e9",
+     "website": "https://now.dining.cornell.edu/eatery/Crossings-Cafe"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13357634101,
+    "lat": 42.4372376,
+    "lon": -76.5092762,
+    "tags": {
+     "addr:housenumber": "220",
+     "addr:street": "South Fulton Street",
+     "amenity": "restaurant",
+     "check_date": "2026-07-13",
+     "check_date:opening_hours": "2026-07-13",
+     "cuisine": "pizza",
+     "name": "Sal\u2019s Pizzeria",
+     "opening_hours": "Su-Mo, We-Th 11:00-20:00; Fr-Sa 11:00-21:00",
+     "phone": "+1-607-277-7257",
+     "website": "https://www.salspizzeriaithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13604617428,
+    "lat": 42.4452687,
+    "lon": -76.509778,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:floor": "G",
+     "addr:housenumber": "770",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Cascadilla Street",
+     "air_conditioning": "yes",
+     "amenity": "cafe",
+     "check_date": "2026-08-27",
+     "cuisine": "coffee_shop",
+     "description": "Open daily for locally roasted coffee, tea, and baked goods.",
+     "internet_access": "wlan",
+     "internet_access:fee": "no",
+     "level": "0",
+     "name": "Forty Weight Coffee Roasters",
+     "opening_hours": "Mo-Su 07:00-17:00",
+     "outdoor_seating": "yes",
+     "payment:cash": "yes",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "website": "https://www.instagram.com/fortyweight_cafe/",
+     "website:menu": "fortyweightcoffee.cafe",
+     "wheelchair": "yes"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13604617431,
+    "lat": 42.440684,
+    "lon": -76.4850366,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "307",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "College Avenue",
+     "addr:unit": "Ste 1",
+     "amenity": "cafe",
+     "cuisine": "coffee_shop",
+     "internet_access": "wlan",
+     "internet_access:fee": "customers",
+     "name": "Forty Weight Coffee Roasters",
+     "opening_hours": "Mo-Fr 07:30-18:00; Sa-Su 09:00-18:00",
+     "website": "https://www.instagram.com/fortyweight_cafe/",
+     "website:menu": "fortyweightcoffee.cafe"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13667982072,
+    "lat": 42.439342,
+    "lon": -76.4998175,
+    "tags": {
+     "amenity": "restaurant",
+     "changing_table": "no",
+     "diet:vegetarian": "yes",
+     "name": "Farm to Feast NY",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "website": "https://www.farmtofeastny.com",
+     "wheelchair": "no"
+    },
+    "type": "node"
+   },
+   {
+    "id": 13890207501,
+    "lat": 42.4409909,
+    "lon": -76.4988131,
+    "tags": {
+     "addr:housenumber": "215",
+     "addr:street": "North Cayuga Street",
+     "amenity": "ice_cream",
+     "check_date": "2026-09-01",
+     "name": "Cayuga Lake Creamery",
+     "opening_hours": "Tu-Su 12:30-21:00",
+     "payment:cash": "yes",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "phone": "+1-607-227-3987",
+     "website": "https://cayugalakecreamery.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 14005628253,
+    "lat": 42.4394903,
+    "lon": -76.4960081,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "215",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East State Street",
+     "amenity": "restaurant",
+     "cuisine": "pizza",
+     "diet:halal": "yes",
+     "name": "More than Pizza",
+     "opening_hours": "Su-We 10:30-21:00; Th-Sa 10:30-02:00",
+     "phone": "+1-607-319-0791",
+     "website": "https://morethanpizzaithaca.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 14005667426,
+    "lat": 42.4403596,
+    "lon": -76.4961526,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "211",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "East Seneca Street",
+     "amenity": "restaurant",
+     "cuisine": "pizza",
+     "name": "Thompson and Bleeker",
+     "opening_hours": "Mo-Su 17:00-21:00",
+     "phone": "+1-607-319-0851",
+     "website": "https://thompsonandbleeckerpizza.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 14007500969,
+    "lat": 42.4396282,
+    "lon": -76.499591,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "114",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "bar",
+     "contact:instagram": "https://www.instagram.com/nowherespecialith",
+     "email": "nowherespecialith@gmail.com",
+     "name": "Nowhere Special Libations Parlor",
+     "opening_hours": "Mo-Th 17:00-22:00; Fr-Sa 16:00-22:00",
+     "website": "https://www.nowherespecialith.com/"
+    },
+    "type": "node"
+   },
+   {
+    "id": 14079708542,
+    "lat": 42.4417034,
+    "lon": -76.4859009,
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "114 Dryden Road",
+     "amenity": "cafe",
+     "cuisine": "bubble_tea",
+     "name": "Ninja Chicken & Friends",
+     "opening_hours": "Mo-Su 11:30-22:00",
+     "outdoor_seating": "no"
+    },
+    "type": "node"
+   },
+   {
+    "center": {
+     "lat": 42.4377988,
+     "lon": -76.5079415
+    },
+    "id": 106289641,
+    "nodes": [
+     1223317059,
+     1223317067,
+     1223317004,
+     1223317051,
+     1223317059
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "209",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Meadow Street",
+     "amenity": "restaurant",
+     "building": "retail",
+     "diet:gluten_free": "yes",
+     "diet:vegan": "yes",
+     "diet:vegetarian": "yes",
+     "name": "Taste of Thai Express",
+     "opening_hours": "11:00-22:00",
+     "phone": "+1 607-272-8424",
+     "url": "http://www.tasteofthaiexpress.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4381195,
+     "lon": -76.5079215
+    },
+    "id": 106289642,
+    "nodes": [
+     1223317050,
+     1223317055,
+     1223317001,
+     1223317046,
+     1223317050
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "205",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Meadow Street",
+     "alt_name": "Dunkin' Donuts",
+     "amenity": "fast_food",
+     "brand": "Dunkin'",
+     "brand:wikidata": "Q847743",
+     "building": "retail",
+     "contact:website": "https://locations.dunkindonuts.com/en/ny/ithaca/205-s-meadow-st/343337",
+     "cuisine": "donut;coffee_shop",
+     "diet:vegetarian": "yes",
+     "drive_through": "yes",
+     "name": "Dunkin'",
+     "opening_hours": "24/7",
+     "phone": "+1 607-272-3619",
+     "ref": "343337",
+     "takeaway": "yes",
+     "website": "https://locations.dunkindonuts.com/en/ny/ithaca/205-s-meadow-st/343337",
+     "wheelchair": "yes"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4307737,
+     "lon": -76.5075517
+    },
+    "id": 106292518,
+    "nodes": [
+     1223360802,
+     10224589131,
+     10224589132,
+     1223360731,
+     10224589133,
+     10224589130,
+     1223360762,
+     1223360753,
+     1223360802
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "719-25",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Meadow Street",
+     "amenity": "restaurant",
+     "brand": "Texas Roadhouse",
+     "brand:wikidata": "Q7707945",
+     "building": "retail",
+     "building:levels": "1",
+     "cuisine": "steak_house",
+     "delivery": "no",
+     "indoor_seating": "yes",
+     "name": "Texas Roadhouse",
+     "opening_hours": "Mo-Th 16:00-22:00; Fr 16:00-23:00; Sa 12:00-23:00; Su 12:00-21:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-272-1621",
+     "takeaway": "yes",
+     "website": "https://www.texasroadhouse.com/locations/398-ithacany"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4395025,
+     "lon": -76.5069594
+    },
+    "id": 106297261,
+    "nodes": [
+     1223440878,
+     1223440882,
+     1227218511,
+     1223440887,
+     1223440870,
+     1223440878
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "516",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "bar",
+     "building": "yes",
+     "check_date": "2026-07-18",
+     "check_date:opening_hours": "2026-07-18",
+     "min_age": "21",
+     "name": "The Westy",
+     "opening_hours": "Su-Th 16:00-01:00; Fr-Sa 15:00-01:00",
+     "phone": "+1-607-218-2851",
+     "smoking": "no",
+     "website": "https://www.thewestyisabar.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4395021,
+     "lon": -76.5068415
+    },
+    "id": 106693723,
+    "nodes": [
+     1223440887,
+     1227218584,
+     1227218516,
+     1227218536,
+     1227218570,
+     1227218511,
+     1223440887
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "512",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "restaurant",
+     "building": "yes",
+     "check_date": "2026-07-13",
+     "check_date:opening_hours": "2026-07-13",
+     "cuisine": "japanese;ramen",
+     "name": "Maru Ramen",
+     "opening_hours": "Su-Mo, We-Th 11:00-21:00; Fr-Sa 11:00-22:00"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.439518,
+     "lon": -76.5064486
+    },
+    "id": 106693739,
+    "nodes": [
+     1227218543,
+     1227218566,
+     1227218588,
+     1227218540,
+     1227218535,
+     7511457898,
+     1322166979,
+     1227218543
+    ],
+    "tags": {
+     "addr:housenumber": "506",
+     "addr:street": "W State St",
+     "amenity": "cafe",
+     "building": "yes",
+     "cuisine": "coffee_shop",
+     "diet:vegetarian": "yes",
+     "internet_access": "wlan",
+     "internet_access:fee": "no",
+     "name": "Gimme! Coffee",
+     "opening_hours": "Mo-Su 07:30-17:00",
+     "opening_hours:covid19": "08:00-15:00",
+     "outdoor_seating": "yes",
+     "phone": "+1-607-272-8564",
+     "smoking": "no",
+     "website": "https://www.gimmecoffee.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4484601,
+     "lon": -76.4809587
+    },
+    "id": 107869176,
+    "nodes": [
+     1238895397,
+     1238895339,
+     1238895666,
+     1238895248,
+     1238895569,
+     1238895682,
+     1238894905,
+     1238894686,
+     1238895397
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "135",
+     "addr:postcode": "14853",
+     "addr:state": "NY",
+     "addr:street": "Presidents Drive",
+     "amenity": "pub",
+     "building": "university",
+     "check_date": "2026-07-18",
+     "check_date:opening_hours": "2026-07-18",
+     "contact:facebook": "BigRedBarnCornell",
+     "ele": "263",
+     "gnis:feature_id": "2433578",
+     "name": "Big Red Barn",
+     "nysgissam:nysaddresspointid": "TOMP029111",
+     "opening_hours": "Mo-Th 08:00-22:00; Fr 08:00-19:00",
+     "phone": "+16072550428",
+     "source": "USGS Geonames"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4303237,
+     "lon": -76.5031625
+    },
+    "id": 207815669,
+    "nodes": [
+     2180660701,
+     2180660681,
+     6553240681,
+     2180660674,
+     2180660673,
+     2180660679,
+     2180660677,
+     2180660692,
+     2180660695,
+     2180660703,
+     2180660704,
+     2180660700,
+     2180660701
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "205",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Elmira Road",
+     "amenity": "restaurant",
+     "building": "retail",
+     "cuisine": "asian",
+     "diet:vegan": "yes",
+     "diet:vegetarian": "yes",
+     "email": "ohanaithaca@gmail.com",
+     "name": "Modern Ohana",
+     "nysgissam:nysaddresspointid": "TOMP010535",
+     "opening_hours": "Tu-Fr 07:30-15:00,15:30-21:30; Sa-Su 07:30-15:00,16:30-21:30",
+     "payment:credit_cards": "yes",
+     "payment:debit_cards": "yes",
+     "phone": "+1-607-319-4248",
+     "website": "https://www.ithacaohana.com/",
+     "wheelchair": "yes"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4297021,
+     "lon": -76.5047017
+    },
+    "id": 207815688,
+    "nodes": [
+     2180660638,
+     2180660649,
+     2180660653,
+     2180660641,
+     2180660633,
+     2180660636,
+     2180660638
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "215",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Elmira Road",
+     "amenity": "restaurant",
+     "building": "retail",
+     "cuisine": "pizza;wings",
+     "name": "Pudgie's Pizza",
+     "website": "https://pudgiespizza.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4387787,
+     "lon": -76.5019484
+    },
+    "id": 330921981,
+    "nodes": [
+     3379564306,
+     3379564307,
+     3379564310,
+     3379564309,
+     3379564304,
+     3379564308,
+     3379564298,
+     3379564297,
+     3379564294,
+     3379564293,
+     3379564296,
+     3379564295,
+     3379564306
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "302",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West Green Street",
+     "amenity": "bar",
+     "building": "retail",
+     "check_date": "2026-07-18",
+     "check_date:opening_hours": "2026-07-18",
+     "contact:facebook": "UncleJoesGrillandSportsBar",
+     "cuisine": "burger",
+     "indoor_seating": "yes",
+     "name": "Uncle Joe's Grill and Sports Bar",
+     "nysgissam:nysaddresspointid": "TOMP018151",
+     "opening_hours": "Mo, We, Fr 17:00-00:00; Tu 16:00-00:00; Sa-Su 12:00-00:00; Th 16:00-00:30",
+     "outdoor_seating": "no",
+     "phone": "+1-607-273-2662"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4458838,
+     "lon": -76.5125203
+    },
+    "id": 331165605,
+    "nodes": [
+     3382281611,
+     10092612011,
+     10092612012,
+     10092612013,
+     10092638650,
+     10092638651,
+     10092612014,
+     3382281612,
+     10092616724,
+     10092616723,
+     10092638649,
+     3382281613,
+     10092616722,
+     10092616721,
+     3382281614,
+     10092612015,
+     10092612016,
+     10092616717,
+     10092616718,
+     3382281611
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "525",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Old Taughannock Boulevard",
+     "amenity": "restaurant",
+     "building": "retail",
+     "check_date": "2026-07-13",
+     "cuisine": "american;burger;seafood",
+     "delivery": "no",
+     "email": "info@boatyardgrill.com",
+     "name": "The Boatyard Grill",
+     "nysgissam:nysaddresspointid": "TOMP027637",
+     "opening_hours": "We-Th 16:00-21:00; Fr 16:00-22:00; Sa 11:00-14:00, 16:00-22:00; Su 11:00-14:00, 16:00-21:00",
+     "phone": "+1 607-256-2628",
+     "website": "https://boatyardgrill.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4290019,
+     "lon": -76.4973025
+    },
+    "id": 350406318,
+    "nodes": [
+     3561566794,
+     3561589293,
+     3561589294,
+     3561589393,
+     3561566794
+    ],
+    "tags": {
+     "amenity": "restaurant",
+     "brand": "Sunset Grill",
+     "brand:wikidata": "Q62112489",
+     "cuisine": "american",
+     "name": "Sunset Grill"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4330922,
+     "lon": -76.5084778
+    },
+    "id": 447292544,
+    "nodes": [
+     4444571575,
+     4444571576,
+     4444571577,
+     4444571578,
+     4444571575
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "608",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Meadow Street",
+     "amenity": "restaurant",
+     "brand": "Chili's",
+     "brand:wikidata": "Q1072948",
+     "building": "retail",
+     "cuisine": "tex-mex",
+     "diet:vegetarian": "yes",
+     "name": "Chili's",
+     "nysgissam:nysaddresspointid": "TOMP032092",
+     "official_name": "Chili's Grill & Bar",
+     "opening_hours": "Mo-Th 11:00-23:00; Fr-Sa 11:00-00:00; Su 11:00-23:00",
+     "phone": "+1-607-272-5004",
+     "website": "https://www.chilis.com/locations/us/new-york/ithaca/ithaca/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4383402,
+     "lon": -76.4648525
+    },
+    "id": 447293671,
+    "nodes": [
+     4444582501,
+     4444582502,
+     4444582503,
+     6600994582,
+     6600994583,
+     6600994584,
+     6601050185,
+     6601050186,
+     6601050187,
+     6601050188,
+     6601050190,
+     6601050189,
+     4444582504,
+     4444582505,
+     4444582506,
+     4444582501
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "381",
+     "addr:postcode": "14850",
+     "addr:street": "Pine Tree Road",
+     "amenity": "restaurant",
+     "building": "yes",
+     "name": "Former restaurant. Vacant as of August 2026."
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4365172,
+     "lon": -76.4636735
+    },
+    "id": 447293851,
+    "nodes": [
+     4444583774,
+     4444583775,
+     4444583776,
+     4444583777,
+     4444583778,
+     4444583779,
+     4444583780,
+     4444583774
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "1010",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Ellis Hollow Road",
+     "amenity": "fast_food",
+     "brand": "Burger King",
+     "brand:wikidata": "Q177054",
+     "building": "yes",
+     "cuisine": "burger",
+     "delivery": "no",
+     "drive_through": "yes",
+     "name": "Burger King",
+     "note": "Closed and slated for rennovation as of August 2026",
+     "nysgissam:nysaddresspointid": "TOMP001157",
+     "source": "NYS GIS OpenData and ESRI sat imagery",
+     "takeaway": "yes"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4434179,
+     "lon": -76.5082094
+    },
+    "id": 539357573,
+    "nodes": [
+     5219207951,
+     5219207950,
+     5219207949,
+     5219207948,
+     5219207951
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "503",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Meadow Street",
+     "amenity": "restaurant",
+     "building": "yes",
+     "cuisine": "thai",
+     "name": "Tamarind",
+     "nysgissam:nysaddresspointid": "TOMP008857",
+     "opening_hours": "Mo,We,Fr 11:30-15:00,17:00-22:00; Th 17:00-22:00; Sa-Su 11:30-22:00",
+     "phone": "+1-607-277-2220",
+     "website": "https://www.tamarindthaiithaca.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4392842,
+     "lon": -76.5004914
+    },
+    "id": 540123615,
+    "nodes": [
+     5225879645,
+     5225879644,
+     5225879643,
+     5225879642,
+     5225879641,
+     9168012917,
+     9168012918,
+     5225879640,
+     5225879645
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "103",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Geneva Street",
+     "addr:unit": "Lower",
+     "amenity": "cafe",
+     "building": "commercial",
+     "building:levels": "2",
+     "cuisine": "tea;coffee_shop;dessert",
+     "name": "The Nocturnal Cafe",
+     "nysgissam:nysaddresspointid": "TOMP012509",
+     "opening_hours": "Mo-We 16:00-22:00; Th-Sa 16:00-00:00",
+     "phone": "+1-607-272-5282",
+     "smoking": "no",
+     "website": "https://www.thenocturnalcafe.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4402681,
+     "lon": -76.5103182
+    },
+    "id": 542935915,
+    "nodes": [
+     5248857769,
+     5248857768,
+     5248857767,
+     5248857766,
+     5248857765,
+     5248857764,
+     5248857769
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "632",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West Seneca Street",
+     "amenity": "bar",
+     "building": "yes",
+     "name": "The Rhine House",
+     "nysgissam:nysaddresspointid": "TOMP016135"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4407264,
+     "lon": -76.5080436
+    },
+    "id": 542935937,
+    "nodes": [
+     2482979014,
+     5248857851,
+     5248857850,
+     5248857849,
+     2482979014
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "215",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "North Meadow Street",
+     "amenity": "restaurant",
+     "building": "yes",
+     "name": "Milkstand Breakfast & Lunch",
+     "nysgissam:nysaddresspointid": "TOMP012024",
+     "opening_hours": "Mo-Su 08:00-15:30",
+     "phone": "+1-607-273-1691",
+     "website": "https://www.ithacamilkstand.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.438983,
+     "lon": -76.5101787
+    },
+    "id": 545333364,
+    "nodes": [
+     5270711369,
+     5270711367,
+     5959768093,
+     5959768092,
+     5270711366,
+     6285640309,
+     5270711365,
+     5270711368,
+     5270711369
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "635",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "restaurant",
+     "building": "retail",
+     "cuisine": "seafood",
+     "indoor_seating": "yes",
+     "name": "Maxie's Supper Club & Oyster Bar",
+     "opening_hours": "We-Th,Su 15:30-21:00; Fr-Sa 15:30-21:30",
+     "outdoor_seating": "yes",
+     "phone": "+1-607-272-4136",
+     "website": "https://www.maxiesithaca.com/"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4346055,
+     "lon": -76.5078472
+    },
+    "id": 698312598,
+    "nodes": [
+     6558094928,
+     12058979607,
+     6558094929,
+     6558094930,
+     7335708156,
+     6558094928
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "529",
+     "addr:state": "NY",
+     "addr:street": "S Meadow Street",
+     "amenity": "restaurant",
+     "building": "retail",
+     "name": "Royal Court Restaurant",
+     "opening_hours": "Tu-Fr 07:00-21:00; Sa 17:00-21:00"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4389547,
+     "lon": -76.5086304
+    },
+    "id": 702971568,
+    "nodes": [
+     6601792643,
+     6601792644,
+     6601792645,
+     6601792648,
+     6601792647,
+     6601792646,
+     6601792643
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "108",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "South Meadow Street",
+     "amenity": "restaurant",
+     "building": "retail",
+     "check_date": "2026-04-30",
+     "check_date:opening_hours": "2026-04-30",
+     "cuisine": "chinese",
+     "name": "Jade Garden",
+     "nysgissam:nysaddresspointid": "TOMP010090",
+     "opening_hours": "Tu-Sa 11:00-21:30; Su 12:00-21:30",
+     "outdoor_seating": "no",
+     "self_service": "no"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4413225,
+     "lon": -76.4850481
+    },
+    "id": 808939296,
+    "nodes": [
+     7564130714,
+     7564130715,
+     7564130716,
+     7564130717,
+     7564130714
+    ],
+    "tags": {
+     "amenity": "restaurant",
+     "building": "yes",
+     "cuisine": "asian;korean",
+     "name": "Koko"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4444674,
+     "lon": -76.5091462
+    },
+    "id": 907062397,
+    "nodes": [
+     8796632822,
+     11010678865,
+     8422909764,
+     11010678866,
+     11010678867,
+     11010678868,
+     8422909794,
+     8422913324,
+     8422913355,
+     8796632822
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:country": "US",
+     "addr:housenumber": "700",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Cascadilla Street",
+     "amenity": "ice_cream",
+     "building": "retail",
+     "delivery": "yes",
+     "diet:dairy_free": "yes",
+     "diet:gluten_free": "yes",
+     "diet:nut_free": "yes",
+     "diet:vegan": "yes",
+     "diet:vegetarian": "yes",
+     "email": "info@purityicecream.com",
+     "name": "Purity Ice Cream",
+     "nysgissam:nysaddresspointid": "TOMP019672",
+     "opening_hours": "07:30-22:00",
+     "outdoor_seating": "yes",
+     "phone": "+1-607-272-1545",
+     "url": "http://purityicecream.com/",
+     "website": "https://www.purityicecream.com",
+     "wheelchair": "yes"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4555602,
+     "lon": -76.4793243
+    },
+    "id": 1151622577,
+    "nodes": [
+     10713039376,
+     10713039377,
+     10713039378,
+     10713039379,
+     10713039380,
+     10713039381,
+     10713039376
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "18",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "Sisson Place",
+     "amenity": "fast_food",
+     "building": "yes",
+     "fast_food": "cafeteria",
+     "indoor_seating": "yes",
+     "layer": "-1",
+     "location": "surface",
+     "name": "Morrison Dining",
+     "outdoor_seating": "yes"
+    },
+    "type": "way"
+   },
+   {
+    "center": {
+     "lat": 42.4395256,
+     "lon": -76.5052084
+    },
+    "id": 1304926299,
+    "nodes": [
+     5312657620,
+     12086198622,
+     5312657573,
+     12086198600,
+     12086198601,
+     12086198602,
+     5312657620
+    ],
+    "tags": {
+     "addr:city": "Ithaca",
+     "addr:housenumber": "428",
+     "addr:postcode": "14850",
+     "addr:state": "NY",
+     "addr:street": "West State Street",
+     "amenity": "restaurant",
+     "building": "retail",
+     "cuisine": "american",
+     "indoor_seating": "yes",
+     "name": "The State Diner",
+     "opening_hours": "Mo-Su 07:00-16:00",
+     "outdoor_seating": "no",
+     "phone": "+1-607-272-6189",
+     "website": "https://thestatediner.com/"
+    },
+    "type": "way"
+   }
+  ],
+  "generator": "Overpass API 0.7.62.11 87bfad18",
+  "osm3s": {
+   "copyright": "The data included in this document is from www.openstreetmap.org. The data is made available under ODbL.",
+   "timestamp_osm_base": "2026-10-03T07:34:16Z"
+  },
+  "version": 0.6
+ }
+}
