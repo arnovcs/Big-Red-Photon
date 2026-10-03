@@ -36,7 +36,10 @@ class PlacesProvider(Protocol):
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
 
     async def geocode(self, text: str, near: LatLng) -> tuple[LatLng, str] | None:
-        """Returns (coords, clean label), or None if nothing matched."""
+        """Returns (coords, clean label), or None if nothing matched.
+
+        Checks demo_locations first, then Nominatim.
+        """
         ...
 
 
@@ -68,7 +71,7 @@ class LLMProvider(Protocol):
 
 
 class ContextProvider(Protocol):
-    """Stage 7 stretch."""
+    """Stage 7 stretch (Gemini + Search grounding, if tier allows)."""
 
     async def find_events(
         self, area_label: str, when: datetime, intent: str

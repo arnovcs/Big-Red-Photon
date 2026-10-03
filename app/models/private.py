@@ -10,8 +10,9 @@ from pydantic import BaseModel
 
 class TravelModes(BaseModel):
     walk: bool = True
-    transit: bool = True
-    drive: bool = False
+    bike: bool = False
+    drive: bool = False  # own car
+    rideshare: bool = True
 
 
 class LatLng(BaseModel):

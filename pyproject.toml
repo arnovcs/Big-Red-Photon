@@ -13,7 +13,7 @@ dependencies = [
     "aiosqlite",
     "httpx",
     "tenacity",
-    "openai",
+    "google-genai",
     "python-dateutil",
 ]
 

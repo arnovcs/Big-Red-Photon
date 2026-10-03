@@ -37,7 +37,7 @@ class PlanScore(BaseModel):
     max_burden: float
     mean_burden: float
     burden_spread: float
-    arrival_spread_min: float
+    arrival_spread_min: float  # v2: always 0 (deterministic modes); kept for future use
 
 
 class Plan(BaseModel):

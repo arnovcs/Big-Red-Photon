@@ -41,7 +41,7 @@ class ConstraintField(StrEnum):
     CUISINE = "cuisine"
     CATEGORY = "category"  # food | bar | cafe | dessert | activity | event
     NOVELTY = "novelty"  # 0..1
-    MODE_PREFERENCE = "mode_preference"  # "walk" | "transit" | "drive" with polarity
+    MODE_PREFERENCE = "mode_preference"  # "walk" | "bike" | "drive" | "rideshare" with polarity
 
 
 class ExtractedConstraint(BaseModel):

@@ -11,7 +11,7 @@ class OnboardingState(StrEnum):
     AWAITING_BANK_CODE = "awaiting_bank_code"
     AWAITING_LIMIT_CONFIRM = "awaiting_limit_confirm"
     AWAITING_LOCATION = "awaiting_location"
-    AWAITING_CAR = "awaiting_car"
+    AWAITING_MODES = "awaiting_modes"
     READY = "ready"
 
 

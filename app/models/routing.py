@@ -12,8 +12,9 @@ from app.models.candidates import Uncertain
 
 class Mode(StrEnum):
     WALK = "walk"
-    TRANSIT = "transit"
+    BIKE = "bike"
     DRIVE = "drive"
+    RIDESHARE = "rideshare"
 
 
 class RouteEstimate(BaseModel):
@@ -22,19 +23,17 @@ class RouteEstimate(BaseModel):
     mode: Mode
     duration_min: float
     distance_mi: float
-    walk_min: float  # walking portion; equals duration for WALK
-    fare_usd: Uncertain[Decimal]  # transit: Routes fare or config; drive: miles × rate + parking
-    source: Literal["google_routes", "mock"]
+    walk_min: float  # equals duration for WALK; 0 for other modes
+    # walk/bike: 0; drive: miles × rate + parking; rideshare: formula (status="estimated")
+    fare_usd: Uncertain[Decimal]
+    source: Literal["ors", "mock"]
 
 
 class RouteStep(BaseModel):
-    mode: Literal["walk", "transit", "drive"]
-    instruction: str
+    mode: Literal["walk", "bike", "drive", "rideshare"]
+    instruction: str  # from ORS directions, e.g. "Turn left onto College Ave"
     duration_min: float
-    line_name: str | None = None
-    depart_stop: str | None = None
-    arrive_stop: str | None = None
-    depart_time: datetime | None = None
+    distance_mi: float
 
 
 class RouteDetail(RouteEstimate):

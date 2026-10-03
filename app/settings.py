@@ -15,13 +15,18 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # xAI Grok
-    xai_api_key: str = ""
-    xai_model: str = ""  # fill from current xAI docs
-    grok_timeout_sec: float = 20.0
+    # Gemini
+    gemini_api_key: str = ""
+    gemini_model: str = ""  # fill from current Gemini docs; a Flash model
 
-    # Google Places + Routes
-    google_maps_api_key: str = ""
+    # OpenRouteService
+    ors_api_key: str = ""
+    ors_base_url: str = "https://api.openrouteservice.org"
+
+    # OpenStreetMap community services
+    nominatim_base_url: str = "https://nominatim.openstreetmap.org"
+    nominatim_user_agent: str = ""  # required by Nominatim's usage policy
+    overpass_url: str = "https://overpass-api.de/api/interpreter"  # scripts/fetch_venues.py only
 
     # Capital One Nessie
     nessie_api_key: str = ""
@@ -36,8 +41,8 @@ class Settings(BaseSettings):
 
     # Provider selection
     provider_messaging: Literal["photon", "sim"] = "sim"
-    provider_places: Literal["google", "mock"] = "mock"
-    provider_routing: Literal["google", "mock"] = "mock"
+    provider_places: Literal["osm", "mock"] = "mock"
+    provider_routing: Literal["ors", "mock"] = "mock"
     provider_finance: Literal["nessie"] = "nessie"
 
     # Record/replay cache (§14.1)
@@ -49,16 +54,24 @@ class Settings(BaseSettings):
     demo_center_lat: float = 42.4440
     demo_center_lng: float = -76.4830
 
-    # Costs
-    transit_fare_usd: Decimal = Decimal("1.50")
+    # Own car
     drive_cost_per_mile_usd: Decimal = Decimal("0.20")
     drive_parking_usd: Decimal = Decimal("3.00")
+
+    # Ride-share: max(min_fare, base + booking + per_mile × mi + per_min × min)
+    rideshare_base_usd: Decimal = Decimal("2.50")
+    rideshare_booking_usd: Decimal = Decimal("2.50")
+    rideshare_per_mile_usd: Decimal = Decimal("1.20")
+    rideshare_per_min_usd: Decimal = Decimal("0.30")
+    rideshare_min_fare_usd: Decimal = Decimal("8.00")
+    rideshare_pickup_wait_min: int = 6
 
     # Tuning
     optimizer_lambda: float = 0.5
     poll_timeout_sec: int = 300
 
-    # Default timeout for real providers (§8)
+    # Timeouts (§8)
+    llm_timeout_sec: float = 20.0
     http_timeout_sec: float = 10.0
 
 

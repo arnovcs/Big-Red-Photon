@@ -2,7 +2,17 @@
 
 > An iMessage agent that turns group-chat debates into a plan everyone can afford and reach, and gets the whole group there at the same time.
 
-**Status:** approved plan, ready to build. No application code yet.
+**Status:** v2 — free-API stack. Stage 0 is complete; apply the Stage 0.5 migration (§15) before Stage 1.
+
+### v2 changes (summary)
+v1 used paid Google Maps and xAI Grok APIs. v2 uses only free services plus the team's Gemini key:
+- **LLM:** Grok → **Gemini** (structured output).
+- **Venues:** Google Places → **OpenStreetMap** (Overpass API), pulled once into a hand-checked fixture with hand-entered price tiers.
+- **Geocoding:** Google → **`demo_locations.json` first, then Nominatim**.
+- **Routing:** Google Routes → **OpenRouteService** (walking, cycling, driving profiles).
+- **Transit removed** (no free schedule-based transit API for Ithaca). **Ride-share added** as a mode, with time from ORS driving + pickup wait and cost from a configurable formula. Modes are now `walk | bike | drive | rideshare`.
+- Arrival-spread scoring term removed (all modes are deterministic, so everyone arrives exactly at `T_target`).
+- New definitions: `FinancialSnapshot`, `EventFinding` (§6.9).
 **Event:** BigRed//Hacks 2026 (Cornell), theme **Navigation**.
 **Hard deadline:** Devpost submission **Sunday 8:30 AM ET**. Judging starts 9:00 AM.
 **Prize tracks targeted:** Photon (Agents in iMessage), Capital One (Best Use of Nessie), Big Red (theme), Design (UI/UX).
@@ -39,16 +49,17 @@
 Group chats waste time deciding where to go. Every person has different preferences, a different starting location, and a different budget they may not want to share. Existing tools either ignore money entirely or expose it.
 
 ### Solution
-A bot that joins an iMessage group chat. Each member privately links a (sandbox) bank account and shares where they're starting from. When the group says `@plan`, the bot listens to the discussion, extracts preferences, finds nearby options, routes every person to every option by walking, transit, or driving, and picks the plans that are fairest to the worst-off person while staying inside **everyone's** private budget. The group votes in a poll. Then each person gets a **private** DM with their own travel mode, cost, and leave-by time, calculated so the whole group **arrives together**.
+A bot that joins an iMessage group chat. Each member privately links a (sandbox) bank account and shares where they're starting from. When the group says `@plan`, the bot listens to the discussion, extracts preferences, finds nearby options, routes every person to every option by walking, biking, driving, or ride-share, and picks the plans that are fairest to the worst-off person while staying inside **everyone's** private budget. The group votes in a poll. Then each person gets a **private** DM with their own travel mode, cost, and leave-by time, calculated so the whole group **arrives together**.
 
 ### Why it fits "Navigation"
-Navigation is the core, not a side feature: multi-origin, multi-modal routing to a shared destination, with departure scheduling so arrivals converge. Money and preferences are constraints on that navigation problem.
+Navigation is the core, not a side feature: multi-origin, multi-modal routing to a shared destination, with departure scheduling so arrivals converge. Money and preferences are constraints on that navigation problem. Ride-share creates a real money-versus-time trade-off per person: fast but costly versus free but slow.
 
 ### What makes it technically interesting (pitch points)
 - **Fair group optimization:** exact enumeration with a min-max + mean objective, so no one person carries the cost of the plan.
 - **Synchronized arrival:** work backward from a shared target arrival time to compute each person's leave-by time.
 - **Privacy by construction:** budgets never reach the group chat or the LLM. Enforced by module boundaries, types, and an output scanner.
-- **Grounded LLM use:** the LLM extracts preferences and phrases explanations, but every number (time, distance, cost, hours) comes from real APIs, and explanations are checked against computed facts.
+- **Grounded LLM use:** the LLM extracts preferences and phrases explanations, but every number (time, distance, cost, hours) comes from routing data or deterministic formulas, and explanations are checked against computed facts.
+- **Built on open data:** venues and routing come from OpenStreetMap (Overpass, Nominatim, OpenRouteService).
 
 ---
 
@@ -60,10 +71,12 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 | iMessage | Photon `spectrum-ts` in a **thin TypeScript bridge** (`bridge/`) | Photon's SDKs are TypeScript. The bridge only relays; all logic stays in Python. |
 | Bridge ↔ backend | Plain JSON over HTTP on **localhost** | Both run on one laptop. No HMAC, no auth. |
 | Database | SQLite via SQLAlchemy | Zero setup. No Postgres or Supabase. |
-| Routing | Google Routes API (`computeRouteMatrix`, `computeRoutes`) | Only mainstream API with walk + drive + transit with schedules and arrival-time targeting. |
-| Places | Google Places API (New) | Same key as Routes. Price level, hours, types, ratings. Also geocodes text. |
-| LLM | xAI Grok (structured output) for extraction and explanation | Team choice. Model name is config. |
-| Live events | Grok `web_search` | **Stretch only** (Stage 7). |
+| Routing | **OpenRouteService** (matrix + directions; `foot-walking`, `cycling-regular`, `driving-car`) | Free key, no card. Free plan: 2,000 directions/day, 500 matrix/day. |
+| Modes | `walk`, `bike`, `drive` (own car), `rideshare` | No free transit API for Ithaca. Ride-share = ORS driving time + pickup wait, cost from formula. |
+| Venues | **OpenStreetMap via Overpass**, fetched once into `fixtures/venues.json` | Free, no key. No prices in OSM, so price tiers are hand-entered. |
+| Geocoding | `fixtures/demo_locations.json`, then **Nominatim** | Free. Max ~1 request/second; requires a descriptive User-Agent. |
+| LLM | **Gemini** (structured output) for extraction and explanation | Team already has a key. Model name is config. Use a Flash model. |
+| Live events | Gemini + Google Search grounding **only if the key's tier supports it**; otherwise a hand-checked list | **Stretch only** (Stage 7). |
 | Finance | Capital One Nessie sandbox + deterministic estimator | LLM never sees balances. |
 | Optimizer | Exact enumeration, hard filters, min-max + mean burden | Small search space; fully explainable; no solver dependency. |
 | Demo reliability | Record/replay cache + simulator + two small mocks | Real data on stage without live-API risk. |
@@ -165,7 +178,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   └── poll.py               # send poll (native or text), tally votes, pick winner
 │   │
 │   ├── delivery/
-│   │   └── itinerary.py          # detailed routes for winner; per-person DMs; map image (stretch)
+│   │   └── itinerary.py          # directions for winner; per-person DMs; map image (stretch, `staticmap` + OSM tiles)
 │   │
 │   ├── messaging/
 │   │   ├── outbound.py           # send_group / send_private wrappers
@@ -176,9 +189,9 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   ├── cache.py              # record/replay cache (§14.1)
 │   │   ├── real/
 │   │   │   ├── photon.py         # calls bridge HTTP endpoints
-│   │   │   ├── grok.py           # LLMProvider (+ ContextProvider in Stage 7)
-│   │   │   ├── places.py         # Google Places (New)
-│   │   │   ├── routes.py         # Google Routes
+│   │   │   ├── gemini.py         # LLMProvider (+ ContextProvider in Stage 7)
+│   │   │   ├── osm_places.py     # PlacesProvider: venue fixture + demo_locations + Nominatim geocoding
+│   │   │   ├── ors.py            # RoutingProvider: OpenRouteService (+ ride-share derivation)
 │   │   │   └── nessie.py         # FinanceProvider
 │   │   └── mock/
 │   │       ├── sim_messaging.py  # writes to in-memory outbox (simulator)
@@ -204,15 +217,16 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   └── src/index.ts              # Photon relay (§9.1)
 │
 ├── fixtures/
-│   ├── venues.json               # ~25 real venues around the demo area (mock Places + replay seed)
+│   ├── venues.json               # ~25 real OSM venues around the demo area, hand-checked, with price tiers
 │   ├── demo_locations.json       # named starting points with lat/lng
 │   ├── personas.json             # Nessie seed definitions (§12.3)
+│   ├── events_fallback.json      # hand-checked events for the demo weekend (Stage 7 fallback)
 │   ├── transcripts/              # golden group-chat transcripts + expected extraction
 │   └── recorded/                 # record/replay cache files (committed)
 │
 ├── scripts/
 │   ├── seed_nessie.py            # creates demo customers/accounts/purchases/bills
-│   ├── fetch_venues.py           # pulls venues from Places into fixtures/venues.json
+│   ├── fetch_venues.py           # pulls venues from Overpass into fixtures/venues.json (prices added by hand)
 │   └── run_demo_scenario.py      # drives the full §18 scenario through the simulator
 │
 └── tests/
@@ -232,9 +246,13 @@ All config through `app/settings.py` (pydantic-settings), loaded from `.env`.
 
 | Variable | Example | Purpose |
 |---|---|---|
-| `XAI_API_KEY` | | Grok |
-| `XAI_MODEL` | (fill from current xAI docs) | Model id for extraction + explanation |
-| `GOOGLE_MAPS_API_KEY` | | Places + Routes (+ Static Maps if used) |
+| `GEMINI_API_KEY` | | Gemini |
+| `GEMINI_MODEL` | (fill from current Gemini docs; a Flash model) | Model id for extraction + explanation |
+| `ORS_API_KEY` | | OpenRouteService |
+| `ORS_BASE_URL` | `https://api.openrouteservice.org` | Verify against ORS docs |
+| `NOMINATIM_BASE_URL` | `https://nominatim.openstreetmap.org` | |
+| `NOMINATIM_USER_AGENT` | `bigredhacks-<name>/0.1 (team email)` | Required by Nominatim's usage policy |
+| `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | Used only by `scripts/fetch_venues.py` |
 | `NESSIE_API_KEY` | | Nessie |
 | `NESSIE_BASE_URL` | `http://api.nessieisreal.com` | Verify scheme/host against Nessie docs |
 | `BRIDGE_URL` | `http://localhost:3001` | Backend → bridge |
@@ -242,19 +260,25 @@ All config through `app/settings.py` (pydantic-settings), loaded from `.env`.
 | `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET` | | Bridge only |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./app.db` | |
 | `PROVIDER_MESSAGING` | `photon` \| `sim` | |
-| `PROVIDER_PLACES` | `google` \| `mock` | |
-| `PROVIDER_ROUTING` | `google` \| `mock` | |
+| `PROVIDER_PLACES` | `osm` \| `mock` | |
+| `PROVIDER_ROUTING` | `ors` \| `mock` | |
 | `PROVIDER_FINANCE` | `nessie` | (no mock; seeded customers serve that role) |
 | `CACHE_MODE` | `off` \| `record` \| `replay` | §14.1 |
 | `DEMO_TIMEZONE` | `America/New_York` | All "by 9" style times are local |
 | `DEMO_AREA_LABEL` | `Ithaca, NY` | Used in prompts and Places queries |
 | `DEMO_CENTER_LAT`, `DEMO_CENTER_LNG` | | Fallback search center |
-| `TRANSIT_FARE_USD` | `1.50` | Verify local fare; used when Routes gives no fare |
-| `DRIVE_COST_PER_MILE_USD` | `0.20` | |
-| `DRIVE_PARKING_USD` | `3.00` | |
+| `DRIVE_COST_PER_MILE_USD` | `0.20` | Own car: gas estimate |
+| `DRIVE_PARKING_USD` | `3.00` | Own car |
+| `RIDESHARE_BASE_USD` | `2.50` | Ride-share cost = base + booking + per_mile × mi + per_min × min, then max(min_fare) |
+| `RIDESHARE_BOOKING_USD` | `2.50` | |
+| `RIDESHARE_PER_MILE_USD` | `1.20` | |
+| `RIDESHARE_PER_MIN_USD` | `0.30` | |
+| `RIDESHARE_MIN_FARE_USD` | `8.00` | |
+| `RIDESHARE_PICKUP_WAIT_MIN` | `6` | Added to ride-share duration |
 | `OPTIMIZER_LAMBDA` | `0.5` | Worst-off vs mean weight |
 | `POLL_TIMEOUT_SEC` | `300` | Auto-pick the leader after this |
-| `GROK_TIMEOUT_SEC` | `20` | |
+| `LLM_TIMEOUT_SEC` | `20` | |
+| `HTTP_TIMEOUT_SEC` | `10` | Default provider timeout |
 
 ---
 
@@ -270,7 +294,7 @@ class OnboardingState(StrEnum):
     AWAITING_BANK_CODE = "awaiting_bank_code"
     AWAITING_LIMIT_CONFIRM = "awaiting_limit_confirm"
     AWAITING_LOCATION = "awaiting_location"
-    AWAITING_CAR = "awaiting_car"
+    AWAITING_MODES = "awaiting_modes"      # v2: was AWAITING_CAR
     READY = "ready"
 
 class User(BaseModel):
@@ -290,10 +314,11 @@ class Group(BaseModel):
 ### 6.2 Private data (vault only)
 
 ```python
-class TravelModes(BaseModel):
+class TravelModes(BaseModel):          # v2: bike + rideshare added
     walk: bool = True
-    transit: bool = True
-    drive: bool = False
+    bike: bool = False
+    drive: bool = False                   # own car
+    rideshare: bool = True
 
 class LatLng(BaseModel):
     lat: float
@@ -347,7 +372,7 @@ class ConstraintField(StrEnum):
     CUISINE = "cuisine"
     CATEGORY = "category"                   # food | bar | cafe | dessert | activity | event
     NOVELTY = "novelty"                     # 0..1
-    MODE_PREFERENCE = "mode_preference"     # "walk" | "transit" | "drive" with polarity
+    MODE_PREFERENCE = "mode_preference"     # "walk" | "bike" | "drive" | "rideshare" with polarity
 
 class ExtractedConstraint(BaseModel):
     pid: str
@@ -380,31 +405,32 @@ class Uncertain(BaseModel, Generic[T]):
     low: T | None = None
     high: T | None = None
     status: Literal["known", "estimated", "unknown"]
-    source: str                     # "google_places" | "fixture" | "config" | "grok:<url>"
+    source: str                     # "osm_fixture" | "hand_entered" | "formula" | "ors" | "gemini:<url>"
 
 class Candidate(BaseModel):
-    candidate_id: str               # "gp:<place_id>" | "fx:<slug>" | "ev:<hash>"
+    candidate_id: str               # "osm:<node|way>/<id>" | "ev:<hash>"
     name: str
     category: str                   # food | bar | cafe | dessert | activity | event
     cuisines: list[str] = []
-    location: LatLng                # REQUIRED, from Places or fixture — never from the LLM
+    location: LatLng                # REQUIRED, from the OSM fixture or Nominatim — never from the LLM
     address: str
     est_cost_pp: Uncertain[Decimal]
     open_at_target: Literal["open", "closed", "unknown"] = "unknown"
     closes_at: datetime | None = None
     typical_duration_min: int       # category default: food 60, cafe 45, dessert 30, bar 90, activity 90
     rating: float | None = None
-    source: Literal["google_places", "fixture", "grok_event"]
+    source: Literal["osm_fixture", "event"]
     novelty_tags: list[str] = []
 ```
 
 ### 6.5 Routing
 
 ```python
-class Mode(StrEnum):
+class Mode(StrEnum):                  # v2
     WALK = "walk"
-    TRANSIT = "transit"
+    BIKE = "bike"
     DRIVE = "drive"
+    RIDESHARE = "rideshare"
 
 class RouteEstimate(BaseModel):
     origin_pid: str
@@ -412,18 +438,15 @@ class RouteEstimate(BaseModel):
     mode: Mode
     duration_min: float
     distance_mi: float
-    walk_min: float                 # walking portion; equals duration for WALK
-    fare_usd: Uncertain[Decimal]    # transit: Routes fare or config; drive: miles × rate + parking; walk: 0
-    source: Literal["google_routes", "mock"]
+    walk_min: float                 # equals duration for WALK; 0 for other modes
+    fare_usd: Uncertain[Decimal]    # walk/bike: 0; drive: miles × rate + parking; rideshare: formula (status="estimated")
+    source: Literal["ors", "mock"]
 
-class RouteStep(BaseModel):
-    mode: Literal["walk", "transit", "drive"]
-    instruction: str
+class RouteStep(BaseModel):            # v2: simplified
+    mode: Literal["walk", "bike", "drive", "rideshare"]
+    instruction: str                # from ORS directions, e.g. "Turn left onto College Ave"
     duration_min: float
-    line_name: str | None = None
-    depart_stop: str | None = None
-    arrive_stop: str | None = None
-    depart_time: datetime | None = None
+    distance_mi: float
 
 class RouteDetail(RouteEstimate):
     depart_at: datetime
@@ -461,7 +484,7 @@ class PlanScore(BaseModel):
     max_burden: float
     mean_burden: float
     burden_spread: float
-    arrival_spread_min: float
+    arrival_spread_min: float       # v2: always 0 (deterministic modes); kept for future use
 
 class Plan(BaseModel):
     plan_id: str
@@ -520,6 +543,22 @@ class PrivateMessage(BaseModel):
 
 Use `create_all()` on startup. No migrations.
 
+### 6.9 Supporting models (v2: previously undefined)
+
+```python
+class FinancialSnapshot(BaseModel):     # app/models/private.py — vault-only
+    checking_balance: Decimal
+    upcoming_bills_14d: Decimal
+    recent_outing_amounts: list[Decimal]   # dining/entertainment purchases, last 60 days
+
+class EventFinding(BaseModel):          # app/models/candidates.py — Stage 7 only
+    title: str
+    venue_name: str
+    starts_at: datetime | None
+    est_price_usd: Decimal | None = None
+    source_url: str
+```
+
 ---
 
 ## 7. Conversation flows and state machines
@@ -547,7 +586,8 @@ AWAITING_BANK_CODE ──valid code──► vault.link_customer() → budget.es
 AWAITING_LIMIT_CONFIRM ──"yes" | number──► save limit (source = estimate | override)
 AWAITING_LOCATION ──text──► places.geocode(text, near=demo center) → "Got it: Olin Library. Right? (yes/no)"
                     ──"no"──► ask again
-AWAITING_CAR ──"yes"|"no"──► TravelModes(drive=…)
+AWAITING_MODES ──"car" | "bike" | "both" | "neither"──► TravelModes(drive=…, bike=…)  (walk + rideshare always on;
+                    user may reply "no rideshare" to turn it off)
 READY ──► DM: "You're set." Group: "✅ Maya is set (2/3)."  (no details)
 ```
 
@@ -591,8 +631,8 @@ Confirmation:
 
 Personal DM:
 > Your plan for tonight: **Koko**, 123 College Ave.
-> 🚌 Leave by **6:24**. Walk 4 min to Schwartz Center, Route 10 bus (3 stops), walk 3 min.
-> Arrive ~6:41. Estimated total: $27.50 (food + fare).
+> 🚗 Request a ride by **6:29** (about 6 min pickup + 7 min drive).
+> Arrive ~6:42. Estimated total: $34 (food ~$25 + ride ~$9).
 
 Keep copy short, warm, and free of jargon.
 
@@ -615,7 +655,7 @@ class PlacesProvider(Protocol):
     async def search_nearby(self, center: LatLng, radius_m: int, categories: list[str],
                             open_at: datetime) -> list[Candidate]: ...
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
-    async def geocode(self, text: str, near: LatLng) -> tuple[LatLng, str] | None: ...  # (coords, clean label)
+    async def geocode(self, text: str, near: LatLng) -> tuple[LatLng, str] | None: ...  # (coords, clean label); demo_locations first, then Nominatim
 
 class RoutingProvider(Protocol):
     async def matrix(self, origins: dict[str, LatLng], destinations: dict[str, LatLng],
@@ -629,7 +669,7 @@ class LLMProvider(Protocol):
                                   now_local: datetime) -> GroupPreferences: ...
     async def phrase_explanations(self, facts: list[dict]) -> list[str]: ...
 
-class ContextProvider(Protocol):       # Stage 7 stretch
+class ContextProvider(Protocol):       # Stage 7 stretch (Gemini + Search grounding, if tier allows)
     async def find_events(self, area_label: str, when: datetime,
                           intent: str) -> list[EventFinding]: ...
 ```
@@ -637,7 +677,7 @@ class ContextProvider(Protocol):       # Stage 7 stretch
 `FinancialSnapshot`: `checking_balance: Decimal`, `upcoming_bills_14d: Decimal`, `recent_outing_amounts: list[Decimal]` (dining/entertainment purchases in the last 60 days).
 
 Every real provider:
-- Uses `httpx.AsyncClient` with an explicit timeout (10 s default; Grok 20 s).
+- Uses `httpx.AsyncClient` (or the provider's official SDK) with an explicit timeout (`HTTP_TIMEOUT_SEC`; LLM uses `LLM_TIMEOUT_SEC`).
 - Retries once on network errors or 5xx (`tenacity`, 2 attempts total).
 - Goes through `providers/cache.py` (§14.1).
 - Logs provider, method, latency, status. Never logs request bodies containing PII.
@@ -647,6 +687,8 @@ Every real provider:
 ## 9. External service details
 
 > These shapes are best-known as of planning. **Verify each against current official docs before implementing**, and adapt the provider internals, not the interfaces.
+>
+> **Free-tier etiquette:** Nominatim and Overpass are community-run. Send a descriptive User-Agent, stay under ~1 request/second, and never call them in loops. All live calls go through the record/replay cache (§14.1).
 
 ### 9.1 Photon bridge (`bridge/src/index.ts`)
 
@@ -677,40 +719,52 @@ The bridge holds no state and makes no decisions. If the backend is down, log an
 - Do native polls work in group chats, and do votes arrive as events?
 - What does a shared location look like in the inbound payload, if anything?
 - Are there rate or allowlist limits on the hackathon tier?
+- **Do group chats work on the free tier, or does the promo code (HACKWITHPHOTON) unlock them?** Free shared lines also cannot message a number that hasn't texted the line first, which the "DM me start" onboarding already handles.
 
-### 9.2 xAI Grok (`providers/real/grok.py`)
+### 9.2 Gemini (`providers/real/gemini.py`)
 
-- Use xAI's OpenAI-compatible API (base URL `https://api.x.ai/v1`) with the `openai` Python SDK, or the official `xai-sdk`. Check current docs for structured-output support and model names.
-- **Extraction:** system prompt + pseudonymous transcript; require JSON matching the `GroupPreferences` schema (pass the Pydantic JSON schema as the structured-output schema). Temperature 0. Then run the validation rules in §6.3.
+- Use the official `google-genai` Python SDK. Check current docs for model names and structured-output parameters.
+- **Extraction:** system instruction + pseudonymous transcript; request JSON output constrained to the `GroupPreferences` schema (pass the Pydantic model or its JSON schema as the response schema). Temperature 0. Then run the validation rules in §6.3. If the SDK rejects the schema (e.g. unsupported union types), simplify the *wire* schema (e.g. `value` as string) and convert to the Pydantic model in code.
 - **Extraction prompt must include:**
   - Current local time and timezone, so "back by 9" → `21:00`.
   - Definitions of HARD / SOFT / VETO / INFERRED with one example each.
   - The allowed `ConstraintField` and `CATEGORY` values.
   - "Only attribute a constraint to the person who said it. Cite message ids. Do not invent constraints. Do not output any prices, distances, or times other than those stated by a person."
 - **Explanation:** input is a list of group-safe fact dicts (§13.8). Output: one sentence (≤ 25 words) per plan. Then the number check (§13.8).
-- **Stage 7 only:** `find_events` uses the Responses API with the `web_search` tool, 20 s hard timeout, run in parallel with Places. Results must be resolved to coordinates via `PlacesProvider.text_search`; unresolved events are dropped.
+- **Rate limits:** free-tier request limits can be low. Record/replay (§14.1) is mandatory during testing so repeated runs don't burn quota. One `@go` should cost exactly 2 Gemini calls (extract + explain).
+- **Stage 7 only:** `find_events` uses Gemini with Google Search grounding **if the key's tier supports it** (check the Gemini pricing/rate-limit page for your key). 20 s hard timeout. Results must be resolved to coordinates via `PlacesProvider.geocode`; unresolved events are dropped. If grounding is unavailable, use `fixtures/events_fallback.json`.
 
-### 9.3 Google Places API (New) (`providers/real/places.py`)
+### 9.3 OpenStreetMap venues + geocoding (`providers/real/osm_places.py`, `scripts/fetch_venues.py`)
 
-- `POST https://places.googleapis.com/v1/places:searchNearby` and `.../places:searchText`.
-- Headers: `X-Goog-Api-Key`, `X-Goog-FieldMask` (request only needed fields: `places.id, places.displayName, places.location, places.formattedAddress, places.types, places.priceLevel, places.priceRange, places.currentOpeningHours, places.rating`).
-- Map Google `types` → our `category`. Map cost:
-  - `priceRange` present → `low/high` from it, `value` = midpoint, `status="known"`.
-  - Else `priceLevel`: FREE → 0; INEXPENSIVE → $12 (8–15); MODERATE → $25 (15–35); EXPENSIVE → $45 (35–60); VERY_EXPENSIVE → $75 (60–100); `status="estimated"`.
-  - Else category default with `status="unknown"`.
-- `geocode()` = `searchText` with location bias around the demo center; take the top result.
-- **For the demo, prefer the fixture:** `scripts/fetch_venues.py` pulls ~25 venues once into `fixtures/venues.json`, which is then hand-checked (fix obvious cost errors, remove closed places).
+**Venue fixture (run once, by `scripts/fetch_venues.py`):**
+- Query Overpass for `amenity` in (`restaurant`, `cafe`, `fast_food`, `bar`, `pub`, `ice_cream`) and `leisure`/`amenity` activity tags (e.g. `bowling_alley`, `cinema`, `escape_game` if present) within ~2.5 km of the demo center. Use `out center;` so ways get a center point.
+- Map OSM tags → `Candidate`: `name`, `cuisine` (split on `;`), category from `amenity`, `opening_hours` kept as the raw string, address from `addr:*` tags.
+- Write `fixtures/venues.json`. Then a teammate **hand-checks** it: remove closed/irrelevant places, keep ~25 with category variety, and **enter a price tier per venue** (`$`, `$$`, `$$$`, `$$$$`).
+- Tier → cost: `$` → $12 (8–15), `$$` → $25 (15–35), `$$$` → $45 (35–60), `$$$$` → $75 (60–100); `status="estimated"`, `source="hand_entered"`. Free activities → $0.
 
-### 9.4 Google Routes API (`providers/real/routes.py`)
+**Opening hours:** parse OSM `opening_hours` only for the simple common forms (e.g. `Mo-Su 11:00-22:00`, `Mo-Fr 07:00-20:00; Sa-Su 09:00-20:00`). Anything else → `open_at_target="unknown"` (no crash, no guess). Do not add a heavy parsing dependency.
 
-- **Screening:** `POST https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix`, field mask `originIndex,destinationIndex,duration,distanceMeters,status,condition,travelAdvisory`.
-  - One call per mode. Only include origins whose `TravelModes` allow that mode.
-  - TRANSIT matrices are limited in size (≈100 elements; verify). Batch destinations so `origins × destinations` stays under the limit.
-  - Walk portion for TRANSIT is not in the matrix: estimate `walk_min = min(duration, 8)` for screening; the detailed route gives the real value.
-- **Detail:** `POST https://routes.googleapis.com/directions/v2:computeRoutes` only for the winning plan's legs. For TRANSIT, set `arrivalTime = T_target`. For WALK/DRIVE, set `departureTime = leave_by`. Parse steps into `RouteStep`s (transit line names, stops, departure times).
-- Use transit fare from the response if present; otherwise `TRANSIT_FARE_USD`.
-- Driving cost = `distance_mi × DRIVE_COST_PER_MILE_USD + DRIVE_PARKING_USD`.
-- If Routes returns no transit route for a pair, that mode is unavailable for that pair. Do not fake it.
+**Runtime `search_nearby`:** reads the fixture, filters by category and distance from `center`, and returns `Candidate`s. No live Overpass calls at runtime.
+
+**Runtime `geocode`:**
+1. Fuzzy-match the text against `fixtures/demo_locations.json` (names + aliases like "Olin", "Olin Library", "Collegetown").
+2. Otherwise call Nominatim `/search?q=<text>&format=jsonv2&limit=1&viewbox=<demo bbox>&bounded=1` with the configured User-Agent, through the cache.
+3. Otherwise return `None` (onboarding re-asks).
+
+`text_search` = same as `geocode` but returns a `Candidate`-shaped result (used only by Stage 7).
+
+### 9.4 OpenRouteService (`providers/real/ors.py`)
+
+- Auth: `Authorization: <ORS_API_KEY>` header. Coordinates are **`[lng, lat]`** order. Verify endpoint shapes in the ORS API docs.
+- **Profiles:** `foot-walking` (WALK), `cycling-regular` (BIKE), `driving-car` (DRIVE and RIDESHARE).
+- **Screening:** `POST /v2/matrix/{profile}` with `locations` = origins + destinations, `sources` = origin indices, `destinations` = destination indices, `metrics = ["duration", "distance"]`, `units = "mi"`. One call per profile actually needed (skip profiles nobody has). A typical `@go` = 2–3 matrix calls.
+- **Derived modes (in code, not extra API calls):**
+  - DRIVE (own car): `duration = ors_duration + 5` (parking); `fare = mi × DRIVE_COST_PER_MILE_USD + DRIVE_PARKING_USD`.
+  - RIDESHARE: `duration = ors_duration + RIDESHARE_PICKUP_WAIT_MIN`; `fare = max(MIN_FARE, BASE + BOOKING + PER_MILE × mi + PER_MIN × ors_duration)`, `status="estimated"`, `source="formula"`.
+  - WALK, BIKE: fare 0; `walk_min = duration` for WALK, 0 for BIKE.
+- **Detail:** `POST /v2/directions/{profile}` with `instructions=true` only for the winning plan's legs, to produce `RouteStep`s (turn-by-turn text). For RIDESHARE, a single step: "Request a ride to <venue>" plus the ORS drive duration.
+- If ORS returns no route for a pair (null in the matrix), that mode is unavailable for that pair. Do not fake it.
+- Free-plan limits (verify): ~500 matrix requests/day, ~2,000 directions/day, ~40 requests/minute. Record/replay keeps testing well under this.
 
 ### 9.5 Capital One Nessie (`providers/real/nessie.py`)
 
@@ -741,14 +795,14 @@ Triggered by `@go`. Target end-to-end latency: ≤ 15 s live, ≤ 3 s in replay.
 2. Extract   (LLMProvider.extract_preferences + validation)
    - On failure or timeout: retry once; then continue with empty preferences and intent "either".
 
-3. Discover  (PlacesProvider)
+3. Discover  (PlacesProvider — reads the OSM venue fixture)
    - center = centroid of origins (computed inside the pipeline from PrivateConstraints; never sent to the LLM)
    - categories from group_intent and CATEGORY constraints
    - search_nearby(center, radius 2500 m, categories, open_at = now + 30 min)
    - Pre-filter: vetoed cuisines/categories, known-closed; keep top ~20 by rating with category variety
-   - [Stage 7] ContextProvider.find_events in parallel; resolved events added as candidates
+   - [Stage 7] ContextProvider.find_events in parallel (Gemini grounding or fallback list); resolved events added as candidates
 
-4. Route     (RoutingProvider.matrix)
+4. Route     (RoutingProvider.matrix — ORS, one call per needed profile; drive/rideshare derived)
    - origins = {pid: origin}, destinations = {candidate_id: location}
    - modes = {pid: allowed modes}
    - depart_at = now + 5 min
@@ -770,10 +824,8 @@ Triggered by `@go`. Target end-to-end latency: ≤ 15 s live, ≤ 3 s in replay.
 After the winner is chosen (`delivery/itinerary.py`):
 ```
 for each person in winner.assignments:
-    detail = routing.route(origin, venue, mode, arrive_by=T_target if transit else None,
-                           depart_at=leave_by if not transit else None)
-    leave_by = detail.depart_at (transit) or recomputed
-    send_private(handle, PrivateMessage(text=itinerary text))
+    detail = routing.route(origin, venue, mode, depart_at=leave_by)   # ORS directions for steps
+    send_private(handle, PrivateMessage(text=itinerary text))       # leave_by from the optimizer is exact
 group: confirmation message with the shared arrival time (rounded to the minute)
 ```
 If `route()` fails for someone, fall back to the screening estimate and a generic instruction ("Walk ~12 min via College Ave").
@@ -831,7 +883,7 @@ Adjust amounts so the expected limits come out as listed (verify by running the 
 Pure functions. Inputs: `candidates`, `estimates` (indexed by `(pid, candidate_id, mode)`), `constraints: dict[pid, PrivateConstraints]`, `preferences: GroupPreferences`, `now: datetime`, `params: OptimizerParams`.
 
 ### 13.1 Search space
-For each candidate `v` (≤20) and each person `i` (N ≤ 6), the feasible modes are `M_i(v) ⊆ {walk, transit, drive}` (allowed by `TravelModes`, present in estimates, not refused by a HARD mode preference). Enumerate the Cartesian product: at most 20 × 3⁶ = 14,580 combinations. Brute force is fine.
+For each candidate `v` (≤20) and each person `i` (N ≤ 6), the feasible modes are `M_i(v) ⊆ {walk, bike, drive, rideshare}` (allowed by `TravelModes`, present in estimates, not refused by a HARD mode preference). Enumerate the Cartesian product: at most 20 × 4⁶ = 81,920 combinations. Brute force in pure Python is still well under a second; if profiling shows otherwise, prune per person to modes not dominated on both duration and cost.
 
 ### 13.2 Synchronized arrival (`arrival.py`)
 ```
@@ -839,8 +891,7 @@ ready_i            = AVAILABLE_FROM_i if stated else now + 5 min
 earliest_arrival_i = ready_i + duration_i(v, m_i)
 T_target           = max_i earliest_arrival_i, rounded up to the next minute
 leave_by_i         = T_target − duration_i
-arrival_spread     = 0 at screening (everyone scheduled to T_target);
-                     after detailed transit routing: T_target − min_i actual_arrival_i
+arrival_spread     = 0 (v2: all modes are deterministic, so everyone is scheduled to arrive at T_target)
 ```
 The only coupling between people is `T_target`: one slow mode pushes everyone's start later.
 
@@ -876,8 +927,8 @@ Weights live in `OptimizerParams` so they can be tuned without code changes.
 ### 13.5 Group objective (`score.py`), lower is better
 ```
 J = λ · max_i B_i + (1 − λ) · mean_i B_i              λ = 0.5   (phase 1)
-  + μ · arrival_spread_min / 10                        μ = 0.15  (phase 2)
   + ρ · uncertainty_fraction                           ρ = 0.10  (phase 2)
+                                                       (v2: the arrival-spread term is removed)
 ```
 - The **max term** protects the worst-off person (no plan wins by being great for three and miserable for one).
 - The **mean term** keeps the plan good overall.
@@ -898,6 +949,7 @@ For each venue, the best mode assignment is the feasible combination with minimu
 - A HARD `available_until` removes a plan whose end time is too late.
 - **Fairness case:** construct two venues where venue X has lower total travel time but one person travels 45 min, and venue Y has slightly higher total but max 20 min. Assert Y ranks above X with λ = 0.5, and X wins with λ = 0.
 - `T_target` and `leave_by` are correct for mixed modes.
+- **Ride-share budget case:** a person whose limit can't cover venue + ride-share is assigned WALK (or the plan is infeasible if walking breaks a HARD time limit); a person with a larger limit gets RIDESHARE when it lowers `J`.
 - Diversity: three sushi places with the best scores do not fill all three slots if other categories are feasible.
 - Determinism: same inputs → same output order.
 
@@ -927,8 +979,8 @@ Do not include `binding_constraint` facts that name a person.
 
 ### 14.2 Mocks (only these)
 - `mock/sim_messaging.py`: appends to an in-memory outbox per `chat_id`/handle; used by the simulator and tests.
-- `mock/routing.py`: haversine × 1.3 detour. Walk 3 mph. Drive 18 mph + 5 min parking. Transit 12 mph + 7 min wait + 6 min total walking; fare from config. Used in tests and as fallback.
-- `mock/places.py`: returns `fixtures/venues.json`, filtered by category and distance.
+- `mock/routing.py`: haversine × 1.3 detour. Walk 3 mph. Bike 10 mph. Drive 18 mph + 5 min parking. Ride-share = drive speed + pickup wait, fare from the same formula as `ors.py` (share the formula function). Used in tests and as fallback.
+- `mock/places.py`: returns `fixtures/venues.json`, filtered by category and distance; geocodes only from `demo_locations.json`.
 
 There is no mock LLM or mock finance. Tests that need them use recorded responses in replay mode, or stub the provider directly in the test.
 
@@ -947,24 +999,25 @@ There is no mock LLM or mock finance. Tests that need them use recorded response
 Work assignment for 4 people (all code against the Stage 0 models and protocols, so work runs in parallel):
 - **A — Core:** Stages 0, 1, 2 (router, FSMs, optimizer).
 - **B — Photon:** Stage 0b, then 6.
-- **C — LLM:** Stage 3, then 7 (stretch).
-- **D — Data:** Stages 4 and 5 (Google, Nessie, fixtures, record/replay).
+- **C — LLM:** Stage 3 (Gemini), then 7 (stretch).
+- **D — Data:** Stages 4 and 5 (OSM fixture, ORS, Nominatim, Nessie, record/replay).
 
 Suggested clock targets assume Saturday daytime start; adjust to actual time but **keep the 3 AM freeze**.
 
 | Stage | Deliverable | Depends on | Exit criterion | Target |
 |---|---|---|---|---|
-| **0. Skeleton** | `pyproject.toml`, settings, logging, all models (§6), protocols (§8), DB tables, `GET /health`, ruff + pytest set up | — | App boots; models import; empty test suite passes | +1.5 h |
+| **0. Skeleton** ✅ done | `pyproject.toml`, settings, logging, all models (§6), protocols (§8), DB tables, `GET /health`, ruff + pytest set up | — | App boots; models import; empty test suite passes | done |
+| **0.5. v2 migration** | Apply the v2 changes to Stage 0 code: settings (§5), `Mode`, `TravelModes`, `OnboardingState`, `RouteStep`, `RouteEstimate.source`, `Candidate.source`, `Uncertain` source comment, `FinancialSnapshot`/`EventFinding` (§6.9), deps (§20), `.env.example`. Update `test_skeleton.py` | 0 | Tests + ruff pass; no references to `xai`, `grok`, `google_maps`, `transit` remain in `app/` | +0.5 h |
 | **0b. Photon spike** (parallel) | Bridge receives a group message and a DM, sends text to both, tries a poll. Spike answers written in README | — | All §9.1 spike questions answered | +3 h |
 | **1. Mock vertical slice** | Simulator, sim messaging, mock routing + places, router, onboarding FSM (bank code can be stubbed to a fixed limit), session FSM, phase-1 optimizer, text poll, personal DMs | 0 | `test_end_to_end.py` runs §18 through the simulator with mocks and a stubbed LLM | +6 h |
 | **2. Optimizer + privacy** | Full feasibility filters, arrival logic, diversity selection, facts, PrivacyGuard, all §13.7 and privacy tests | 1 | All optimizer and guard tests pass | +8 h |
-| **3. Grok extraction** | Real extraction + validation; explanation + number check; 3–5 golden transcripts | 1 | ≥ 90% of expected constraints extracted on golden transcripts; template fallback on failure | +8 h |
-| **4. Google Places + Routes** | Real providers, field masks, batching, detailed routes, record/replay cache, `fetch_venues.py` | 1 | Real 3-person scenario returns real durations and transit steps | +9 h |
+| **3. Gemini extraction** | Real extraction + validation; explanation + number check; 3–5 golden transcripts | 1 | ≥ 90% of expected constraints extracted on golden transcripts; template fallback on failure | +8 h |
+| **4. OSM + ORS** | `fetch_venues.py` (Overpass) + hand-checked fixture with price tiers; `osm_places.py` with Nominatim geocoding; `ors.py` matrix + directions + ride-share derivation; record/replay cache | 1 | Real 3-person scenario returns ORS durations for walk/bike/drive and correct ride-share costs | +9 h |
 | **5. Nessie** | `seed_nessie.py`, real FinanceProvider, budget estimator + tests, link-by-bank-code onboarding | 1 | Three personas produce expected limits; override works | +9 h |
 | **6. Photon integration** | Production bridge, real messaging provider, text poll (native poll if spike says it works), DM delivery | 0b, 1 | Full §18 demo on real phones with mock data providers | +12 h |
 | **— Full-loop checkpoint** | Everything real, end to end on phones | 2–6 | One complete live run | +13 h |
 | **Phase 2 scoring** | walk/sched burden terms, arrival spread, uncertainty penalty | checkpoint | Tests still pass; demo outcome still sensible | +15 h |
-| **7. Grok events (stretch)** | `find_events` with timeout + Places resolution | 3, 4 | At least one live event appears as a candidate with a source URL | +16 h |
+| **7. Events (stretch)** | `find_events` via Gemini grounding (if tier allows) or `events_fallback.json`; geocode resolution | 3, 4 | At least one event appears as a candidate with a source URL | +16 h |
 | **8. Demo hardening** | Record the rehearsal, replay mode, progress messages, error copy, README, Devpost text, backup video | all | Two clean full rehearsals in a row | **freeze by 3 AM** |
 
 **Feature freeze at 3 AM Sunday.** After that: bug fixes, rehearsal, Devpost (draft by 6 AM, submit by 8:00 AM).
@@ -979,7 +1032,9 @@ Suggested clock targets assume Saturday daytime start; adjust to actual time but
 - Live re-planning when someone is late; live location tracking.
 - Multi-stop plans.
 - Learned weights / any ML model.
-- Ride-share as a travel mode.
+- Public transit. (Stretch only, after Stage 8: direct-trip routing from TCAT's GTFS schedule files.)
+- Any Google Maps Platform or xAI API (paid; replaced in v2).
+- Real ride-share APIs or booking (cost is a formula estimate).
 - Real bank account linking (Nessie sandbox only).
 - A web frontend (a judge-facing debug page only if everything else is done).
 - Mock LLM or rule-based extractor.
@@ -1027,8 +1082,8 @@ Match on `(pid, field, value, kind)`; ignore confidence.
    - Maya: `@go`
 3. **Bot:** "🔎 Looking at options…" then the 3-option poll with one-line explanations.
 4. **Vote:** two people reply/vote A → bot confirms: "🎉 Plan A: Koko. Everyone arrives around 6:42. Check your DMs."
-5. **Reveal:** hold up the three phones. Maya walks 12 min, Sam takes the bus, Jordan drives — different leave-by times, same arrival. Jordan's plan respects the lowest budget, but nobody in the group chat ever saw it.
-6. **Explain the tech (60 s):** fairness objective (show the λ trade-off), synchronized arrival, privacy guard (show that the LLM prompt contains no money), Nessie-derived limits.
+5. **Reveal:** hold up the three phones. Sam takes a ~$9 ride-share and leaves last. Maya bikes. Jordan walks, because a ride-share would break his budget, so he leaves first. Different modes and leave-by times, same arrival. Nobody in the group chat ever saw anyone's budget.
+6. **Explain the tech (60 s):** fairness objective (show the λ trade-off), synchronized arrival, money-vs-time mode choice per person, privacy guard (show that the LLM prompt contains no money), Nessie-derived limits, built on OpenStreetMap.
 
 **Fallbacks:** if iMessage fails, run `scripts/run_demo_scenario.py` and show outboxes; if that fails, play the backup video.
 
@@ -1040,24 +1095,26 @@ Match on `(pid, field, value, kind)`; ignore confidence.
 |---|---|---|
 | Photon behavior differs from assumptions (DMs, polls, payloads) | Stage 0b spike; text poll fallback; "DM me start" onboarding | End of 0b |
 | Bot cannot see messages before `@plan` | Designed in: collection starts at `@plan` | — |
-| Sparse evening transit in the demo area | Check Routes returns transit for the demo origin/venue pairs at the planned demo time; if not, demo with walk + drive and note transit support | Stage 4 |
+| No transit mode | Ride-share replaces it in the story; GTFS transit is a post-freeze stretch | — |
+| OSM data gaps (missing hours, odd names) | Hand-checked fixture; unknown hours treated as unknown, not guessed | Stage 4 |
+| Free-tier rate limits (Gemini, ORS, Nominatim) | Record/replay during all testing; 2 Gemini calls and 2–3 ORS calls per `@go` | Stages 3–4 |
 | LLM latency or bad JSON | Temperature 0, schema, validation, one retry, empty-preferences fallback | Stage 3 |
 | Nessie slow/flaky | Record/replay; snapshot at onboarding | Stage 5 |
-| Google billing not enabled | Set up billing first thing in Stage 0 | Stage 0 |
+| API keys missing | Get Gemini, ORS, and Nessie keys during Stage 0.5 | Stage 0.5 |
 | Venue wifi drops during judging | Replay mode; phone hotspot; simulator backup; video | Stage 8 |
 | Privacy leak through explanation text | Number check + PrivacyGuard + tests | Stage 2 |
 
 **Open decisions (team to confirm, defaults in bold):**
-1. Demo area: **Ithaca (Collegetown/campus)**, switching only if transit coverage fails the Stage 4 check.
+1. Demo area: **Ithaca (Collegetown/campus)**.
 2. Group size: **3 in the demo**, cap at 6.
-3. Driving cost: **miles × $0.20 + $3 parking**.
+3. Driving cost: **miles × $0.20 + $3 parking**. Ride-share formula defaults in §5 (estimates; tune so a typical Collegetown → downtown ride is ~$9–12).
 4. Product name: replace `[NAME]` everywhere (`copy.py`, README, Devpost).
 
 ---
 
 ## 20. Coding conventions
 
-- **Python deps (pyproject):** `fastapi`, `uvicorn[standard]`, `pydantic>=2`, `pydantic-settings`, `sqlalchemy>=2`, `aiosqlite`, `httpx`, `tenacity`, `openai` (or `xai-sdk`), `python-dateutil`; dev: `pytest`, `pytest-asyncio`, `ruff`. Nothing else without asking.
+- **Python deps (pyproject):** `fastapi`, `uvicorn[standard]`, `pydantic>=2`, `pydantic-settings`, `sqlalchemy[asyncio]>=2`, `aiosqlite`, `httpx`, `tenacity`, `google-genai`, `python-dateutil` (plus `staticmap` only if the map-image stretch is built); dev: `pytest`, `pytest-asyncio`, `ruff`. Nothing else without asking.
 - **Bridge deps:** `spectrum-ts` (or the scoped `@spectrum-ts/core` + `@spectrum-ts/imessage` packages, per its README). Use Bun's built-in HTTP server and `fetch`.
 - Type hints everywhere; Pydantic models at every module boundary.
 - `async` for all I/O. No blocking calls in request paths.

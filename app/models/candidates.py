@@ -14,33 +14,34 @@ class Uncertain[T](BaseModel):
     low: T | None = None
     high: T | None = None
     status: Literal["known", "estimated", "unknown"]
-    source: str  # "google_places" | "fixture" | "config" | "grok:<url>"
+    source: str  # "osm_fixture" | "hand_entered" | "formula" | "ors" | "gemini:<url>"
 
 
 class Candidate(BaseModel):
-    candidate_id: str  # "gp:<place_id>" | "fx:<slug>" | "ev:<hash>"
+    candidate_id: str  # "osm:<node|way>/<id>" | "ev:<hash>"
     name: str
     category: str  # food | bar | cafe | dessert | activity | event
     cuisines: list[str] = []
-    location: LatLng  # REQUIRED, from Places or fixture — never from the LLM
+    location: LatLng  # REQUIRED, from the OSM fixture or Nominatim — never from the LLM
     address: str
     est_cost_pp: Uncertain[Decimal]
     open_at_target: Literal["open", "closed", "unknown"] = "unknown"
     closes_at: datetime | None = None
     typical_duration_min: int  # category default: food 60, cafe 45, dessert 30, bar 90, activity 90
     rating: float | None = None
-    source: Literal["google_places", "fixture", "grok_event"]
+    source: Literal["osm_fixture", "event"]
     novelty_tags: list[str] = []
 
 
 class EventFinding(BaseModel):
-    """A live event found by ContextProvider (Stage 7 stretch).
+    """A live event found by ContextProvider (Stage 7 only).
 
-    Placeholder shape: no coordinates by design — events must be resolved to a
-    location via PlacesProvider.text_search before becoming a Candidate.
+    No coordinates by design: events must be resolved via PlacesProvider.geocode
+    before becoming a Candidate.
     """
 
     title: str
     venue_name: str
-    starts_at: datetime | None = None
+    starts_at: datetime | None
+    est_price_usd: Decimal | None = None
     source_url: str
