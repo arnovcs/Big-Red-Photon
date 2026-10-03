@@ -18,6 +18,7 @@ class GroupPlanOption(BaseModel):
     max_travel_min: int  # "≤22 min for everyone"
     walking_level: Literal["low", "moderate", "high"]
     price_tier: Literal["$", "$$", "$$$", "$$$$", "?"]  # "?" = Google has no price
+    price_estimated: bool = False  # typical cost for this kind of place, not its own price
     arrival_window_min: int
     blurb: str  # explanation from group-safe facts only
 

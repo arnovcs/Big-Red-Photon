@@ -37,10 +37,11 @@ from app.optimizer.enumerate import EstimateIndex
 from app.optimizer.feasibility import allowed_modes
 from app.planning.explain import explain
 from app.private import vault
+from app.providers.mock.routing import haversine_mi
 
 log = get_logger(__name__)
 
-SEARCH_RADIUS_M = 2500
+SEARCH_RADIUS_M = 50_000  # effectively none: Google returns the nearest matches
 OPEN_AT_OFFSET_MIN = 30
 DEPART_OFFSET_MIN = 5
 MAX_CANDIDATES = 20
@@ -48,7 +49,8 @@ LLM_ATTEMPTS = 2
 
 _INTENT_CATEGORIES = {
     "food": ["food", "cafe", "dessert"],
-    "activity": ["activity", "event", "bar"],
+    # Bars only when someone asks for drinks or a bar (then "bar" is added below).
+    "activity": ["activity", "sports"],
 }
 
 
@@ -110,9 +112,10 @@ async def _extract(
 
 
 def _categories(preferences: GroupPreferences) -> list[str]:
-    categories = list(_INTENT_CATEGORIES.get(preferences.group_intent, []))
-    if not categories:
-        return []  # "either" / "unknown" → all categories
+    """What kinds of place to search. A specific kind someone asked for ("sporty" →
+    sports, "drinks" → bar, "coffee" → cafe) is searched on its own; the broad words
+    ("activity", "food") and the overall intent give the wider mix."""
+    asked: list[str] = []
     for c in preferences.constraints:
         if (
             c.field == ConstraintField.CATEGORY
@@ -120,8 +123,14 @@ def _categories(preferences: GroupPreferences) -> list[str]:
             and c.kind != ConstraintKind.VETO
         ):
             values = c.value if isinstance(c.value, list) else [c.value]
-            categories.extend(str(v).lower() for v in values if str(v).lower() not in categories)
-    return categories
+            asked.extend(str(v).lower() for v in values if str(v).lower() not in asked)
+    specific = [c for c in asked if c not in _INTENT_CATEGORIES]
+    if specific:
+        return specific
+    categories = list(_INTENT_CATEGORIES.get(preferences.group_intent, []))
+    for broad in asked:  # e.g. "food" said during an "activity" plan: both
+        categories.extend(c for c in _INTENT_CATEGORIES[broad] if c not in categories)
+    return categories  # [] ("either" / "unknown", nothing asked) → all categories
 
 
 def _centroid(constraints: dict[str, PrivateConstraints]) -> LatLng:
@@ -146,14 +155,64 @@ def _wanted_cuisines(preferences: GroupPreferences) -> list[str]:
     return wanted
 
 
-def _shortlist(candidates: list[Candidate], wanted_cuisines: list[str]) -> list[Candidate]:
-    """Drop known-closed; keep the top MAX_CANDIDATES, venues serving a wanted cuisine
-    first, then by rating (stable order)."""
+def _wanted_activities(preferences: GroupPreferences) -> list[str]:
+    """Specific things someone asked to do ("pickleball"), not ones they ruled out."""
+    wanted: list[str] = []
+    for c in preferences.constraints:
+        if (
+            c.field == ConstraintField.ACTIVITY
+            and c.polarity == "want"
+            and c.kind != ConstraintKind.VETO
+        ):
+            values = c.value if isinstance(c.value, list) else [c.value]
+            wanted.extend(str(v).lower() for v in values if str(v).lower() not in wanted)
+    return wanted
+
+
+def _shortlist(
+    candidates: list[Candidate],
+    wanted_cuisines: list[str],
+    wanted_activities: list[str] | None = None,
+    center: LatLng | None = None,
+) -> list[Candidate]:
+    """Drop known-closed; keep the top MAX_CANDIDATES.
+
+    1. Venues matching a wanted cuisine or activity, in the search's own order (Google
+       ranks "pickleball" results by relevance: courts before a gym that mentions it).
+       If a specific activity was asked for and has matches, only those are kept.
+    2. The rest, closest first, taking turns between kinds of place (parks, theaters,
+       courts...) so a vague ask like "something fun" gets a mix, not 20 of one kind.
+    There's no search radius, so distance is kept in mind here; the optimizer then
+    weighs each person's actual travel time.
+    """
+    activities = set(wanted_activities or [])
     open_ = [c for c in candidates if c.open_at_target != "closed"]
-    open_.sort(
-        key=lambda c: (not cuisine_families.matches(wanted_cuisines, c.cuisines), -(c.rating or 0))
+
+    def matches(c: Candidate) -> bool:
+        return cuisine_families.matches(wanted_cuisines, c.cuisines) or bool(
+            activities & set(c.cuisines)
+        )
+
+    def distance(c: Candidate) -> float:
+        return haversine_mi(center, c.location) if center else 0.0
+
+    matched = [c for c in open_ if matches(c)]
+    if activities and any(activities & set(c.cuisines) for c in matched):
+        # A specific activity ("pickleball") was asked for and Google found places for it:
+        # only those. The wider search is only a fallback when it finds none.
+        return matched[:MAX_CANDIDATES]
+    rest = sorted(
+        (c for c in open_ if not matches(c)), key=lambda c: (distance(c), -(c.rating or 0))
     )
-    return open_[:MAX_CANDIDATES]
+    # Take turns between kinds: each kind's nearest, then each kind's second nearest...
+    turn: dict[str, int] = {}
+    ranked_rest = []
+    for c in rest:
+        kind = c.cuisines[0] if c.cuisines else c.category
+        ranked_rest.append((turn.get(kind, 0), distance(c), c))
+        turn[kind] = turn.get(kind, 0) + 1
+    ranked_rest.sort(key=lambda row: row[:2])
+    return (matched + [c for _, _, c in ranked_rest])[:MAX_CANDIDATES]
 
 
 @dataclass
@@ -164,6 +223,7 @@ class PlanningResult:
     facts: list[dict] = field(default_factory=list)  # group-safe, one per plan (§13.8)
     hint: str | None = None  # "nothing fits" suggestion, when plans is []
     blurbs: list[str] = field(default_factory=list)  # checked explanations (§13.8)
+    no_places: bool = False  # Google found nothing for what they asked (vs. nothing fits)
     # Members with no starting point (or travel answer): asked, never given a default.
     missing: list[uuid.UUID] = field(default_factory=list)
 
@@ -209,17 +269,43 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
 
     # 2. Extract
     preferences = await _extract(deps, transcript, now_local)
+    # Each person's mode is their own answer ("How are you getting there?" or a later
+    # "actually I'll drive"), so modes the LLM read from chat aren't applied twice
+    # (an old "I'm walking" plus a new "I'll drive" would rule out every way there).
+    preferences = preferences.model_copy(
+        update={
+            "constraints": [
+                c for c in preferences.constraints if c.field != ConstraintField.MODE_PREFERENCE
+            ]
+        }
+    )
 
     # 3. Discover
     wanted_cuisines = _wanted_cuisines(preferences)
+    wanted_activities = _wanted_activities(preferences)
+    categories = _categories(preferences)
+    log.info(
+        kv(
+            "extracted",
+            intent=preferences.group_intent,
+            categories=",".join(categories) or "all",
+            activities=",".join(wanted_activities),
+            cuisines=",".join(wanted_cuisines),
+            constraints=len(preferences.constraints),
+        )
+    )
+    center = _centroid(constraints)
     candidates = await deps.places.search_nearby(
-        _centroid(constraints),
+        center,
         SEARCH_RADIUS_M,
-        _categories(preferences),
+        categories,
         open_at=now_local + timedelta(minutes=OPEN_AT_OFFSET_MIN),
         cuisines=wanted_cuisines,
+        activities=wanted_activities,
     )
-    candidates = _shortlist(candidates, wanted_cuisines)
+    found = len(candidates)
+    candidates = _shortlist(candidates, wanted_cuisines, wanted_activities, center)
+    log.info(kv("venues_filtered", found=found, shortlisted=len(candidates)))
 
     # 4. Route
     estimates = await deps.routing.matrix(
@@ -244,6 +330,7 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
         plans=top,
         facts=plan_facts,
         hint=None if top else facts.nothing_fits_hint(preferences, candidates),
+        no_places=not candidates,
         blurbs=await explain(deps, plan_facts),
     )
 

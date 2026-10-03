@@ -98,11 +98,40 @@ CATEGORY_TYPES: dict[str, list[str]] = {
         "museum",
         "art_gallery",
         "planetarium",
+        # Entertainment ("something fun").
+        "video_arcade",
+        "karaoke",
+        "live_music_venue",
+        "performing_arts_theater",
+        "comedy_club",
+    ],
+    # "something sporty". All checked against Google: pickleball_court, escape_room and
+    # rock_climbing are NOT valid types (those go through Text Search as activities).
+    "sports": [
+        "sports_complex",
+        "sports_activity_location",
+        "athletic_field",
+        "sports_club",
+        "tennis_court",
+        "fitness_center",
+        "gym",
+        "swimming_pool",
+        "golf_course",
+        "skateboard_park",
+        "ice_skating_rink",
+        "sports_coaching",
     ],
 }
+# Categories that aren't food or drink: restaurants and bars are never results here.
+NON_FOOD_CATEGORIES = {"activity", "sports"}
+FOOD_AND_DRINK_TYPES = ["restaurant", "bar", "pub", "cafe", "fast_food_restaurant"]
+# Spectator venues: somewhere to watch a game on game day, not somewhere to go do something.
+SPECTATOR_TYPES = ["stadium", "arena"]
 # "restaurant" matches every kind of restaurant (italian_restaurant, ...), so food
 # filters on any type. The other categories must be the place's *primary* type, or
 # Google returns e.g. a 7-Eleven as a cafe.
+# Sports must be the place's main type too (secondary types pull in stadiums and halls);
+# courts inside parks are found by the activity's own Text Search ("pickleball").
 MATCH_ANY_TYPE = {"food"}
 # Never venues for a group outing, whatever else they're tagged with.
 EXCLUDED_PRIMARY_TYPES = [
@@ -149,6 +178,38 @@ CUISINE_SEARCH_TYPES = {
 }
 # Fewer reviews than this → probably not a real venue (or too unknown to recommend).
 MIN_REVIEWS = 10
+# Public courts, fields and parks get few reviews but are real: a lower bar for them.
+MIN_REVIEWS_NON_FOOD = 3
+# No search radius (team decision): Nearby Search's maximum circle, ranked nearest first,
+# so the results are the closest matching places; the optimizer weighs travel time.
+SEARCH_RADIUS_MAX_M = 50_000.0
+# Where Google has no price, a typical cost by kind of place, marked as an estimate.
+# (low, high) per person in USD. Free-to-visit places count as $0 with price unknown.
+TYPE_COST_ESTIMATES: dict[str, tuple[int, int]] = {
+    "gym": (10, 20),
+    "fitness_center": (10, 20),
+    "bowling_alley": (15, 25),
+    "video_arcade": (15, 25),
+    "karaoke": (15, 25),
+    "ice_skating_rink": (15, 25),
+    "amusement_center": (15, 25),
+    "golf_course": (30, 60),
+    "sports_club": (20, 40),
+    "sports_coaching": (20, 40),
+}
+FREE_TO_VISIT_TYPES = {
+    "park",
+    "state_park",
+    "national_park",
+    "hiking_area",
+    "botanical_garden",
+    "garden",
+    "playground",
+    "athletic_field",
+    "tennis_court",
+    "skateboard_park",
+    "wildlife_refuge",
+}
 MAX_RESULTS = 20
 MAX_TYPES_PER_REQUEST = 50  # Google rejects more ("Too many types in included_types")
 MAX_RESULTS_PER_CATEGORY_WHEN_MANY = 10
@@ -207,10 +268,30 @@ def _cuisines(place: dict) -> list[str]:
 
 
 def _activity_kind(place: dict, category: str) -> list[str]:
-    """Activities get their kind ("park", "museum", "zoo") where food gets a cuisine, so
-    the poll shows it and picks a park, a museum, and a zoo rather than three "activity"."""
+    """Activities and sports get their kind ("park", "museum", "tennis_court") where food
+    gets a cuisine, so the poll shows it and picks a variety rather than three alike."""
     primary = place.get("primaryType") or ""
-    return [primary] if category == "activity" and primary in CATEGORY_TYPES["activity"] else []
+    return [primary] if category in NON_FOOD_CATEGORIES and primary else []
+
+
+def _is_food_or_drink(place: dict) -> bool:
+    """Also spectator venues: neither belongs in an activity search."""
+    primary = place.get("primaryType") or ""
+    return (
+        primary in FOOD_AND_DRINK_TYPES
+        or primary in SPECTATOR_TYPES
+        or primary.endswith("_restaurant")
+    )
+
+
+def _dedupe(items: list[str]) -> list[str]:
+    return list(dict.fromkeys(items))
+
+
+def category_of(place: dict) -> str:
+    """For a place found by a free-text activity search: sports or activity."""
+    types = {place.get("primaryType") or "", *(place.get("types") or [])}
+    return "sports" if types & set(CATEGORY_TYPES["sports"]) else "activity"
 
 
 def cuisine_types(wanted: list[str]) -> list[str]:
@@ -225,12 +306,12 @@ def cuisine_types(wanted: list[str]) -> list[str]:
     return sorted(types)[:MAX_TYPES_PER_REQUEST]
 
 
-def is_real_venue(place: dict) -> bool:
+def is_real_venue(place: dict, min_reviews: int = MIN_REVIEWS) -> bool:
     """Open for business, has a storefront, and enough reviews to trust."""
     return (
         place.get("businessStatus") == "OPERATIONAL"
         and not place.get("pureServiceAreaBusiness")
-        and (place.get("userRatingCount") or 0) >= MIN_REVIEWS
+        and (place.get("userRatingCount") or 0) >= min_reviews
     )
 
 
@@ -257,13 +338,31 @@ def price_from_range(place: dict) -> Uncertain[Decimal] | None:
 
 
 def place_cost(place: dict) -> Uncertain[Decimal]:
-    """Best price Google has: the real range, then its $ level, else unknown (no guess)."""
+    """Best price we have: Google's real range, then its $ level; else, for kinds of
+    places that usually charge (gyms, bowling, golf...), a typical-cost estimate; for
+    parks, courts, and trails $0 with the price marked unknown; else unknown."""
     from_range = price_from_range(place)
     if from_range is not None:
         return from_range
     tier = PRICE_TIERS.get(place.get("priceLevel", ""))
     if tier is not None:
         return tier_cost(tier, source="google")
+    types = [place.get("primaryType") or "", *(place.get("types") or [])]
+    for t in types:
+        if t in TYPE_COST_ESTIMATES:
+            low, high = (Decimal(x) for x in TYPE_COST_ESTIMATES[t])
+            return Uncertain[Decimal](
+                value=(low + high) / 2,
+                low=low,
+                high=high,
+                status="estimated",
+                source="type_estimate",
+            )
+    if types[0] in FREE_TO_VISIT_TYPES:
+        zero = Decimal(0)
+        return Uncertain[Decimal](
+            value=zero, low=zero, high=zero, status="unknown", source="free_to_visit"
+        )
     return Uncertain[Decimal](value=None, status="unknown", source="google")
 
 
@@ -281,9 +380,16 @@ def to_resolved_place(place: dict) -> ResolvedPlace | None:
     )
 
 
-def to_candidate(place: dict, category: str, at: datetime) -> Candidate | None:
-    if not is_real_venue(place):
+def to_candidate(
+    place: dict, category: str, at: datetime, tags: list[str] | None = None
+) -> Candidate | None:
+    """`tags`: what the person asked for that found this place (e.g. ["pickleball"]),
+    kept first in `cuisines` so the optimizer can tell it matches."""
+    min_reviews = MIN_REVIEWS_NON_FOOD if category in NON_FOOD_CATEGORIES else MIN_REVIEWS
+    if not is_real_venue(place, min_reviews):
         return None
+    if category in NON_FOOD_CATEGORIES and _is_food_or_drink(place):
+        return None  # an activity search never suggests a restaurant or bar
     location = place.get("location") or {}
     name = (place.get("displayName") or {}).get("text")
     if not name or "latitude" not in location or "longitude" not in location:
@@ -294,7 +400,7 @@ def to_candidate(place: dict, category: str, at: datetime) -> Candidate | None:
         candidate_id=f"google:{place.get('id', name)}",
         name=name,
         category=category,
-        cuisines=_cuisines(place) or _activity_kind(place, category),
+        cuisines=_dedupe([*(tags or []), *(_cuisines(place) or _activity_kind(place, category))]),
         location=LatLng(lat=location["latitude"], lng=location["longitude"]),
         address=place.get("shortFormattedAddress") or place.get("formattedAddress") or "",
         est_cost_pp=cost,
@@ -352,13 +458,17 @@ class GooglePlaces:
         request = {"body": body, "field_mask": field_mask}
         return await self.cache.call("google_places", method, request, live)
 
-    def _nearby_body(
-        self, center: LatLng, radius_m: int, type_filter: str, types: list[str], n: int
-    ) -> dict:
+    def _nearby_body(self, center: LatLng, category: str, types: list[str], n: int) -> dict:
+        type_filter = "includedTypes" if category in MATCH_ANY_TYPE else "includedPrimaryTypes"
+        excluded = EXCLUDED_PRIMARY_TYPES
+        if category in NON_FOOD_CATEGORIES:
+            excluded = [*EXCLUDED_PRIMARY_TYPES, *FOOD_AND_DRINK_TYPES, *SPECTATOR_TYPES]
         return {
             type_filter: types,
-            "excludedPrimaryTypes": EXCLUDED_PRIMARY_TYPES,
+            "excludedPrimaryTypes": excluded,
             "maxResultCount": n,
+            # No search radius: the nearest matches anywhere (Google's max circle).
+            "rankPreference": "DISTANCE",
             "locationRestriction": {
                 "circle": {
                     # ~10 m rounding keeps the cache key stable for the same group.
@@ -366,7 +476,7 @@ class GooglePlaces:
                         "latitude": round(center.lat, 4),
                         "longitude": round(center.lng, 4),
                     },
-                    "radius": float(min(radius_m, 50_000)),
+                    "radius": SEARCH_RADIUS_MAX_M,
                 }
             },
         }
@@ -378,33 +488,45 @@ class GooglePlaces:
         categories: list[str],
         open_at: datetime,
         cuisines: list[str] | None = None,
+        activities: list[str] | None = None,
     ) -> list[Candidate]:
+        """Venues for what the group wants. `radius_m` is ignored (no search radius: the
+        nearest matches, then the optimizer weighs everyone's travel time).
+        `activities` ("pickleball") are searched by name with Text Search, since most
+        have no Google place type; `cuisines` by restaurant type; then each category."""
         wanted = [c for c in (categories or list(CATEGORY_TYPES)) if c in CATEGORY_TYPES]
         per_call = MAX_RESULTS if len(wanted) == 1 else MAX_RESULTS_PER_CATEGORY_WHEN_MANY
-        # (label, category, body). Wanted cuisines first, so those venues are kept.
-        searches: list[tuple[str, str, dict]] = []
+        # (label, category or None = decide per place, tags, url, body).
+        searches: list[tuple[str, str | None, list[str], str, dict]] = []
+        for activity in activities or []:
+            body = self._text_body(activity, center, MAX_RESULTS)
+            searches.append((f"activity:{activity}", None, [activity], TEXT_SEARCH_URL, body))
         types = cuisine_types(cuisines or [])
         if types:
-            body = self._nearby_body(center, radius_m, "includedTypes", types, MAX_RESULTS)
-            searches.append(("cuisine", "food", body))
+            body = self._nearby_body(center, "food", types, MAX_RESULTS)
+            searches.append(("cuisine", "food", [], NEARBY_URL, body))
         for category in wanted:
-            type_filter = "includedTypes" if category in MATCH_ANY_TYPE else "includedPrimaryTypes"
-            # Activities span many kinds (parks, museums, zoos...): always the full 20.
-            n = MAX_RESULTS if category == "activity" else per_call
-            body = self._nearby_body(center, radius_m, type_filter, CATEGORY_TYPES[category], n)
-            searches.append((category, category, body))
+            # Activities and sports span many kinds: always the full 20.
+            n = MAX_RESULTS if category in NON_FOOD_CATEGORIES else per_call
+            body = self._nearby_body(center, category, CATEGORY_TYPES[category], n)
+            searches.append((category, category, [], NEARBY_URL, body))
 
         found: dict[str, Candidate] = {}
-        for label, category, body in searches:
+        for label, category, tags, url, body in searches:
+            method = "search_text" if url == TEXT_SEARCH_URL else "search_nearby"
             try:
-                response = await self._post(body)
+                response = await self._post(body, url, FIELD_MASK, method)
             except Exception as exc:
                 log.warning(kv("google_places_failed", category=label, error=type(exc).__name__))
                 continue
-            for place in response.get("places") or []:
-                candidate = to_candidate(place, category, open_at)
+            places = response.get("places") or []
+            kept = 0
+            for place in places:
+                candidate = to_candidate(place, category or category_of(place), open_at, tags)
                 if candidate and candidate.candidate_id not in found:
                     found[candidate.candidate_id] = candidate
+                    kept += 1
+            log.info(kv("places_search", search=label, returned=len(places), kept=kept))
         log.info(
             kv(
                 "venue_candidates",
@@ -412,6 +534,7 @@ class GooglePlaces:
                 found=len(found),
                 categories=",".join(wanted),
                 cuisines=",".join(cuisines or []),
+                activities=",".join(activities or []),
             )
         )
         if not found:

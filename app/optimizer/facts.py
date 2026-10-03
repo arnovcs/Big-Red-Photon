@@ -24,7 +24,7 @@ OPTION_LABELS = ("A", "B", "C")
 # Preference fields that describe venues, so they can be named to the whole group
 # without pointing at anyone. Times, walking/travel limits and modes are personal.
 # Novelty ("something new") isn't a venue fact we have (Google has no such data).
-_VENUE_FIELDS = (ConstraintField.CUISINE, ConstraintField.CATEGORY)
+_VENUE_FIELDS = (ConstraintField.CUISINE, ConstraintField.CATEGORY, ConstraintField.ACTIVITY)
 _SAFE_VALUE = re.compile(r"^[a-z][a-z _-]{0,29}$")
 
 

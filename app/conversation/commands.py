@@ -75,29 +75,47 @@ def parse_amount(text: str) -> Decimal | None:
         return None
 
 
-def parse_modes(text: str) -> TravelModes | None:
-    """ "car" | "bike" | "both" | "neither", optionally with "no rideshare".
+RIDE_WORDS = {"uber", "lyft", "rideshare", "taxi", "ride"}
+WALK_WORDS = {"walk", "walking", "foot", "walks"}
 
-    Walk and ride-share are on unless the user says "no rideshare".
+
+def parse_modes(text: str) -> TravelModes | None:
+    """How someone is getting there THIS time: the mode they'll actually use.
+
+    car → drive · bike → bike · both → drive or bike · walk → walk · uber → rideshare ·
+    neither → walk, or a rideshare if that's what gets everyone there together.
+    "no rideshare" rules the ride out. None if it isn't an answer.
     """
     lowered = text.lower()
     no_rideshare = bool(re.search(r"no\s*(ride\s*-?\s*share|uber|lyft)", lowered))
     words = set(_words(lowered))
-    words |= {"car" for w in ("drive", "driving", "driven") if w in words}
+    words |= {"car" for w in ("drive", "driving", "driven", "drives") if w in words}
     words |= {"bike" for w in ("biking", "bicycle", "cycling", "bikes") if w in words}
-    if not words & {"car", "bike", "both"} and words & {"walk", "walking", "foot"}:
-        words.add("neither")
-    if "both" in words:
-        car, bike = True, True
-    elif "neither" in words or "none" in words:
-        car, bike = False, False
-    elif "car" in words or "bike" in words:
-        car, bike = "car" in words, "bike" in words
-    elif no_rideshare:
-        car, bike = False, False
-    else:
+    car = "car" in words or "both" in words
+    bike = "bike" in words or "both" in words
+    if car or bike:
+        return TravelModes(walk=False, bike=bike, drive=car, rideshare=False)
+    if words & RIDE_WORDS and not no_rideshare:
+        return TravelModes(walk=False, bike=False, drive=False, rideshare=True)
+    if words & WALK_WORDS:
+        return TravelModes(walk=True, bike=False, drive=False, rideshare=False)
+    if "neither" in words or "none" in words or no_rideshare:
+        return TravelModes(walk=True, bike=False, drive=False, rideshare=not no_rideshare)
+    return None
+
+
+# "actually I'll drive", "I'm biking", "gonna walk": someone telling the bot their mode
+# mid-plan (not just mentioning a car).
+_MODE_CHANGE = re.compile(
+    r"\b(i'?ll|i will|i'?m|i am|im|gonna|going to|actually|instead|i can|we'?ll|switch)\b"
+)
+
+
+def parse_mode_change(text: str) -> TravelModes | None:
+    """A mode statement in a chat message ("actually I'll drive"), or None."""
+    if not _MODE_CHANGE.search(text.lower()):
         return None
-    return TravelModes(walk=True, bike=bike, drive=car, rideshare=not no_rideshare)
+    return parse_modes(text)
 
 
 @dataclass(frozen=True)

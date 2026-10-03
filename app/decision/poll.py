@@ -37,8 +37,8 @@ def _walking_level(plan: Plan) -> str:
 
 
 def _price_tier(plan: Plan) -> str:
-    value = plan.candidate.est_cost_pp.value
-    return "?" if value is None else tier_for_cost(value)
+    cost = plan.candidate.est_cost_pp
+    return "?" if cost.value is None or cost.status == "unknown" else tier_for_cost(cost.value)
 
 
 def build_options(
@@ -60,6 +60,7 @@ def build_options(
                 max_travel_min=fact["max_travel_min"],
                 walking_level=_walking_level(plan),
                 price_tier=_price_tier(plan),
+                price_estimated=plan.candidate.est_cost_pp.source == "type_estimate",
                 arrival_window_min=fact["arrival_window_min"],
                 blurb=blurb,
             )

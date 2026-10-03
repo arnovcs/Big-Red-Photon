@@ -75,13 +75,17 @@ def itinerary_text(
         lines.extend(f"• {step.instruction}" for step in steps[:MAX_STEPS_SHOWN])
     lines.append(copy.maps_line(directions_url(venue.location, assignment.mode, origin)))
     food = _food_cost(plan, assignment)
-    lines.append(copy.cost_line(arrive_local, food, assignment.fare_usd, assignment.mode.value))
+    what = "entry" if venue.category in ("activity", "sports", "event") else "food"
+    lines.append(
+        copy.cost_line(arrive_local, food, assignment.fare_usd, assignment.mode.value, what)
+    )
     return "\n".join(lines)
 
 
 def _food_cost(plan: Plan, assignment: PersonAssignment) -> Decimal | None:
-    """The venue's own estimate; None when Google has no price (never the stand-in)."""
-    return plan.candidate.est_cost_pp.value
+    """The venue's own estimate; None when its price is unknown (never the stand-in)."""
+    cost = plan.candidate.est_cost_pp
+    return None if cost.status == "unknown" else cost.value
 
 
 def own_amounts(plan: Plan, assignment: PersonAssignment) -> frozenset[int]:

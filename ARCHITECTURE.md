@@ -782,6 +782,10 @@ Post-v3 this replaced the OpenStreetMap fixture (`fixtures/venues.json`), `demo_
 
 `text_search` = Text Search returning venue `Candidate`s.
 
+**Activities (post-v3):** extraction has an `activity` field (a specific thing to do, e.g. "pickleball") and a `sports` category. The "activity" intent searches `activity` + `sports` (never restaurants or bars; bars only when someone asks for drinks). A specific activity is searched by name with Text Search (most have no Places type) and, when it finds places, only those are offered. A specific category ("sporty" → sports, "coffee" → cafe) is searched on its own. There is no search radius: Nearby Search uses Google's maximum circle ranked by DISTANCE; the shortlist keeps requested matches in Google's relevance order, then the rest closest first, taking turns between kinds of place. Activity/sports venues with no price count as $0 ("price ?"); usually-paid kinds (gym, bowling, golf, ...) get a typical-cost estimate shown as "est.".
+
+**Travel modes (post-v3):** the per-plan answer is the mode the person will use (car → drive, bike, walk, uber → rideshare, neither → walk or a ride if needed). "actually I'll drive" in chat replaces it. No answer by @go → walking, and they're told. Each person's mode comes only from these, so modes the LLM reads from chat are not applied as constraints. Transit: later.
+
 ### 9.4 OpenRouteService (`providers/real/ors.py`)
 
 - Auth: `Authorization: <ORS_API_KEY>` header. Coordinates are **`[lng, lat]`** order. Verify endpoint shapes in the ORS API docs.

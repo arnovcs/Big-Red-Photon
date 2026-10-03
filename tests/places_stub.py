@@ -131,6 +131,7 @@ class StubPlaces:
         categories: list[str],
         open_at: datetime,
         cuisines: list[str] | None = None,
+        activities: list[str] | None = None,
     ) -> list[Candidate]:
         radius_mi = radius_m / METERS_PER_MILE
         return [

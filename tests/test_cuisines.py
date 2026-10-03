@@ -88,7 +88,9 @@ def test_shortlist_keeps_wanted_cuisines_first() -> None:
     ramen = venue("ramen", cuisines=("ramen",), rating=4.0)
     shortlist = _shortlist([*many, ramen], ["japanese"])
     assert shortlist[0].candidate_id == "ramen" and len(shortlist) == 20
-    assert "ramen" not in [c.candidate_id for c in _shortlist([*many, ramen], [])]
+    # Not asked for: no longer first, but kept for variety (one of each kind gets a turn).
+    unasked = [c.candidate_id for c in _shortlist([*many, ramen], [])]
+    assert unasked[0] != "ramen" and "ramen" in unasked
 
 
 # --- Google cuisine search (A) -----------------------------------------------------
@@ -120,7 +122,7 @@ class StubGoogle(GooglePlaces):
         )
         self.bodies: list[dict] = []
 
-    async def _post(self, body: dict) -> dict:
+    async def _post(self, body: dict, *args, **kwargs) -> dict:
         self.bodies.append(body)
         return SAMPLE
 

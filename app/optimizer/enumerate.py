@@ -113,6 +113,11 @@ def _build_plan(
     )
 
 
+# Activities with no price at all (Google has none and it's not a usually-paid kind of
+# place) count as free, flagged "price unknown"; budgets only bite where cost matters.
+FREE_UNLESS_PRICED = {"activity", "sports"}
+
+
 def unknown_price_stand_in(candidates: list[Candidate]) -> Decimal | None:
     """Median budget-check cost of the venues that do have a price (None if none do)."""
     costs = sorted(c for c, unknown in map(venue_cost, candidates) if c is not None and not unknown)
@@ -146,9 +151,12 @@ def rank(
     for candidate in candidates:
         cost, price_unknown = venue_cost(candidate)
         if cost is None and price_unknown:
-            # No price from Google: use what nearby venues actually cost (never a guess
-            # by category). The unknown-price safety margin then applies in budgets.
-            cost = stand_in
+            if candidate.category in FREE_UNLESS_PRICED:
+                cost = Decimal(0)  # parks, courts, museums...: counted free, flagged unknown
+            else:
+                # Food/drink with no price: what nearby venues actually cost (never a
+                # category guess), under the unknown-price safety margin.
+                cost = stand_in
         if cost is None or is_vetoed(candidate, preferences) or is_known_closed(candidate):
             continue  # no price at all nearby to check budgets against, vetoed, or closed
         per_person = [

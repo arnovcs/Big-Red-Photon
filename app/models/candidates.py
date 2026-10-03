@@ -15,6 +15,7 @@ DEFAULT_DURATION_MIN: dict[str, int] = {
     "dessert": 30,
     "bar": 90,
     "activity": 90,
+    "sports": 90,
     "event": 90,
 }
 
@@ -30,7 +31,7 @@ class Uncertain[T](BaseModel):
 class Candidate(BaseModel):
     candidate_id: str  # "google:<place id>"
     name: str
-    category: str  # food | bar | cafe | dessert | activity | event
+    category: str  # food | bar | cafe | dessert | activity | sports | event
     cuisines: list[str] = []
     location: LatLng  # REQUIRED, from Google Places — never from the LLM
     address: str

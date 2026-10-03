@@ -39,7 +39,8 @@ class ConstraintField(StrEnum):
     AVAILABLE_UNTIL = "available_until"  # "HH:MM" local
     AVAILABLE_FROM = "available_from"  # "HH:MM" local
     CUISINE = "cuisine"
-    CATEGORY = "category"  # food | bar | cafe | dessert | activity | event
+    CATEGORY = "category"  # food | bar | cafe | dessert | activity | sports | event
+    ACTIVITY = "activity"  # a specific thing to do: "pickleball", "bowling", "karaoke"
     NOVELTY = "novelty"  # 0..1
     MODE_PREFERENCE = "mode_preference"  # "walk" | "bike" | "drive" | "rideshare" with polarity
 

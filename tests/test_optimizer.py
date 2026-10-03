@@ -380,27 +380,34 @@ def test_demo_origins_sam_rides_and_jordan_walks_with_default_weights() -> None:
 # --- Unknown prices: no guessing by category ------------------------------------------------
 
 
-def test_unknown_price_uses_nearby_median_with_the_safety_margin() -> None:
+def test_unknown_food_price_uses_nearby_median_with_the_safety_margin() -> None:
     from app.optimizer.enumerate import unknown_price_stand_in
 
-    unpriced = venue(
-        "park",
-        category="activity",
-        cost=Uncertain[Decimal](value=None, status="unknown", source="google"),
-    )
+    unknown = Uncertain[Decimal](value=None, status="unknown", source="google")
+    unpriced = venue("diner", cost=unknown)
     cheap, pricey = venue("cheap", tier="$"), venue("pricey", tier="$$$")  # highs 15 and 60
     assert unknown_price_stand_in([unpriced, cheap, pricey]) == Decimal("37.5")
     assert unknown_price_stand_in([unpriced]) is None
 
-    estimates = index(*(trip("p1", c, WALK, 5) for c in ("park", "cheap", "pricey")))
-    # $50 limit: stand-in 37.5 ≤ 80% × 50, so the unpriced park is a real option, flagged.
+    estimates = index(*(trip("p1", c, WALK, 5) for c in ("diner", "cheap", "pricey")))
+    # $50 limit: stand-in 37.5 ≤ 80% × 50, so the unpriced diner is a real option, flagged.
     plans = {p.plan_id: p for p in run([unpriced, cheap, pricey], estimates, [person("p1", 50)])}
-    assert "price unknown" in plans["park"].risk_flags
+    assert "price unknown" in plans["diner"].risk_flags
     # $40 limit: 37.5 > 80% × 40, so it's left out rather than risk the budget.
     plans = {p.plan_id: p for p in run([unpriced, cheap, pricey], estimates, [person("p1", 40)])}
-    assert "park" not in plans
+    assert "diner" not in plans
     # Nothing nearby has a price: nothing to check a budget against, so it's left out.
-    assert run([unpriced], index(trip("p1", "park", WALK, 5)), [person("p1", 50)]) == []
+    assert run([unpriced], index(trip("p1", "diner", WALK, 5)), [person("p1", 50)]) == []
+
+
+def test_unpriced_activities_count_as_free_and_are_flagged() -> None:
+    unknown = Uncertain[Decimal](value=None, status="unknown", source="google")
+    court = venue("court", category="sports", cost=unknown)
+    museum = venue("museum", category="activity", cost=unknown)
+    estimates = index(trip("p1", "court", WALK, 5), trip("p1", "museum", WALK, 5))
+    plans = {p.plan_id: p for p in run([court, museum], estimates, [person("p1", 5)])}
+    assert set(plans) == {"court", "museum"}  # even a $5 budget: no price to break it
+    assert all("price unknown" in p.risk_flags for p in plans.values())
 
 
 def test_poll_and_itinerary_say_price_unknown() -> None:

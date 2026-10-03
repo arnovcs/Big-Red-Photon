@@ -17,11 +17,23 @@ from app.logging import get_logger, kv
 from app.messaging.outbound import send_private
 from app.models.identity import OnboardingState
 from app.models.outbound import PrivateMessage
-from app.models.private import LatLng
+from app.models.private import LatLng, TravelModes
 from app.private import vault
 
 # Short replies that mean "I shared my location" rather than a place name.
 log = get_logger(__name__)
+
+
+def modes_text(modes: TravelModes) -> str:
+    """ "driving", "walking (or a ride if needed)", ... for replies and logs."""
+    names = {"drive": "driving", "bike": "biking", "walk": "walking", "rideshare": "a ride"}
+    chosen = [names[m] for m in ("drive", "bike", "walk") if getattr(modes, m)]
+    if modes.rideshare and chosen:
+        return f"{' or '.join(chosen)} (or a ride if needed)"
+    if modes.rideshare:
+        return "taking a ride"
+    return " or ".join(chosen)
+
 
 SHARE_REPLIES = {"done", "shared", "shared it", "sent", "sent it", "here", "i shared", "ok done"}
 # Any reply containing one of these ("I shared my live location", "ok") means "look at
@@ -204,15 +216,30 @@ class Onboarding:
         user.onboarding_state = OnboardingState.AWAITING_MODES
         await self._reply(user, copy.ASK_TRIP_MODES)
 
+    async def change_trip_modes(self, db: AsyncSession, user: UserRow, modes: TravelModes) -> None:
+        """A mode said mid-plan ("actually I'll drive"): it replaces their answer."""
+        await vault.set_modes(db, user.id, modes)
+        log.info(kv("trip_modes", user=user.id.hex[:8], modes=modes_text(modes), source="chat"))
+        await self._reply(user, copy.mode_changed(modes_text(modes)))
+
+    async def default_to_walking(self, db: AsyncSession, user: UserRow) -> None:
+        """Never said how they're getting there by @go: plan them as walking, and say so."""
+        await vault.set_modes(db, user.id, TravelModes(walk=True, rideshare=False))
+        user.onboarding_state = OnboardingState.READY
+        log.info(kv("trip_modes", user=user.id.hex[:8], modes="walking", source="default"))
+        await self._reply(user, copy.DEFAULT_WALK)
+
     async def _modes(self, db: AsyncSession, user: UserRow, text: str) -> None:
         if text.strip().startswith("@"):
             await self._reply(user, copy.MODES_FIRST)  # e.g. @go before answering
             return
         modes = parse_modes(text)
         if modes is None:
-            await self._reply(user, copy.MODES_INVALID)
+            no_bus = "bus" in text.lower() or "transit" in text.lower()
+            await self._reply(user, copy.NO_BUS_YET if no_bus else copy.MODES_INVALID)
             return
         await vault.set_modes(db, user.id, modes)
+        log.info(kv("trip_modes", user=user.id.hex[:8], modes=modes_text(modes), source="answer"))
         # Next question, one at a time: where from? Live location answers it by itself.
         if await self._shared_location(user) is not None:
             user.onboarding_state = OnboardingState.READY

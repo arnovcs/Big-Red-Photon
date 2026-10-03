@@ -235,7 +235,8 @@ def test_where_from_is_asked_after_how_unless_sharing(client) -> None:
 
     started = dm(client, "@plan")
     assert started.endswith(
-        'Reply car, bike, both, or neither. (Add "no rideshare" if you\'d rather not take one.)'
+        "Reply car, bike, walk, uber, or neither "
+        "(walking, and I'll suggest a ride if that gets you there with everyone)."
     )
     assert "Where are you starting from" not in started  # one question at a time
     assert dm(client, "bike").startswith("Got it. I'll plan from your live location")
@@ -320,7 +321,7 @@ def stored_modes(client: TestClient, handle: str) -> str | None:
     return row[0]
 
 
-def test_modes_are_asked_every_plan_and_go_waits_for_answers(client) -> None:
+def test_modes_are_asked_every_plan_and_unanswered_means_walking(client) -> None:
     sam = "+16075550102"
     for text in ["start", "Maya", "MAYA1", "yes", "olin", "yes"]:
         dm(client, text)
@@ -335,12 +336,17 @@ def test_modes_are_asked_every_plan_and_go_waits_for_answers(client) -> None:
     assert dm(client, "I'm driving").startswith("Where are you starting from this time?")
     assert dm(client, "same") == "Got it. Now tell me what you're in the mood for!"
 
-    # Sam hasn't answered: @go waits and asks him again.
-    assert dm(client, "@go") == "Still waiting on Sam to answer my questions."
-    assert all_texts(client, sam)[-1].startswith("How are you getting there this time?")
-    for text in ["walking", "same"]:
-        client.post("/sim/message", json={"sender_handle": sam, "text": text})
+    # Sam never answered: @go plans him as walking and tells him so.
     assert "Looking at options" in dm(client, "@go")
+    assert any(
+        t.startswith("You didn't say how you're getting there") for t in all_texts(client, sam)
+    )
+    assert json.loads(stored_modes(client, sam)) == {
+        "walk": True,
+        "bike": False,
+        "drive": False,
+        "rideshare": False,
+    }
 
     # Next plan: last time's answer is forgotten and asked again.
     dm(client, "@cancel")

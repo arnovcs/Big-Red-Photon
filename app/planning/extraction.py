@@ -21,8 +21,9 @@ from app.models.conversation import (
 from app.models.routing import Mode
 
 HARD_MIN_CONFIDENCE = 0.7
+MAX_ACTIVITY_WORDS = 4
 
-CATEGORIES = ["food", "bar", "cafe", "dessert", "activity", "event"]
+CATEGORIES = ["food", "bar", "cafe", "dessert", "activity", "sports", "event"]
 CATEGORY_SYNONYMS = {
     "restaurant": "food",
     "dinner": "food",
@@ -46,6 +47,14 @@ CATEGORY_SYNONYMS = {
     "cinema": "activity",
     "bowling": "activity",
     "games": "activity",
+    "fun": "activity",
+    "entertainment": "activity",
+    "sport": "sports",
+    "sporty": "sports",
+    "athletic": "sports",
+    "exercise": "sports",
+    "workout": "sports",
+    "gym": "sports",
     "concert": "event",
     "show": "event",
 }
@@ -144,6 +153,11 @@ def _value(field: ConstraintField, raw: Any) -> str | float | list[str] | None:
         mapped = [c for p in parts if (c := _category(p))]
     elif field == ConstraintField.MODE_PREFERENCE:
         mapped = [m for p in parts if (m := _mode(p))]
+    elif field == ConstraintField.ACTIVITY:
+        # A short thing to do ("pickleball", "rock climbing"); it becomes a search query.
+        mapped = [
+            " ".join(p.lower().split()) for p in parts if len(p.split()) <= MAX_ACTIVITY_WORDS
+        ]
     else:  # cuisine
         mapped = [p.lower() for p in parts]
     if not mapped:

@@ -41,6 +41,8 @@ def satisfies(c: ExtractedConstraint, candidate: Candidate) -> bool | None:
         return cuisines.matches(values, candidate.cuisines)  # "asian" matches sushi
     if c.field == ConstraintField.CATEGORY:
         return candidate.category.lower() in values
+    if c.field == ConstraintField.ACTIVITY:  # venues found for "pickleball" carry that tag
+        return any(v in candidate.cuisines for v in values)
     return None  # novelty ("something new") isn't scored: Google has no such data
 
 

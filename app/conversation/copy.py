@@ -70,6 +70,12 @@ def loosen_hint(field: str, polarity: str, value: str | None) -> str:
     return f"Being open to {target} could help."
 
 
+NO_PLACES = (
+    "I couldn't find any places for that nearby. Try something a bit broader "
+    '(like "something sporty" or "food"), then say @go again.'
+)
+
+
 def nothing_fits(hint: str | None) -> str:
     middle = hint or "Try loosening a preference."
     return f"Nothing fits everyone right now. {middle} Then say @go again."
@@ -97,6 +103,12 @@ def plan_blurb(max_travel_min: int) -> str:
     return f"Fits everyone's budget; longest trip {max_travel_min} min."
 
 
+def _price_text(option: GroupPlanOption) -> str:
+    if option.price_tier == "?":
+        return "price ?"
+    return f"{option.price_tier} est." if option.price_estimated else option.price_tier
+
+
 def _option_line(option: GroupPlanOption) -> str:
     arrival = (
         f"arrive within {option.arrival_window_min} min"
@@ -105,7 +117,7 @@ def _option_line(option: GroupPlanOption) -> str:
     )
     return (
         f"{option.label}: {option.title} · ≤{option.max_travel_min} min for everyone · "
-        f"{'price ?' if option.price_tier == '?' else option.price_tier} · {arrival}"
+        f"{_price_text(option)} · {arrival}"
     )
 
 
@@ -192,11 +204,22 @@ ASK_MODES = (
     '(Add "no rideshare" if you\'d rather not take one.)'
 )
 ASK_TRIP_MODES = (
-    "How are you getting there this time? Reply car, bike, both, or neither. "
-    '(Add "no rideshare" if you\'d rather not take one.)'
+    "How are you getting there this time? Reply car, bike, walk, uber, or neither "
+    "(walking, and I'll suggest a ride if that gets you there with everyone)."
 )
-MODES_INVALID = "Reply car, bike, both, or neither."
-MODES_FIRST = "First, how are you getting there this time? Reply car, bike, both, or neither."
+MODES_INVALID = "Reply car, bike, walk, uber, or neither."
+MODES_FIRST = "First, how are you getting there this time? Reply car, bike, walk, uber, or neither."
+NO_BUS_YET = "I can't plan bus trips yet. Reply car, bike, walk, uber, or neither."
+DEFAULT_WALK = (
+    "You didn't say how you're getting there, so I'm planning you as walking. "
+    "Tell me if you're driving (e.g. \"I'm driving\")."
+)
+
+
+def mode_changed(modes_text: str) -> str:
+    return f"Got it, {modes_text}. I'll use that for this plan."
+
+
 TRIP_MODES_SET = "Got it. Now tell me what you're in the mood for!"
 TRIP_LIVE_LOCATION = (
     "Got it. I'll plan from your live location "
@@ -256,15 +279,18 @@ def maps_line(url: str) -> str:
     return f"🗺️ Directions: {url}"
 
 
-def cost_line(arrive_local: datetime, food: Decimal | None, fare: Decimal, mode: str) -> str:
+def cost_line(
+    arrive_local: datetime, food: Decimal | None, fare: Decimal, mode: str, what: str = "food"
+) -> str:
+    """`what`: "food" for places to eat or drink, "entry" for activities."""
     if food is None:  # Google has no price for this venue
         fare_name = "ride" if mode == "rideshare" else "gas + parking"
         travel = f"{fare_name} {approx_usd(fare)} + " if fare > 0 else ""
-        return f"Arrive ~{clock_time(arrive_local)}. Cost: {travel}food (price unknown)."
+        return f"Arrive ~{clock_time(arrive_local)}. Cost: {travel}{what} (price unknown)."
     total = approx_usd(food + fare)
     if fare > 0:
         fare_name = "ride" if mode == "rideshare" else "gas + parking"
-        parts = f"food {approx_usd(food)} + {fare_name} {approx_usd(fare)}"
+        parts = f"{what} {approx_usd(food)} + {fare_name} {approx_usd(fare)}"
     else:
-        parts = "food"
+        parts = what
     return f"Arrive ~{clock_time(arrive_local)}. Estimated total: {total} ({parts})."

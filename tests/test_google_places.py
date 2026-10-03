@@ -127,19 +127,23 @@ async def test_one_call_per_category_with_the_right_filters() -> None:
     await g.search_nearby(CENTER, 2500, [], SAT_6PM)
 
     assert len(g.bodies) == len(CATEGORY_TYPES)
-    food, cafe = g.bodies[0], g.bodies[1]
+    by_first_type = {b.get("includedTypes", b.get("includedPrimaryTypes"))[0]: b for b in g.bodies}
+    food, cafe = by_first_type["restaurant"], by_first_type["cafe"]
+    sports, activity = by_first_type["sports_complex"], by_first_type["movie_theater"]
     assert food["includedTypes"] == ["restaurant"]
     assert cafe["includedPrimaryTypes"] == CATEGORY_TYPES["cafe"]
-    assert all(b["excludedPrimaryTypes"] == EXCLUDED_PRIMARY_TYPES for b in g.bodies)
-    counts = {
-        b.get("includedTypes", b.get("includedPrimaryTypes"))[0]: b["maxResultCount"]
-        for b in g.bodies
-    }
-    assert counts.pop("movie_theater") == 20  # activities: always the full 20
-    assert set(counts.values()) == {10}
-    circle = food["locationRestriction"]["circle"]
-    assert circle["center"] == {"latitude": 42.444, "longitude": -76.483}  # rounded
-    assert circle["radius"] == 2500.0
+    assert sports["includedPrimaryTypes"] == CATEGORY_TYPES["sports"]  # not stadiums/halls
+    assert food["excludedPrimaryTypes"] == EXCLUDED_PRIMARY_TYPES
+    for non_food in (sports, activity):  # an activity search never returns a restaurant/bar
+        assert {"restaurant", "bar", "stadium"} <= set(non_food["excludedPrimaryTypes"])
+        assert non_food["maxResultCount"] == 20
+    assert {food["maxResultCount"], cafe["maxResultCount"]} == {10}
+    # No search radius: Google's largest circle, nearest first.
+    for b in g.bodies:
+        assert b["rankPreference"] == "DISTANCE"
+        circle = b["locationRestriction"]["circle"]
+        assert circle["radius"] == 50_000.0
+        assert circle["center"] == {"latitude": 42.444, "longitude": -76.483}  # rounded
 
 
 async def test_single_category_asks_for_more_results() -> None:

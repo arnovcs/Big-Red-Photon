@@ -41,7 +41,10 @@ Fields and their value format (value is always a string):
 - available_until, available_from: 24-hour local "HH:MM". Use the current local time
   to resolve "by 9" (9 PM in the evening, 9 AM only if that is still ahead and fits).
 - cuisine: one lowercase word, e.g. "korean", "sushi", "pizza".
-- category: one of {categories}.
+- category: one of {categories}. "sports" for anything athletic ("something sporty",
+  "let's play a game of basketball"); "activity" for things to do that aren't food or drink.
+- activity: the specific thing to do, as a short lowercase phrase, e.g. "pickleball",
+  "bowling", "karaoke", "rock climbing", "mini golf". Also give its category.
 - novelty: "1" for wanting something new or untried, "0" for wanting somewhere familiar.
 - mode_preference: walk, bike, drive, or rideshare. Use polarity avoid for "no driving".
 
@@ -52,6 +55,9 @@ Rules:
 - Do not invent constraints. If nothing applies, return an empty list.
 - Do not output any prices, distances, or times other than those stated by a person.
 - group_intent: food, activity, either, or unknown, from the conversation as a whole.
+  Anything to do that isn't eating or drinking is "activity", including sports and vague
+  asks like "something fun" (then category activity, soft). Never turn an activity
+  request into food.
 """.format(categories=", ".join(CATEGORIES))
 
 EXPLAIN_SYSTEM = """You write one short, friendly sentence per plan for a group chat poll.

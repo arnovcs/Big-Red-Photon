@@ -16,7 +16,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversation import copy
-from app.conversation.commands import SessionCommand, parse_session_command
+from app.conversation.commands import SessionCommand, parse_mode_change, parse_session_command
 from app.db import queries
 from app.db.session import session_factory
 from app.db.tables import GroupRow, SessionMessageRow, SessionRow, UserRow
@@ -132,6 +132,10 @@ class PlanningSessions:
         session = await queries.active_session(db, group) if group else None
         if session is None or session.state != SessionState.COLLECTING:
             return False
+        if (modes := parse_mode_change(msg.text)) is not None:
+            # "actually I'll drive": their mode for this plan changes now. The message is
+            # still kept below (it may say more, e.g. "I'm driving, let's get tacos").
+            await Onboarding(self.deps).change_trip_modes(db, user, modes)
         earlier = await db.scalar(
             select(func.count())
             .select_from(SessionMessageRow)
@@ -206,6 +210,10 @@ class PlanningSessions:
             await self._reply(user, copy.need_two(group.join_code))
             return
         members = await queries.group_members(db, group.id)
+        for m in members:
+            if m.onboarding_state == OnboardingState.AWAITING_MODES:
+                # Never said how they're getting there: walking, and they're told so.
+                await Onboarding(self.deps).default_to_walking(db, m)
         waiting = [m for m in members if m.onboarding_state in QUESTION_STATES]
         if waiting:
             await self._reply(user, copy.waiting_on([m.display_name or "someone" for m in waiting]))
@@ -251,7 +259,7 @@ class PlanningSessions:
                 notice = copy.NEED_MORE_PEOPLE
             elif not result.plans:
                 pipeline.save_result(session, result)
-                notice = copy.nothing_fits(result.hint)
+                notice = copy.NO_PLACES if result.no_places else copy.nothing_fits(result.hint)
             else:
                 pipeline.save_result(session, result)
                 session.state = SessionState.POLLING
