@@ -69,7 +69,7 @@ def test_done_without_sharing_explains(client) -> None:
 def test_done_after_sharing_uses_it_and_names_the_nearest_landmark(client) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, "Done!") == "your live location, right?"
+    assert dm(client, "Done!") == "near Collegetown, right?"  # named after what's close
     assert dm(client, "yes").startswith("you're all set!")
 
 
@@ -89,7 +89,7 @@ def test_command_during_location_step_is_not_geocoded(client) -> None:
 def test_casual_share_replies_use_the_shared_location(client, reply) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, reply) == "your live location, right?"
+    assert dm(client, reply) == "near Collegetown, right?"
 
 
 def test_typed_landmark_still_wins(client) -> None:
@@ -131,7 +131,7 @@ class StubPhoton(PhotonMessaging):
         super().__init__(Settings(_env_file=None))
         self.responses = responses
 
-    async def _post(self, path: str, body: dict) -> httpx.Response:
+    async def _post(self, path: str, body: dict, wait_sec=None) -> httpx.Response:
         result = self.responses[path]
         if isinstance(result, Exception):
             raise result
@@ -173,9 +173,13 @@ def test_already_sharing_skips_the_card(client) -> None:
     for text in ["start", "Maya", "MAYA1"]:
         dm(client, text)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, "yes") == "your live location, right?"
+    assert (
+        dm(client, "yes")
+        == "I have your live location near Collegetown 📍 use that, or text a different spot?"
+    )
     assert sim(client).location_requests == []  # nothing to tap: they already share
-    assert dm(client, "yes").startswith("you're all set!")
+    assert dm(client, "use that").startswith("you're all set!")
+    assert stored_label(client, HANDLE) == "near Collegetown"
 
 
 def stored_label(client: TestClient, handle: str) -> str | None:
@@ -238,7 +242,11 @@ def test_where_from_is_asked_after_how_unless_sharing(client) -> None:
     started = dm(client, "@plan")
     assert started.endswith(copy.ASK_TRIP_MODES)
     assert "Where are you starting from" not in started  # one question at a time
-    assert dm(client, "bike").startswith("bet, I'll use your live location")
+    assert (
+        dm(client, "bike")
+        == "I have your live location near Collegetown 📍 use that, or text a different spot?"
+    )  # already sharing: offered, not asked
+    assert dm(client, "yes") == "bet. what are you in the mood for?"
 
     code = re.search(r"join ([A-Z0-9]{4})", started).group(1)
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
@@ -257,9 +265,8 @@ def test_typed_place_this_plan_beats_live_location_at_go(client, caplog) -> None
     sam = setup_maya_and_sam(client)
     sim(client).shared[HANDLE] = COLLEGETOWN  # Maya is sharing...
     code = re.search(r"join ([A-Z0-9]{4})", dm(client, "@plan")).group(1)
-    dm(client, "bike")
-    dm(client, "location")  # ...but types where she'll start from instead
-    reply = dm(client, "olin")  # obvious match: no "right?"
+    assert dm(client, "bike").startswith("I have your live location")
+    reply = dm(client, "olin")  # ...but texts a different spot: looked up as usual
     assert reply == "got it, Olin Library 📍\nbet. what are you in the mood for?"
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
     for text in ["neither", "same"]:
@@ -273,6 +280,7 @@ def test_typed_place_this_plan_beats_live_location_at_go(client, caplog) -> None
     dm(client, "@cancel")
     code = re.search(r"join ([A-Z0-9]{4})", dm(client, "@plan")).group(1)
     dm(client, "bike")
+    dm(client, "use that")
     client.post("/sim/message", json={"sender_handle": sam, "text": f"join {code}"})
     for text in ["neither", "same"]:
         client.post("/sim/message", json={"sender_handle": sam, "text": text})
@@ -309,6 +317,9 @@ async def test_photon_old_location_counts_as_not_sharing() -> None:
     assert await StubPhoton({"/location": no_time}).shared_location("+1") is not None
     legacy = ok({"lat": 42.44, "lng": -76.48, "at": None, "type": "legacy"})
     assert await StubPhoton({"/location": legacy}).shared_location("+1") is None
+    # What Photon really sends: "legacy" on a share taken seconds ago. Fresh = usable.
+    fresh_legacy = ok({"lat": 42.44, "lng": -76.48, "at": at(1), "type": "legacy"})
+    assert await StubPhoton({"/location": fresh_legacy}).shared_location("+1") is not None
 
 
 # --- travel modes: asked per plan, never kept ------------------------------------------
@@ -376,7 +387,7 @@ def test_done_after_setup_switches_to_the_live_location(client) -> None:
     assert stored_label(client, HANDLE) == "Olin Library"
     sim(client).shared[HANDLE] = COLLEGETOWN  # then shares from the card...
     assert dm(client, "done") == copy.LIVE_LOCATION_SET  # ...and says done
-    assert stored_label(client, HANDLE) == "your live location"
+    assert stored_label(client, HANDLE) == "near Collegetown"
     # Plain chat that isn't about sharing doesn't trigger a location lookup.
     assert dm(client, "ok") != copy.LIVE_LOCATION_SET
 
@@ -392,5 +403,13 @@ def test_ok_done_at_the_location_step_reads_the_live_location(client) -> None:
     to_location_step(client)
     assert dm(client, "north campus") == "Robert Purcell Community Center, right?"
     sim(client).shared[HANDLE] = COLLEGETOWN  # changes their mind and shares instead
-    assert dm(client, "ok done") == "your live location, right?"  # not a yes to the old place
-    assert stored_label(client, HANDLE) == "your live location"
+    assert dm(client, "ok done") == "near Collegetown, right?"  # not a yes to the old place
+    assert stored_label(client, HANDLE) == "near Collegetown"
+
+
+def test_typing_dots_while_looking_up_the_live_location(client) -> None:
+    to_location_step(client)
+    sim(client).shared[HANDLE] = COLLEGETOWN
+    sim(client).typing_events.clear()
+    dm(client, "done")
+    assert sim(client).typing_events == [(HANDLE, True), (HANDLE, False)]

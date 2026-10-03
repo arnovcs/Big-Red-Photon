@@ -343,6 +343,7 @@ def test_nothing_fits_returns_to_collecting_with_a_safe_hint(harness) -> None:
     answer_modes(client, JORDAN)
     dm(client, JORDAN[1], "it has to be 1 minute away")  # HARD: nothing qualifies
     dm(client, MAYA[1], "I'd love korean")  # SOFT: named in the hint
+    client.app.state.deps.messaging.typing_events.clear()  # count planning's dots only
     dm(client, JORDAN[1], "go")
     dm(client, MAYA[1], "@go")
 

@@ -54,6 +54,9 @@ LOOKUP_FIELD_MASK = (
     "places.shortFormattedAddress,places.formattedAddress"
 )
 LOOKUP_BIAS_RADIUS_M = 10_000.0
+# Naming someone's live location ("near Collegetown Bagels"): the best-known place close by.
+NEAREST_PLACE_RADIUS_M = 150.0
+NEAREST_FIELD_MASK = "places.displayName"
 FIELDS = [
     "id",
     "displayName",
@@ -571,6 +574,31 @@ class GooglePlaces:
         now = datetime.now(UTC)
         found = [to_candidate(p, "food", now) for p in response.get("places") or []]
         return [c for c in found if c is not None]
+
+    async def nearest_place_name(self, location: LatLng) -> str | None:
+        """Nearby Search for the most prominent place (any type) within ~150 m: a name
+        people recognize ("Collegetown Bagels"), not the closest tiny business."""
+        body = {
+            "maxResultCount": 1,
+            "rankPreference": "POPULARITY",
+            "excludedPrimaryTypes": EXCLUDED_PRIMARY_TYPES,
+            "locationRestriction": {
+                "circle": {
+                    "center": {
+                        "latitude": round(location.lat, 4),
+                        "longitude": round(location.lng, 4),
+                    },
+                    "radius": NEAREST_PLACE_RADIUS_M,
+                }
+            },
+        }
+        try:
+            response = await self._post(body, NEARBY_URL, NEAREST_FIELD_MASK, "nearest_place")
+        except Exception as exc:
+            log.warning(kv("nearest_place_failed", error=type(exc).__name__))
+            return None
+        places = response.get("places") or []
+        return (places[0].get("displayName") or {}).get("text") if places else None
 
     async def geocode(self, text: str, near: LatLng) -> ResolvedPlace | None:
         """The place someone typed, via Text Search biased to `near`. None if Google finds

@@ -21,6 +21,8 @@ from app.settings import Settings
 
 log = get_logger(__name__)
 
+LOCATION_TIMEOUT_SEC = 25.0
+
 
 def _is_retryable(exc: BaseException) -> bool:
     """Retry when the bridge was never reached, or it reported a server error.
@@ -66,11 +68,16 @@ class PhotonMessaging:
     async def shared_location(self, handle: str) -> LatLng | None:
         """The person's Find My location, if shared with the bot. Never logs coordinates."""
         try:
-            response = await self._post("/location", {"handle": handle})
+            # Photon's Find My lookups can take 15+ s; a short timeout looked like "not
+            # sharing" and sent the share card to someone already sharing.
+            response = await self._post("/location", {"handle": handle}, LOCATION_TIMEOUT_SEC)
             if response.status_code != 200:
                 return None
             data = response.json()
-            if data.get("type") == "legacy" or self._is_stale(data.get("at")):
+            # Judge freshness by the timestamp: Photon labels even seconds-old shares
+            # "legacy". Without a timestamp, "legacy" is all we have to go on.
+            at = data.get("at")
+            if self._is_stale(at) or (not at and data.get("type") == "legacy"):
                 return None  # an old snapshot: they've probably stopped sharing
             return LatLng(lat=float(data["lat"]), lng=float(data["lng"]))
         except Exception:
@@ -90,8 +97,8 @@ class PhotonMessaging:
             taken = taken.replace(tzinfo=UTC)
         return datetime.now(UTC) - taken > self.max_location_age
 
-    async def _post(self, path: str, body: dict) -> httpx.Response:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
+    async def _post(self, path: str, body: dict, wait_sec: float | None = None) -> httpx.Response:
+        async with httpx.AsyncClient(timeout=wait_sec or self.timeout) as client:
             return await client.post(f"{self.bridge_url}{path}", json=body)
 
     async def react(self, handle: str, message_id: str, emoji: str) -> bool:

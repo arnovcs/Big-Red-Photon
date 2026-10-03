@@ -20,6 +20,7 @@ from app.conversation import copy
 from app.conversation.commands import (
     GO_IN_SENTENCE,
     SessionCommand,
+    is_greeting,
     parse_mode_change,
     parse_session_command,
 )
@@ -138,6 +139,23 @@ class PlanningSessions:
                 return False
             assert parsed.arg is not None
             await self._vote(db, group, session, user, parsed.arg)
+        return True
+
+    async def greet(self, db: AsyncSession, user: UserRow, msg: InboundMessage) -> bool:
+        """A plain "hi" / "hey": say hi back with what to do next, instead of the help
+        text (or saving it as a preference). False if it isn't just a greeting."""
+        if not is_greeting(msg.text):
+            return False
+        group = await queries.active_group_for_user(db, user.id)
+        session = await queries.active_session(db, group) if group else None
+        if session is None:
+            await self._reply(user, copy.hello_idle(user.display_name or ""))
+        elif session.state == SessionState.COLLECTING:
+            await self._reply(user, copy.HELLO_COLLECTING)
+        elif session.state == SessionState.POLLING:
+            await self._reply(user, copy.HELLO_VOTING)
+        else:
+            await self._reply(user, copy.HELLO_BUSY)
         return True
 
     async def store_message(

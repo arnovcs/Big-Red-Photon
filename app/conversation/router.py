@@ -104,6 +104,8 @@ class Router:
                 pass
             elif await self.onboarding.handle_shared_after_setup(db, user, msg.text):
                 pass
+            elif await self.sessions.greet(db, user, msg):
+                pass
             elif await self.sessions.store_message(db, user, msg):
                 pass
             else:

@@ -145,6 +145,15 @@ class StubPlaces:
         q = query.lower()
         return [_candidate(v) for v in VENUES if v[1].lower() in q or q in v[1].lower()]
 
+    async def nearest_place_name(self, location: LatLng) -> str | None:
+        """The closest landmark within ~400 m, like Google's nearest place."""
+        best = None
+        for name, lat, lng in LANDMARKS.values():
+            d = haversine_mi(location, LatLng(lat=lat, lng=lng))
+            if d <= 0.25 and (best is None or d < best[0]):
+                best = (d, name)
+        return best[1] if best else None
+
     async def geocode(self, text: str, near: LatLng) -> ResolvedPlace | None:
         self.lookups.append(text)
         q = " ".join(text.lower().split()).strip(".!?")

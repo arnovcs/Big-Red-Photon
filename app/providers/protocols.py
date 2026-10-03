@@ -77,6 +77,11 @@ class PlacesProvider(Protocol):
 
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
 
+    async def nearest_place_name(self, location: LatLng) -> str | None:
+        """The closest named place to a point ("Collegetown Bagels"), to describe someone's
+        live location back to them. None if nothing's close or the lookup failed."""
+        ...
+
     async def geocode(self, text: str, near: LatLng) -> ResolvedPlace | None:
         """The place someone typed, searched near `near`. None if nothing matched or the
         lookup failed: callers ask the person to rephrase, never substitute a default."""

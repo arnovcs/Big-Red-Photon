@@ -107,6 +107,18 @@ def _plain(text: str) -> str:
     return " ".join(re.findall(r"[a-z]+", text.lower().replace("'", "").replace("’", "")))
 
 
+_GREETING = re.compile(
+    r"^(hi+|hey+|hello+|helo|yo+|sup|wassup|whats up|what up|hiya|howdy|heyo|"
+    r"hey there|hi there|hello there|gm|good morning|good afternoon|good evening|"
+    r"hey huddle|hi huddle|yo huddle)$"
+)
+
+
+def is_greeting(text: str) -> bool:
+    """Just a hello ("hi", "heyyy", "what's up"), nothing else in the message."""
+    return bool(_GREETING.match(_plain(text)))
+
+
 def is_go_sentence(text: str) -> bool:
     plain = _plain(text)
     return any(p.search(plain) for p in _GO_SENTENCE)

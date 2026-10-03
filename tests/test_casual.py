@@ -239,6 +239,7 @@ def test_search_waits_for_more_than_half_and_everyone_hears_who_is_ready(client)
         return client.get(f"/sim/outbox/{handle}").json()[-1]["text"]
 
     # 1 of 3 isn't enough: everyone hears Maya's ready, nothing is searched yet.
+    client.app.state.deps.messaging.typing_events.clear()
     send(client, "go")
     for handle in people.values():
         assert last(handle) == "Maya's ready ✅ (1/2 needed). say go when you're in too"
@@ -250,3 +251,20 @@ def test_search_waits_for_more_than_half_and_everyone_hears_who_is_ready(client)
     texts = [m["text"] for m in client.get(f"/sim/outbox/{people['Jordan']}").json()]
     assert "Sam's ready too ✅ finding spots 👀" in texts
     assert any(t.startswith("ok here's what works") for t in texts)
+
+
+# --- "hi" gets a hello back ---------------------------------------------------------------
+
+
+def test_hi_gets_a_friendly_reply_for_where_you_are(client) -> None:
+    for text in ["start", "Maya", "MAYA1", "yes", "olin"]:
+        send(client, text)
+    assert send(client, "hiii") == [copy.hello_idle("Maya")]  # not the help text
+    send(client, "plan")
+    send(client, "bike")
+    send(client, "same")
+    assert send(client, "hey!") == [copy.HELLO_COLLECTING]
+    # Not saved as a preference; "hi I want tacos" still is.
+    from app.conversation.commands import is_greeting
+
+    assert not is_greeting("hi I want tacos")

@@ -201,6 +201,14 @@ LOCATION_NOT_FOUND = (
 )
 LIVE_LOCATION_LABEL = "your live location"
 LIVE_LOCATION_SET = "got it, using your live location 📍"
+
+
+def live_location_offer(place: str | None) -> str:
+    """They're already sharing: offer it instead of asking where they're starting."""
+    where = f"near {place} " if place else ""
+    return f"I have your live location {where}📍 use that, or text a different spot?"
+
+
 LOCATION_UNCLEAR = (
     "is that a yes? if not, send me the place you're starting from (or share your location "
     'and say "done")'
@@ -242,10 +250,6 @@ def mode_changed(modes_text: str) -> str:
 
 
 TRIP_MODES_SET = "bet. what are you in the mood for?"
-TRIP_LIVE_LOCATION = (
-    'bet, I\'ll use your live location 📍 (say "location" to pick a different spot). '
-    "what are you in the mood for?"
-)
 ASK_TRIP_LOCATION = (
     'where are you starting from? share your location (tap the card, then say "done"), '
     'type a place, or say "same" for last time\'s spot'
@@ -264,6 +268,19 @@ HELP = (
     "A/B/C to vote, nvm to cancel.\n"
     "settings: budget <amount>, location, car yes / car no"
 )
+
+
+def hello_idle(name: str) -> str:
+    return (
+        f"hey {name}! 👋 wanna plan something? just say plan"
+        if name
+        else ("hey! 👋 wanna plan something? just say plan")
+    )
+
+
+HELLO_COLLECTING = "hey! 👋 tell me what you're in the mood for, or say go when everyone's in"
+HELLO_VOTING = "hey! 👋 vote with A, B, or C"
+HELLO_BUSY = "hey! 👋 hang tight, I'm on it"
 
 # --- Web signup claim (app/onboarding/web_claim.py) ----------------------------
 

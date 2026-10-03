@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversation import copy
 from app.conversation.commands import (
+    is_greeting,
     is_no,
     is_yes,
     parse_amount,
@@ -57,6 +58,16 @@ def is_share_reply(text: str) -> bool:
 EXPLICIT_SHARE_WORDS = {"done", "shared", "share", "sharing", "sent", "location"}
 
 
+_USE_THAT = re.compile(
+    r"\b(use (that|it|this|that one|my (live )?location|live location|the live one|live)|"
+    r"that one|thats fine|sounds good|perfect|works)\b"
+)
+
+
+def is_use_that(text: str) -> bool:
+    return bool(_USE_THAT.search(" ".join(re.findall(r"[a-z]+", text.lower()))))
+
+
 def is_explicit_share(text: str) -> bool:
     words = set(re.findall(r"[a-z]+", text.lower()))
     return bool(words & EXPLICIT_SHARE_WORDS)
@@ -90,6 +101,8 @@ def is_chatter(text: str) -> bool:
     words = re.findall(r"[a-z]+", text.lower())
     if not words:
         return True  # emoji / punctuation only
+    if is_greeting(text):
+        return True  # "hi" isn't a place
     return " ".join(words) in CHATTER or all(w in CHATTER for w in words)
 
 
@@ -110,11 +123,7 @@ class Onboarding:
     async def _ask_location(self, db: AsyncSession, user: UserRow, use_share: bool = True) -> None:
         """Already sharing their location with the bot (and `use_share`)? Use it (they
         confirm yes/no). Otherwise ask where they're starting, with the Find My card."""
-        found = await self._shared_location(user) if use_share else None
-        if found is not None:
-            coords, label = found
-            await vault.set_origin(db, user.id, coords, label)
-            await self._reply(user, copy.confirm_location(label))
+        if use_share and await self._offer_shared_location(db, user):
             return
         await self._reply(user, copy.ASK_LOCATION)
         await self._send_location_card(user)
@@ -126,13 +135,38 @@ class Onboarding:
             pass  # the typed-landmark path still works
 
     async def _shared_location(self, user: UserRow) -> tuple[LatLng, str] | None:
+        # Typing dots while Find My answers (it can take 15+ s), cleared either way.
+        await self.deps.messaging.typing(user.handle, True)
+        try:
+            return await self._lookup_shared_location(user)
+        finally:
+            await self.deps.messaging.typing(user.handle, False)
+
+    async def _lookup_shared_location(self, user: UserRow) -> tuple[LatLng, str] | None:
         try:
             coords = await self.deps.messaging.shared_location(user.handle)
         except Exception:
             coords = None
         if coords is None:
             return None
-        return coords, copy.LIVE_LOCATION_LABEL
+        try:
+            place = await self.deps.places.nearest_place_name(coords)
+        except Exception:
+            place = None
+        return coords, f"near {place}" if place else copy.LIVE_LOCATION_LABEL
+
+    async def _offer_shared_location(self, db: AsyncSession, user: UserRow) -> bool:
+        """Already sharing? Hold that as their start and offer it ("use that, or text a
+        different spot?") instead of asking. False if the bot can't see a share."""
+        found = await self._shared_location(user)
+        if found is None:
+            return False
+        coords, label = found
+        await vault.set_origin(db, user.id, coords, label)
+        user.onboarding_state = OnboardingState.AWAITING_LOCATION
+        place = label.removeprefix("near ") if label.startswith("near ") else None
+        await self._reply(user, copy.live_location_offer(place))
+        return True
 
     async def _react(self, user: UserRow, emoji: str) -> bool:
         """Tapback on the message being answered. False if it couldn't be sent."""
@@ -229,6 +263,10 @@ class Onboarding:
     async def _location(self, db: AsyncSession, user: UserRow, text: str) -> None:
         """A typed landmark, or the person's shared (Find My) location. Either way the
         place is stored, then confirmed yes/no."""
+        if is_use_that(text):
+            # "use that" / "use my live location": the place just offered.
+            if await self._confirm_location(db, user):
+                return
         if is_explicit_share(text) and await self._use_shared_location(db, user):
             return  # "ok done" / "done ✅": their live location, not a yes to the old place
         if is_yes(text) or " ".join(text.lower().split()).strip(".!") in SAME_REPLIES:
@@ -366,9 +404,7 @@ class Onboarding:
         await vault.set_modes(db, user.id, modes)
         log.info(kv("trip_modes", user=user.id.hex[:8], modes=modes_text(modes), source="answer"))
         # Next question, one at a time: where from? Live location answers it by itself.
-        if await self._shared_location(user) is not None:
-            user.onboarding_state = OnboardingState.READY
-            await self._reply(user, copy.TRIP_LIVE_LOCATION)
+        if await self._offer_shared_location(db, user):
             return
         user.onboarding_state = OnboardingState.AWAITING_LOCATION
         await self._reply(user, copy.ASK_TRIP_LOCATION)
