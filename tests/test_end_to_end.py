@@ -1,4 +1,5 @@
-"""§18 demo scenario through the simulator: mock places/routing, stubbed LLM (tests only)."""
+"""v3 §18 demo through the simulator (DMs + join code), with mock places/routing and a
+stubbed LLM defined here (there is no mock LLM in app/)."""
 
 import json
 import re
@@ -24,15 +25,35 @@ from app.settings import Settings
 
 # 18:00 in Ithaca (EDT) on the demo date.
 FIXED_NOW = datetime(2026, 10, 3, 22, 0, tzinfo=UTC)
-GROUP = "group-chat-1"
 
-PERSONAS = [
-    # name, handle, bank code, stub limit, start, modes reply
-    ("Maya", "+16075550101", "MAYA1", 30, "Olin Library", "bike"),
-    ("Sam", "+16075550102", "SAM1", 50, "north campus", "neither"),
-    ("Jordan", "+16075550103", "JORDAN1", 15, "Willard Straight", "neither"),
-]
-ORIGIN_LABELS = ["Olin Library", "Robert Purcell Community Center", "Willard Straight Hall"]
+# name, handle, bank code, stub limit, typed start, geocoded label, modes reply
+MAYA = ("Maya", "+16075550101", "MAYA1", 30, "Olin Library", "Olin Library", "bike")
+SAM = (
+    "Sam",
+    "+16075550102",
+    "SAM1",
+    50,
+    "north campus",
+    "Robert Purcell Community Center",
+    "neither",
+)
+JORDAN = (
+    "Jordan",
+    "+16075550103",
+    "JORDAN1",
+    15,
+    "Willard Straight",
+    "Willard Straight Hall",
+    "neither",
+)
+PERSONAS = [MAYA, SAM, JORDAN]
+
+# What each person DMs privately while the plan is collecting (§18 step 3).
+PREFERENCES = {
+    MAYA[1]: ["I'm starving"],
+    SAM[1]: ["no sushi pls", "something we haven't tried?"],
+    JORDAN[1]: ["I have to be back by 9, and nothing too far"],
+}
 
 
 class StubLLM:
@@ -89,33 +110,31 @@ def harness(tmp_path):
         yield client, llm
 
 
-def say(client: TestClient, handle: str, name: str, text: str, chat_id: str = GROUP) -> None:
-    is_group = chat_id == GROUP
-    resp = client.post(
-        "/sim/message",
-        json={
-            "chat_id": chat_id if is_group else f"dm-{handle}",
-            "is_group": is_group,
-            "sender_handle": handle,
-            "sender_name": name,
-            "text": text,
-        },
-    )
-    assert resp.status_code == 200
-
-
-def dm(client: TestClient, handle: str, name: str, text: str) -> str:
-    say(client, handle, name, text, chat_id="dm")
-    return outbox(client, handle)[-1]["text"]
-
-
-def outbox(client: TestClient, key: str) -> list[dict]:
-    resp = client.get(f"/sim/outbox/{key}")
+def outbox(client: TestClient, handle: str) -> list[dict]:
+    resp = client.get(f"/sim/outbox/{handle}")
     assert resp.status_code == 200
     return resp.json()
 
 
-def leaks(text: str, limit: int) -> bool:
+def dm(client: TestClient, handle: str, text: str) -> str:
+    """Send a DM as `handle`; return the last message the bot sent back to them."""
+    resp = client.post("/sim/message", json={"sender_handle": handle, "text": text})
+    assert resp.status_code == 200
+    return outbox(client, handle)[-1]["text"]
+
+
+def onboard(client: TestClient, persona: tuple) -> None:
+    name, handle, code, limit, start, label, modes = persona
+    assert "What's your first name?" in dm(client, handle, "start")
+    assert "bank code" in dm(client, handle, name)
+    assert f"${limit}" in dm(client, handle, code)
+    assert "Where are you starting" in dm(client, handle, "yes")
+    assert f"Got it: {label}" in dm(client, handle, start)
+    assert "car" in dm(client, handle, "yes")
+    assert "join <code>" in dm(client, handle, modes)
+
+
+def leaks_limit(text: str, limit: int) -> bool:
     patterns = [
         rf"\$\s?{limit}(\.\d{{2}})?\b",
         rf"\b{limit}(\.00)?\s*(dollars|bucks|usd)\b",
@@ -124,7 +143,7 @@ def leaks(text: str, limit: int) -> bool:
     return any(re.search(p, text, re.IGNORECASE) for p in patterns)
 
 
-def winning_plan(client: TestClient) -> tuple[Plan, dict[str, str]]:
+def finished_session(client: TestClient) -> tuple[Plan, dict[str, str]]:
     """The delivered plan and its pid → handle map, read from the finished session."""
 
     async def load() -> tuple[Plan, dict[str, str]]:
@@ -142,31 +161,29 @@ def winning_plan(client: TestClient) -> tuple[Plan, dict[str, str]]:
 
 def test_demo_scenario(harness) -> None:
     client, llm = harness
+    handles = [p[1] for p in PERSONAS]
+    for persona in PERSONAS:
+        onboard(client, persona)
+    # Onboarding prompts are fixed copy (they name example landmarks); skip them below.
+    after_onboarding = {handle: len(outbox(client, handle)) for handle in handles}
 
-    # Everyone has spoken in the group, so the bot knows the members.
-    for name, handle, *_ in PERSONAS:
-        say(client, handle, name, "hey")
-    assert outbox(client, GROUP)[0]["text"].startswith("Hi! I'm")
+    # Form the virtual group.
+    started = dm(client, MAYA[1], "@plan")
+    code = re.search(r"join ([A-Z0-9]{4})", started).group(1)
+    assert not re.search(r"[01OI]", code)
+    assert dm(client, SAM[1], f"join {code.lower()}").startswith("You're in!")
+    assert dm(client, JORDAN[1], f"ok join {code}").startswith("You're in!")
+    for handle in handles:
+        assert any(m["text"] == "✅ Jordan joined (3 people)." for m in outbox(client, handle))
 
-    # Private onboarding over DM.
-    for name, handle, code, limit, start, modes in PERSONAS:
-        assert "bank code" in dm(client, handle, name, "start")
-        assert f"${limit}" in dm(client, handle, name, code)
-        assert "Where are you starting" in dm(client, handle, name, "yes")
-        assert "Got it" in dm(client, handle, name, start)
-        assert "car" in dm(client, handle, name, "yes")
-        assert "You're set" in dm(client, handle, name, modes)
-    assert outbox(client, GROUP)[-1]["text"] == "✅ Jordan is set (3/3)."
+    # Preferences, privately. Only each member's first message gets "Got it".
+    for handle, texts in PREFERENCES.items():
+        for text in texts:
+            dm(client, handle, text)
+        noted = [m for m in outbox(client, handle) if m["text"].startswith("Got it 👍")]
+        assert len(noted) == 1
 
-    # §18 group chat.
-    maya, sam, jordan = ((p[0], p[1]) for p in PERSONAS)
-    say(client, maya[1], maya[0], "@plan")
-    assert outbox(client, GROUP)[-1]["text"].startswith("Listening")
-    say(client, maya[1], maya[0], "I'm starving")
-    say(client, sam[1], sam[0], "no sushi pls")
-    say(client, jordan[1], jordan[0], "I have to be back by 9, and nothing too far")
-    say(client, sam[1], sam[0], "something we haven't tried?")
-    say(client, maya[1], maya[0], "@go")
+    dm(client, MAYA[1], "@go")
 
     # The LLM saw only pseudonymous text: no names, handles, or limits.
     (transcript,) = llm.transcripts
@@ -175,43 +192,101 @@ def test_demo_scenario(harness) -> None:
     for name, handle, *_ in PERSONAS:
         assert all(name not in m.text and handle not in m.text for m in transcript)
 
-    group_msgs = outbox(client, GROUP)
-    polls = [m for m in group_msgs if m["poll"]]
-    assert len(polls) == 1
+    # Every member gets "Looking…" and the same poll with ≤3 options.
+    polls = []
+    for handle in handles:
+        msgs = outbox(client, handle)
+        assert any(m["text"] == "🔎 Looking at options…" for m in msgs)
+        (poll_msg,) = [m for m in msgs if m.get("poll")]
+        assert poll_msg["kind"] == "group"
+        polls.append(poll_msg)
+    assert all(p == polls[0] for p in polls)
     options = polls[0]["poll"]
     assert 1 <= len(options) <= 3
     assert all("Plum Tree" not in o["title"] for o in options)  # sushi veto respected
-    assert "Reply A" in polls[0]["text"]
+    assert polls[0]["text"].endswith("Reply A, B, or C.")
 
-    # Two of three vote A → winner.
-    client.post("/sim/vote", json={"chat_id": GROUP, "voter_handle": maya[1], "option_label": "A"})
-    say(client, sam[1], sam[0], "A")
-    group_msgs = outbox(client, GROUP)
-    assert group_msgs[-1]["text"].startswith("🎉 Plan A:")
+    # Votes are DM replies; 2 of 3 decide.
+    assert dm(client, MAYA[1], "A") == "🗳️ 1 of 3 voted"
+    dm(client, SAM[1], "a")
 
-    # No private values in any group message.
-    for msg in group_msgs:
-        text = msg["text"] + json.dumps(msg["poll"] or [])
-        for _, handle, _, limit, _, _ in PERSONAS:
-            assert not leaks(text, limit), text
-            assert handle not in text and handle[-4:] not in text
-        for label in ORIGIN_LABELS:
-            assert label not in text
-
-    # A distinct personal DM per member, all arriving at the same time.
-    itineraries = {handle: outbox(client, handle)[-1]["text"] for _, handle, *_ in PERSONAS}
-    assert all(t.startswith("Your plan for tonight:") for t in itineraries.values())
+    # Each member: group confirmation, then their own itinerary right under it.
+    itineraries = {}
+    for handle in handles:
+        *_, confirmation, itinerary = outbox(client, handle)
+        assert confirmation["kind"] == "group"
+        assert confirmation["text"].startswith("🎉 Plan A:")
+        assert confirmation["text"].endswith("Your route is below 👇")
+        assert itinerary["kind"] == "private"
+        assert itinerary["text"].startswith("Your plan for tonight:")
+        itineraries[handle] = itinerary["text"]
     assert len(set(itineraries.values())) == len(PERSONAS)
     arrivals = {re.search(r"Arrive ~(\d+:\d\d)", t).group(1) for t in itineraries.values()}
     assert len(arrivals) == 1
-    assert arrivals.pop() in group_msgs[-1]["text"]
+    assert arrivals.pop() in confirmation["text"]
+
+    # No private values in any group-safe message.
+    for handle in handles:
+        for msg in outbox(client, handle):
+            if msg["kind"] != "group":
+                continue
+            text = msg["text"] + json.dumps(msg["poll"] or [])
+            for _, other_handle, _, limit, _, label, _ in PERSONAS:
+                assert not leaks_limit(text, limit), text
+                assert other_handle not in text and other_handle[-4:] not in text
+                assert label not in text
+
+    # No member's DMs contain another member's private values or preferences.
+    for name, handle, *_ in PERSONAS:
+        received = outbox(client, handle)[after_onboarding[handle] :]
+        everything = "\n".join(m["text"] for m in received)
+        for other in PERSONAS:
+            if other[1] == handle:
+                continue
+            _, other_handle, _, other_limit, _, other_label, _ = other
+            assert not leaks_limit(everything, other_limit), (name, other[0])
+            assert other_label not in everything
+            assert other_handle not in everything
+            assert all(text not in everything for text in PREFERENCES[other_handle])
 
     # Every leave_by + travel time reaches the same T_target, within each budget.
-    plan, pid_to_handle = winning_plan(client)
-    limit_by_handle = {handle: limit for _, handle, _, limit, _, _ in PERSONAS}
+    plan, pid_to_handle = finished_session(client)
+    limit_by_handle = {p[1]: p[3] for p in PERSONAS}
     assert len(plan.assignments) == len(PERSONAS)
     for a in plan.assignments:
         assert a.arrive_at == plan.target_arrival
         reached = a.leave_by + timedelta(minutes=a.travel_min)
         assert abs((reached - plan.target_arrival).total_seconds()) < 1
         assert a.total_cost_usd <= limit_by_handle[pid_to_handle[a.pid]]
+
+    # The session is over: the code is retired and a new @plan gets a new one.
+    assert (
+        dm(client, JORDAN[1], f"join {code}") == "I don't know that code. Check it and try again."
+    )
+    assert code not in dm(client, MAYA[1], "@plan")
+
+
+def test_join_rules(harness) -> None:
+    client, _ = harness
+    onboard(client, MAYA)
+    onboard(client, SAM)
+
+    assert "not in a plan" in dm(client, MAYA[1], "@go")
+    code = re.search(r"join ([A-Z0-9]{4})", dm(client, MAYA[1], "@plan")).group(1)
+    assert code in dm(client, MAYA[1], "@plan")  # already in a plan
+    assert dm(client, MAYA[1], "@go") == f"I need at least 2 people. Share code {code} first."
+    assert "don't know that code" in dm(client, SAM[1], "join ZZZZ")
+
+    # A join from someone not set up yet starts onboarding instead.
+    newcomer = "+16075550199"
+    client.post("/sim/message", json={"sender_handle": newcomer, "text": f"join {code}"})
+    first, second = (m["text"] for m in outbox(client, newcomer))
+    assert first == f"Let's get you set up first, then send join {code} again."
+    assert "What's your first name?" in second
+
+    # Any member can cancel; everyone hears about it and the code is retired.
+    dm(client, SAM[1], f"join {code}")
+    dm(client, SAM[1], "@cancel")
+    for handle in (MAYA[1], SAM[1]):
+        assert outbox(client, handle)[-1]["text"].startswith("Plan cancelled.")
+    assert "don't know that code" in dm(client, SAM[1], f"join {code}")

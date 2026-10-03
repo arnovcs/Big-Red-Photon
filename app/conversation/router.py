@@ -1,21 +1,25 @@
-"""Inbound dispatch (§7.1): idempotency, user/group upsert, group vs DM routing.
+"""Inbound dispatch (§7.1), v3: every message is a DM.
 
-Messages in one chat are handled in order under a per-chat asyncio.Lock.
+Handling is serialized with one global asyncio.Lock: members of one virtual group write
+from different DMs, and traffic is tiny. Long work (pipeline, delivery) runs as tracked
+background tasks outside the lock.
 """
 
 import asyncio
-from collections import defaultdict
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Coroutine
+from typing import Any
 
 from app.conversation import copy
+from app.conversation.commands import SessionCommand, parse_session_command
 from app.db import queries
 from app.db.session import session_factory
 from app.db.tables import ProcessedMessageRow
 from app.deps import Deps
 from app.logging import get_logger, kv
-from app.messaging.outbound import send_group
+from app.messaging.outbound import send_private
 from app.models.conversation import InboundMessage
-from app.models.outbound import GroupSafeMessage
+from app.models.identity import OnboardingState
+from app.models.outbound import PrivateMessage
 from app.onboarding.fsm import Onboarding
 from app.planning.session import PlanningSessions
 
@@ -25,58 +29,72 @@ log = get_logger(__name__)
 class Router:
     def __init__(self, deps: Deps) -> None:
         self.deps = deps
-        self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+        self._lock = asyncio.Lock()
+        self._tasks: set[asyncio.Task[None]] = set()
         self.onboarding = Onboarding(deps)
-        self.sessions = PlanningSessions(deps, self.run_locked)
+        self.sessions = PlanningSessions(deps, self.run_locked, self.spawn)
 
-    async def run_locked(self, chat_id: str, fn: Callable[[], Awaitable[None]]) -> None:
-        async with self._locks[chat_id]:
+    async def run_locked(self, fn: Callable[[], Awaitable[None]]) -> None:
+        async with self._lock:
             await fn()
+
+    def spawn(self, coro: Coroutine[Any, Any, None]) -> None:
+        """Run long work in the background; failures are logged, never lost."""
+
+        async def guarded() -> None:
+            try:
+                await coro
+            except Exception:
+                log.exception(kv("background_task_failed"))
+
+        task = asyncio.create_task(guarded())
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    async def drain(self) -> None:
+        """Wait for background work (pipeline, delivery), not poll timers. Simulator/tests."""
+        while self._tasks:
+            await asyncio.gather(*list(self._tasks), return_exceptions=True)
 
     async def handle_message(self, msg: InboundMessage) -> None:
         """Never raises: a failure is logged so the bot keeps running."""
         try:
-            await self.run_locked(msg.chat_id, lambda: self._handle_message(msg))
+            await self.run_locked(lambda: self._handle_message(msg))
         except Exception:
-            log.exception(kv("handle_message_failed", is_group=msg.is_group))
-
-    async def handle_vote(self, chat_id: str, voter_handle: str, label: str) -> None:
-        try:
-            await self.run_locked(chat_id, lambda: self._handle_vote(chat_id, voter_handle, label))
-        except Exception:
-            log.exception(kv("handle_vote_failed"))
+            log.exception(kv("handle_message_failed"))
 
     async def _handle_message(self, msg: InboundMessage) -> None:
         async with session_factory()() as db:
             if await db.get(ProcessedMessageRow, msg.message_id) is not None:
                 return
             db.add(ProcessedMessageRow(message_id=msg.message_id))
-            user, _ = await queries.upsert_user(db, msg.sender_handle, msg.sender_name)
-
             if msg.is_group:
-                group, is_new = await queries.upsert_group(db, msg.chat_id)
-                await queries.ensure_member(db, group.id, user.id)
+                log.info(kv("group_message_ignored"))  # v3: DMs only
                 await db.commit()
-                if is_new:
-                    await send_group(
-                        self.deps.messaging, group.chat_id, GroupSafeMessage(text=copy.GROUP_INTRO)
-                    )
-                await self.sessions.on_group_message(db, group, user, msg)
-            else:
-                first_dm = user.dm_chat_id is None
-                user.dm_chat_id = msg.chat_id
-                await self.onboarding.handle_dm(db, user, msg, first_dm)
-            await db.commit()
-
-    async def _handle_vote(self, chat_id: str, voter_handle: str, label: str) -> None:
-        async with session_factory()() as db:
-            group = await queries.group_by_chat(db, chat_id)
-            user = await queries.user_by_handle(db, voter_handle)
-            if group is None or user is None:
                 return
-            await self.sessions.on_vote(db, group, user, label)
+
+            user = await queries.upsert_user(db, msg.sender_handle, msg.sender_name)
+            first_dm = user.dm_chat_id is None
+            user.dm_chat_id = msg.chat_id
+
+            if user.onboarding_state != OnboardingState.READY:
+                parsed = parse_session_command(msg.text)
+                if parsed and parsed.command == SessionCommand.JOIN and parsed.arg:
+                    await self.onboarding.join_before_ready(user, parsed.arg, first_dm)
+                else:
+                    await self.onboarding.handle_dm(db, user, msg.text, first_dm)
+            elif await self.sessions.handle_command(db, user, msg):
+                pass
+            elif await self.onboarding.handle_settings(db, user, msg.text):
+                pass
+            elif await self.sessions.store_message(db, user, msg):
+                pass
+            else:
+                await send_private(self.deps.messaging, user.handle, PrivateMessage(text=copy.HELP))
             await db.commit()
 
     def shutdown(self) -> None:
         self.sessions.shutdown()
-        self._locks.clear()
+        for task in self._tasks:
+            task.cancel()
+        self._tasks.clear()

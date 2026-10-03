@@ -11,8 +11,8 @@ from app.models.routing import Mode, RouteDetail, RouteEstimate
 
 
 class MessagingProvider(Protocol):
-    async def send_group(self, chat_id: str, msg: GroupSafeMessage) -> str | None:
-        """Send to a group chat. Returns poll_id if a native poll was sent."""
+    async def send_group(self, handles: list[str], msg: GroupSafeMessage) -> None:
+        """Send the same group-safe message to each member's DM (v3: no group chats)."""
         ...
 
     async def send_private(self, handle: str, msg: PrivateMessage) -> None: ...

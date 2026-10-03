@@ -7,38 +7,65 @@ from app.models.outbound import GroupPlanOption
 
 BOT_NAME = "[NAME]"  # replace with the product name (§19 open decision 4)
 
-# --- Group chat ---------------------------------------------------------------
+# --- Virtual group (v3: every message is a DM) --------------------------------
 
-GROUP_INTRO = (
-    f"Hi! I'm {BOT_NAME}. I help this chat pick a plan everyone can afford and reach, "
-    'and I get you there at the same time. Each of you: DM me "start" to set up '
-    "privately. I never share anyone's money or location here."
+WELCOME = (
+    f"Hi! I'm {BOT_NAME}. I help friends pick a plan everyone can afford and reach, and I "
+    "get you there at the same time. Let's set you up. It's private: I never share your "
+    "money or location with anyone."
 )
-LISTENING = "Listening — tell me what you're feeling. Say @go when ready."
-ALREADY_PLANNING = "Already planning — say @cancel to start over."
-NEED_MORE_PEOPLE = 'I need at least 2 people set up to plan. DM me "start" to join in.'
-SAY_PLAN_FIRST = "Say @plan first, then tell me what you're feeling."
-LOOKING = "🔎 Looking at options…"
-PIPELINE_FAILED = "Couldn't finish — say @go to retry."
-NOTHING_FITS = "Nothing fits everyone right now. Try loosening a preference, then say @go again."
-CANCELLED = "Cancelled. Say @plan whenever you want to start again."
 
 
-def _join_names(names: list[str]) -> str:
-    if len(names) <= 1:
-        return "".join(names)
-    return ", ".join(names[:-1]) + " and " + names[-1]
-
-
-def planning_with(ready_names: list[str], missing_names: list[str]) -> str:
+def plan_started(code: str) -> str:
     return (
-        f"Planning with {_join_names(ready_names)}. "
-        f"{_join_names(missing_names)}, DM me 'start' to be included."
+        f"Plan started! 🎉 Tell your friends to text me: join {code}\n"
+        "Meanwhile, tell me what you're in the mood for. Only I see it. "
+        "Say @go when everyone's in."
     )
 
 
-def member_ready(name: str, ready: int, total: int) -> str:
-    return f"✅ {name} is set ({ready}/{total})."
+def already_in_plan(code: str) -> str:
+    return f"You're already in a plan (code {code}). Say @cancel to start over."
+
+
+def setup_first(code: str) -> str:
+    return f"Let's get you set up first, then send join {code} again."
+
+
+def joined(name: str, member_count: int) -> str:
+    return f"✅ {name} joined ({member_count} people)."
+
+
+YOU_JOINED = (
+    "You're in! Tell me what you're in the mood for. Only I see it. Say @go when everyone's in."
+)
+UNKNOWN_CODE = "I don't know that code. Check it and try again."
+PLAN_ALREADY_STARTED = "That plan already started. Ask them to @plan again."
+
+
+def plan_full(max_members: int) -> str:
+    return f"That plan is full ({max_members} people max)."
+
+
+NOTED = "Got it 👍 Keep going, or say @go when everyone's ready."
+
+
+def need_two(code: str) -> str:
+    return f"I need at least 2 people. Share code {code} first."
+
+
+NOT_IN_PLAN = "You're not in a plan yet. Say @plan to start one, or join <code> to join a friend's."
+LOOKING = "🔎 Looking at options…"
+PIPELINE_FAILED = "Couldn't finish — say @go to retry."
+NOTHING_FITS = "Nothing fits everyone right now. Try loosening a preference, then say @go again."
+NEED_MORE_PEOPLE = (
+    "I need at least 2 people who are fully set up. Share the code and try @go again."
+)
+CANCELLED = "Plan cancelled. Say @plan whenever you want to start again."
+
+
+def votes_progress(voted: int, total: int) -> str:
+    return f"🗳️ {voted} of {total} voted"
 
 
 def plan_blurb(max_travel_min: int) -> str:
@@ -87,20 +114,20 @@ def clock_time(dt: datetime) -> str:
 def confirmation(label: str, venue: str, arrive_local: datetime) -> str:
     return (
         f"🎉 Plan {label}: {venue}. Everyone arrives around {clock_time(arrive_local)}. "
-        "Check your DMs for your route."
+        "Your route is below 👇"
     )
 
 
 # --- DM onboarding ------------------------------------------------------------
 
-ASK_NAME = f"Hi! I'm {BOT_NAME}. What's your first name?"
+ASK_NAME = "What's your first name?"
 
 
 def ask_bank_code(name: str) -> str:
     greeting = f"Nice to meet you, {name}!" if name else "Welcome!"
     return (
         f"{greeting} To keep plans affordable, link your (sandbox) bank: reply with your "
-        "bank code, like MAYA1. I never share money details with the group."
+        "bank code, like MAYA1. I never share money details with anyone."
     )
 
 
@@ -116,7 +143,6 @@ ASK_LOCATION = (
     'Where are you starting from? A landmark works, like "Olin Library" or "Collegetown".'
 )
 LOCATION_NOT_FOUND = 'I couldn\'t find that. Try a nearby landmark, like "Olin Library".'
-SHARED_LOCATION_LABEL = "your shared location"
 
 
 def confirm_location(label: str) -> str:
@@ -128,14 +154,13 @@ ASK_MODES = (
     '(Add "no rideshare" if you\'d rather not take one.)'
 )
 MODES_INVALID = "Reply car, bike, both, or neither."
-YOU_ARE_SET = (
-    "You're set. Say @plan in your group chat whenever you're ready. Text help for options."
-)
+YOU_ARE_SET = "You're set! Start a plan with @plan, or join a friend's with join <code>."
 ALREADY_SET = "You're already set. Text help for options."
 UPDATED = "Updated."
 HELP = (
-    "Text: budget <amount> to change your limit, location to change where you start, "
-    "car yes / car no, or help."
+    "Plans: @plan to start one, join <code> to join a friend's, @go when everyone's in, "
+    "A/B/C to vote, @cancel to stop.\n"
+    "Settings: budget <amount>, location, car yes / car no."
 )
 
 # --- Personal itinerary DM ----------------------------------------------------

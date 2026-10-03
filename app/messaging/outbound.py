@@ -1,6 +1,8 @@
 """send_group / send_private wrappers. A failed send is logged, never raised.
 
-Stage 2 adds the PrivacyGuard check to send_group.
+v3: a "group" message goes to every member's DM via send_group(handles, ...), never a
+loop of send_private, so the GroupSafeMessage type rule (and, in Stage 2, the
+PrivacyGuard) stays in one place.
 """
 
 from app.logging import get_logger, kv, mask_handle
@@ -11,13 +13,12 @@ log = get_logger(__name__)
 
 
 async def send_group(
-    messaging: MessagingProvider, chat_id: str, msg: GroupSafeMessage
-) -> str | None:
+    messaging: MessagingProvider, handles: list[str], msg: GroupSafeMessage
+) -> None:
     try:
-        return await messaging.send_group(chat_id, msg)
+        await messaging.send_group(handles, msg)
     except Exception:
-        log.exception(kv("send_group_failed"))
-        return None
+        log.exception(kv("send_group_failed", members=len(handles)))
 
 
 async def send_private(messaging: MessagingProvider, handle: str, msg: PrivateMessage) -> None:

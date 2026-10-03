@@ -1,4 +1,4 @@
-"""DM onboarding state machine (§7.2) and READY-state DM commands (§7.1)."""
+"""DM onboarding state machine (§7.2) and READY-state settings commands (§7.1)."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,13 +10,11 @@ from app.conversation.commands import (
     parse_dm_command,
     parse_modes,
 )
-from app.db import queries
 from app.db.tables import UserRow
 from app.deps import Deps
-from app.messaging.outbound import send_group, send_private
-from app.models.conversation import InboundMessage
+from app.messaging.outbound import send_private
 from app.models.identity import OnboardingState
-from app.models.outbound import GroupSafeMessage, PrivateMessage
+from app.models.outbound import PrivateMessage
 from app.models.private import LatLng
 from app.private import vault
 
@@ -31,11 +29,10 @@ class Onboarding:
     async def _reply(self, user: UserRow, text: str) -> None:
         await send_private(self.deps.messaging, user.handle, PrivateMessage(text=text))
 
-    async def handle_dm(
-        self, db: AsyncSession, user: UserRow, msg: InboundMessage, first_dm: bool
-    ) -> None:
+    async def handle_dm(self, db: AsyncSession, user: UserRow, text: str, first_dm: bool) -> None:
+        """Advance a not-yet-READY user by one step."""
         state = OnboardingState(user.onboarding_state)
-        text = msg.text.strip()
+        text = text.strip()
 
         if state == OnboardingState.NEW:
             await self._new(user, text, first_dm)
@@ -44,21 +41,36 @@ class Onboarding:
         elif state == OnboardingState.AWAITING_LIMIT_CONFIRM:
             await self._limit_confirm(db, user, text)
         elif state == OnboardingState.AWAITING_LOCATION:
-            await self._location(db, user, text, msg.location)
+            await self._location(db, user, text)
         elif state == OnboardingState.AWAITING_MODES:
             await self._modes(db, user, text)
-        else:
-            await self._ready_command(db, user, text)
+
+    async def join_before_ready(self, user: UserRow, code: str, first_dm: bool) -> None:
+        """`join <code>` from someone not set up yet: explain, then (re)ask the current step."""
+        await self._reply(user, copy.setup_first(code))
+        state = OnboardingState(user.onboarding_state)
+        if state == OnboardingState.NEW:
+            await self._new(user, "", first_dm=True)
+        elif state == OnboardingState.AWAITING_BANK_CODE:
+            await self._reply(user, copy.ask_bank_code(user.display_name))
+        elif state == OnboardingState.AWAITING_LIMIT_CONFIRM:
+            await self._reply(user, copy.LIMIT_INVALID)
+        elif state == OnboardingState.AWAITING_LOCATION:
+            await self._reply(user, copy.ASK_LOCATION)
+        elif state == OnboardingState.AWAITING_MODES:
+            await self._reply(user, copy.ASK_MODES)
 
     async def _new(self, user: UserRow, text: str, first_dm: bool) -> None:
         if not user.display_name:
             if first_dm:
-                await self._reply(user, copy.ASK_NAME)
+                await self._reply(user, f"{copy.WELCOME}\n\n{copy.ASK_NAME}")
                 return
             user.display_name = text.split()[0][:30] if text else ""
             if not user.display_name:
                 await self._reply(user, copy.ASK_NAME)
                 return
+        elif first_dm:
+            await self._reply(user, copy.WELCOME)
         user.onboarding_state = OnboardingState.AWAITING_BANK_CODE
         await self._reply(user, copy.ask_bank_code(user.display_name))
 
@@ -80,14 +92,8 @@ class Onboarding:
         user.onboarding_state = OnboardingState.AWAITING_LOCATION
         await self._reply(user, copy.ASK_LOCATION)
 
-    async def _location(
-        self, db: AsyncSession, user: UserRow, text: str, shared: LatLng | None
-    ) -> None:
-        if shared is not None:
-            await vault.set_origin(db, user.id, shared, copy.SHARED_LOCATION_LABEL)
-            await self._location_confirmed(db, user)
-            return
-
+    async def _location(self, db: AsyncSession, user: UserRow, text: str) -> None:
+        """Typed landmarks only (v3). A geocoded place is stored, then confirmed yes/no."""
         pending = await vault.origin_label(db, user.id)
         if pending and is_yes(text):
             await self._location_confirmed(db, user)
@@ -126,27 +132,18 @@ class Onboarding:
             return
         await vault.set_modes(db, user.id, modes)
         user.onboarding_state = OnboardingState.READY
-        await db.flush()
         await self._reply(user, copy.YOU_ARE_SET)
-        await self._announce_ready(db, user)
 
-    async def _announce_ready(self, db: AsyncSession, user: UserRow) -> None:
-        for group in await queries.groups_for_user(db, user.id):
-            members = await queries.group_members(db, group.id)
-            ready = sum(1 for m in members if m.onboarding_state == OnboardingState.READY)
-            text = copy.member_ready(user.display_name or "Someone", ready, len(members))
-            await send_group(self.deps.messaging, group.chat_id, GroupSafeMessage(text=text))
-
-    async def _ready_command(self, db: AsyncSession, user: UserRow, text: str) -> None:
+    async def handle_settings(self, db: AsyncSession, user: UserRow, text: str) -> bool:
+        """READY-state settings commands. Returns False if `text` isn't one."""
         command = parse_dm_command(text)
         if command is None:
-            await self._reply(user, copy.HELP)
-            return
+            return False
         if command.name == "budget":
             amount = parse_amount(command.arg)
             if amount is None or not MIN_LIMIT_USD <= amount <= MAX_LIMIT_USD:
                 await self._reply(user, copy.LIMIT_INVALID)
-                return
+                return True
             await vault.set_limit(db, user.id, amount, "user_override")
             await self._reply(user, copy.UPDATED)
         elif command.name == "location":
@@ -163,3 +160,4 @@ class Onboarding:
             await self._reply(user, copy.ALREADY_SET)
         else:
             await self._reply(user, copy.HELP)
+        return True

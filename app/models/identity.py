@@ -24,7 +24,9 @@ class User(BaseModel):
 
 
 class Group(BaseModel):
+    """A virtual group, created by one @plan (v3: DMs only)."""
+
     id: UUID
-    chat_id: str  # Photon group chat id
-    member_ids: list[UUID]  # users seen speaking in this group (+ membership events if available)
+    join_code: str  # e.g. "K7QP"; 4 chars, uppercase, no 0/O/1/I
+    member_ids: list[UUID]  # creator + users who DMed "join <code>"
     active_session_id: UUID | None

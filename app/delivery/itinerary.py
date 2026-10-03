@@ -1,13 +1,12 @@
-"""Winner delivery (§10): one private itinerary DM per person, then the group confirmation."""
+"""Winner delivery (§10): the group confirmation, then one private itinerary DM each."""
 
-from datetime import datetime
+import uuid
 from zoneinfo import ZoneInfo
-
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversation import copy
 from app.db import queries
-from app.db.tables import GroupRow, SessionRow
+from app.db.session import session_factory
+from app.db.tables import SessionRow
 from app.deps import Deps
 from app.logging import get_logger, kv
 from app.messaging.outbound import send_group, send_private
@@ -57,15 +56,23 @@ def itinerary_text(
     return "\n".join(lines)
 
 
-async def deliver(
-    deps: Deps, db: AsyncSession, group: GroupRow, session: SessionRow, plan: Plan, label: str
-) -> None:
-    tz = ZoneInfo(deps.settings.demo_timezone)
-    pid_map = load_pid_map(session)
-    users = await queries.users_by_ids(db, list(pid_map.values()))
-    origins = await vault.itinerary_context_for(db, list(pid_map.values()))
-    await db.commit()  # release the SQLite read lock before routing calls
+async def prepare(
+    deps: Deps, session_id: uuid.UUID, plan: Plan
+) -> list[tuple[str, PrivateMessage]]:
+    """Build each member's itinerary DM: (handle, message). Runs outside the router lock.
 
+    If detailed routing fails for someone, their DM falls back to the screening estimate.
+    """
+    tz = ZoneInfo(deps.settings.demo_timezone)
+    async with session_factory()() as db:
+        session = await db.get(SessionRow, session_id)
+        if session is None:
+            return []
+        pid_map = load_pid_map(session)
+        users = await queries.users_by_ids(db, list(pid_map.values()))
+        origins = await vault.itinerary_context_for(db, list(pid_map.values()))
+
+    personal = []
     for assignment in plan.assignments:
         user_id = pid_map.get(assignment.pid)
         user = users.get(user_id) if user_id else None
@@ -82,8 +89,22 @@ async def deliver(
             except Exception:
                 log.warning(kv("route_detail_failed", mode=assignment.mode.value), exc_info=True)
         text = itinerary_text(plan, assignment, steps, tz, deps.settings.rideshare_pickup_wait_min)
-        await send_private(deps.messaging, user.handle, PrivateMessage(text=text))
+        personal.append((user.handle, PrivateMessage(text=text)))
+    return personal
 
-    arrive_local: datetime = plan.target_arrival.astimezone(tz)
-    confirmation = copy.confirmation(label, plan.candidate.name, arrive_local)
-    await send_group(deps.messaging, group.chat_id, GroupSafeMessage(text=confirmation))
+
+def confirmation_message(deps: Deps, plan: Plan, label: str) -> GroupSafeMessage:
+    arrive_local = plan.target_arrival.astimezone(ZoneInfo(deps.settings.demo_timezone))
+    return GroupSafeMessage(text=copy.confirmation(label, plan.candidate.name, arrive_local))
+
+
+async def send(
+    deps: Deps,
+    handles: list[str],
+    confirmation: GroupSafeMessage,
+    personal: list[tuple[str, PrivateMessage]],
+) -> None:
+    """Group confirmation first, so each person's route lands right under it (§7.3)."""
+    await send_group(deps.messaging, handles, confirmation)
+    for handle, message in personal:
+        await send_private(deps.messaging, handle, message)

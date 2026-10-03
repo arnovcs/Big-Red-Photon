@@ -1,4 +1,5 @@
-"""Parse group commands (@plan, @go, @cancel, @pick, poll replies) and DM replies."""
+"""Parse session commands (@plan, join <code>, @go, @cancel, @pick, A/B/C) and settings
+replies. v3: everything arrives as a DM."""
 
 import re
 from dataclasses import dataclass
@@ -8,21 +9,23 @@ from enum import StrEnum
 from app.models.private import TravelModes
 
 
-class GroupCommand(StrEnum):
+class SessionCommand(StrEnum):
     PLAN = "plan"
+    JOIN = "join"
     GO = "go"
     CANCEL = "cancel"
     PICK = "pick"
-    VOTE = "vote"  # bare "A" / "B" / "C"; only meaningful while POLLING
+    VOTE = "vote"  # bare "A" / "B" / "C"; only a vote while POLLING
 
 
 @dataclass(frozen=True)
 class ParsedCommand:
-    command: GroupCommand
-    option: str | None = None
+    command: SessionCommand
+    arg: str | None = None  # option label for PICK/VOTE, join code for JOIN
 
 
 _PICK = re.compile(r"@pick\s+([abc])\b", re.IGNORECASE)
+_JOIN = re.compile(r"\bjoin\s+([a-z0-9]{4})\b", re.IGNORECASE)
 _VOTE = re.compile(r"^\s*([abc])\s*[.!]?\s*$", re.IGNORECASE)
 _AMOUNT = re.compile(r"\$?\s*(\d{1,5}(?:\.\d{1,2})?)")
 
@@ -30,19 +33,21 @@ _YES = {"yes", "y", "yep", "yeah", "yup", "sure", "ok", "okay", "correct", "righ
 _NO = {"no", "n", "nope", "nah", "wrong"}
 
 
-def parse_group(text: str) -> ParsedCommand | None:
-    """Commands are case-insensitive and may appear inside other text ("ok @go")."""
+def parse_session_command(text: str) -> ParsedCommand | None:
+    """Case-insensitive; may appear inside other text ("ok @go"). Join codes are uppercased."""
     lowered = text.lower()
     if "@cancel" in lowered:
-        return ParsedCommand(GroupCommand.CANCEL)
+        return ParsedCommand(SessionCommand.CANCEL)
     if pick := _PICK.search(text):
-        return ParsedCommand(GroupCommand.PICK, pick.group(1).upper())
+        return ParsedCommand(SessionCommand.PICK, pick.group(1).upper())
     if "@go" in lowered:
-        return ParsedCommand(GroupCommand.GO)
+        return ParsedCommand(SessionCommand.GO)
     if "@plan" in lowered:
-        return ParsedCommand(GroupCommand.PLAN)
+        return ParsedCommand(SessionCommand.PLAN)
+    if join := _JOIN.search(text):
+        return ParsedCommand(SessionCommand.JOIN, join.group(1).upper())
     if vote := _VOTE.match(text):
-        return ParsedCommand(GroupCommand.VOTE, vote.group(1).upper())
+        return ParsedCommand(SessionCommand.VOTE, vote.group(1).upper())
     return None
 
 

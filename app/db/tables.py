@@ -34,7 +34,7 @@ class GroupRow(Base):
     __tablename__ = "groups"
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    chat_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    join_code: Mapped[str] = mapped_column(String, unique=True, index=True)
     active_session_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

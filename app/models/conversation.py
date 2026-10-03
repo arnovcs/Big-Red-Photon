@@ -7,8 +7,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from app.models.private import LatLng
-
 
 class ChatMessage(BaseModel):
     message_id: str
@@ -63,7 +61,7 @@ class GroupPreferences(BaseModel):
 
 
 class InboundMessage(BaseModel):
-    """A message from the bridge webhook (§9.1) or the simulator (§14.3)."""
+    """A DM from the bridge webhook (§9.1) or the simulator (§14.3)."""
 
     message_id: str
     chat_id: str
@@ -72,4 +70,3 @@ class InboundMessage(BaseModel):
     sender_name: str | None = None
     text: str
     ts: datetime
-    location: LatLng | None = None

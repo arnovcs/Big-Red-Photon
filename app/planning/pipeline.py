@@ -1,9 +1,13 @@
-"""Planning pipeline (§10): snapshot → extract → discover → route → optimize → poll."""
+"""Planning pipeline (§10): snapshot → extract → discover → route → optimize.
+
+The session FSM sends the poll (steps 6–7) with the result.
+"""
 
 import asyncio
 import json
 import random
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -11,13 +15,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import optimizer
-from app.conversation import copy
 from app.db import queries
-from app.db.tables import GroupRow, SessionMessageRow, SessionRow, UserRow
-from app.decision import poll
+from app.db.session import session_factory
+from app.db.tables import SessionMessageRow, SessionRow
 from app.deps import Deps
 from app.logging import get_logger, kv
-from app.messaging.outbound import send_group
 from app.models.candidates import Candidate
 from app.models.conversation import (
     ConstraintField,
@@ -25,8 +27,6 @@ from app.models.conversation import (
     GroupPreferences,
     PseudonymousMessage,
 )
-from app.models.identity import OnboardingState
-from app.models.outbound import GroupSafeMessage
 from app.models.plans import Plan
 from app.models.private import LatLng, PrivateConstraints
 from app.optimizer import OptimizerParams
@@ -66,11 +66,6 @@ def load_pid_map(session: SessionRow) -> dict[str, uuid.UUID]:
 
 def load_plans(session: SessionRow) -> list[Plan]:
     return [Plan.model_validate(p) for p in json.loads(session.plans_json or "[]")]
-
-
-async def ready_members(db: AsyncSession, group: GroupRow) -> list[UserRow]:
-    members = await queries.group_members(db, group.id)
-    return [m for m in members if m.onboarding_state == OnboardingState.READY]
 
 
 async def _transcript(
@@ -140,29 +135,38 @@ def _shortlist(candidates: list[Candidate]) -> list[Candidate]:
     return open_[:MAX_CANDIDATES]
 
 
-async def run(deps: Deps, db: AsyncSession, group: GroupRow, session: SessionRow) -> list[Plan]:
-    """Run planning and send the poll. Returns the polled plans ([] if nothing was sent).
+@dataclass
+class PlanningResult:
+    pid_map: dict[str, uuid.UUID]
+    preferences: GroupPreferences
+    plans: list[Plan]  # top 3, best first; [] if nothing fits
 
-    Raises on unexpected errors; the caller sends the retry message.
+
+async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> PlanningResult:
+    """Steps 1–5 of §10: no sends and no session state changes (the caller does those).
+
+    Runs outside the router lock, so it reads its snapshot in its own short DB session.
+    If fewer than 2 members have complete profiles, returns early with that pid_map.
     """
     settings = deps.settings
     tz = ZoneInfo(settings.demo_timezone)
     now_local = deps.clock().astimezone(tz)
 
     # 1. Snapshot
-    members = await ready_members(db, group)
-    pid_map = make_pid_map([m.id for m in members])
-    constraints = await vault.constraints_for(db, pid_map)
-    pid_map = {pid: uid for pid, uid in pid_map.items() if pid in constraints}
+    async with session_factory()() as db:
+        session = await db.get(SessionRow, session_id)
+        if session is None:
+            raise LookupError("session not found")
+        members = await queries.group_members(db, group_id)
+        pid_map = make_pid_map([m.id for m in members])
+        constraints = await vault.constraints_for(db, pid_map)
+        pid_map = {pid: uid for pid, uid in pid_map.items() if pid in constraints}
+        user_to_pid = {uid: pid for pid, uid in pid_map.items()}
+        transcript = await _transcript(db, session, user_to_pid, tz)
+
+    empty = GroupPreferences(constraints=[], group_intent="either")
     if len(pid_map) < 2:
-        await send_group(
-            deps.messaging, group.chat_id, GroupSafeMessage(text=copy.NEED_MORE_PEOPLE)
-        )
-        return []
-    user_to_pid = {uid: pid for pid, uid in pid_map.items()}
-    transcript = await _transcript(db, session, user_to_pid, tz)
-    session.pid_map_json = json.dumps({pid: str(uid) for pid, uid in pid_map.items()})
-    await db.commit()  # release the SQLite read lock before slow provider calls
+        return PlanningResult(pid_map=pid_map, preferences=empty, plans=[])
 
     # 2. Extract
     preferences = await _extract(deps, transcript, now_local)
@@ -188,16 +192,13 @@ async def run(deps: Deps, db: AsyncSession, group: GroupRow, session: SessionRow
     # 5. Optimize
     params = OptimizerParams(lam=settings.optimizer_lambda)
     ranked = optimizer.rank(candidates, index, constraints, preferences, now_local, params)
-    top = optimizer.select(ranked, k=3)
     log.info(kv("pipeline_ranked", candidates=len(candidates), feasible=len(ranked)))
+    return PlanningResult(
+        pid_map=pid_map, preferences=preferences, plans=optimizer.select(ranked, k=3)
+    )
 
-    session.preferences_json = preferences.model_dump_json()
-    if not top:
-        await send_group(deps.messaging, group.chat_id, GroupSafeMessage(text=copy.NOTHING_FITS))
-        return []
 
-    # 6–7. Explain (template blurbs in Stage 1) + send the poll
-    message = poll.build_poll_message(top)
-    session.poll_id = await send_group(deps.messaging, group.chat_id, message)
-    session.plans_json = json.dumps([p.model_dump(mode="json") for p in top])
-    return top
+def save_result(session: SessionRow, result: PlanningResult) -> None:
+    session.pid_map_json = json.dumps({pid: str(uid) for pid, uid in result.pid_map.items()})
+    session.preferences_json = result.preferences.model_dump_json()
+    session.plans_json = json.dumps([p.model_dump(mode="json") for p in result.plans])
