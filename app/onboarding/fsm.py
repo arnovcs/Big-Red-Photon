@@ -75,7 +75,7 @@ class Onboarding:
         await self._reply(user, copy.ask_bank_code(user.display_name))
 
     async def _bank_code(self, db: AsyncSession, user: UserRow, text: str) -> None:
-        limit = await vault.link_customer(db, user.id, text)
+        limit = await vault.link_customer(db, user.id, text, self.deps.finance)
         if limit is None:
             await self._reply(user, copy.BANK_CODE_INVALID)
             return

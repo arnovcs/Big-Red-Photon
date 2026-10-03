@@ -4,24 +4,33 @@ Readers outside onboarding may use only `constraints_for()` (planning pipeline) 
 `itinerary_context_for()` (delivery). The write helpers are for onboarding only.
 """
 
+import json
 import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
+from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.tables import PrivateProfileRow
+from app.logging import get_logger, kv
 from app.models.private import LatLng, PrivateConstraints, TravelModes
+from app.private import budget
+from app.providers.protocols import FinanceProvider
 
-# Stage 1 stub: bank code → fixed limit (the §12.3 expected limits).
-# Stage 5 replaces this with Nessie lookup + budget.estimate().
-_STUB_BANK_LIMITS: dict[str, Decimal] = {
-    "MAYA1": Decimal(30),
-    "SAM1": Decimal(50),
-    "JORDAN1": Decimal(15),
-}
+log = get_logger(__name__)
+
+PERSONAS_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "personas.json"
+
+
+@lru_cache
+def _personas_by_code() -> dict[str, dict]:
+    """Bank code → persona from fixtures/personas.json (written by scripts/seed_nessie.py)."""
+    data = json.loads(PERSONAS_PATH.read_text(encoding="utf-8"))
+    return {p["bank_code"].upper(): p for p in data["personas"]}
 
 
 def _now() -> datetime:
@@ -32,16 +41,40 @@ async def _profile(db: AsyncSession, user_id: uuid.UUID) -> PrivateProfileRow | 
     return await db.get(PrivateProfileRow, user_id)
 
 
-async def link_customer(db: AsyncSession, user_id: uuid.UUID, bank_code: str) -> Decimal | None:
+async def _estimate(persona: dict, finance: FinanceProvider | None) -> Decimal:
+    """Limit from the persona's live Nessie data.
+
+    Degrades to the persona's precomputed limit (the same §12 formula run on the
+    seeded data) when Nessie is not configured, not seeded, or not reachable.
+    """
+    customer_id = persona.get("nessie_customer_id")
+    if finance is not None and customer_id:
+        try:
+            snapshot = await finance.get_financial_snapshot(customer_id)
+            return budget.estimate_limit(snapshot)
+        except Exception as exc:
+            log.warning(kv("nessie_unavailable_using_fallback", error=type(exc).__name__))
+    else:
+        log.info(kv("nessie_offline_using_fallback", seeded=bool(customer_id)))
+    return Decimal(persona["expected_limit"])
+
+
+async def link_customer(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    bank_code: str,
+    finance: FinanceProvider | None,
+) -> Decimal | None:
     """Link a (sandbox) bank by code and store the estimated limit. None if unknown code."""
-    limit = _STUB_BANK_LIMITS.get(bank_code.strip().upper())
-    if limit is None:
+    persona = _personas_by_code().get(bank_code.strip().upper())
+    if persona is None:
         return None
+    limit = await _estimate(persona, finance)
     profile = await _profile(db, user_id)
     if profile is None:
         profile = PrivateProfileRow(user_id=user_id)
         db.add(profile)
-    profile.nessie_customer_id = None
+    profile.nessie_customer_id = persona.get("nessie_customer_id")
     profile.spend_limit_usd = limit
     profile.limit_source = "nessie_estimate"
     profile.updated_at = _now()

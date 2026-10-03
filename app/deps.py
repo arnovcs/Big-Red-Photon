@@ -1,7 +1,8 @@
 """Builds provider instances from settings.
 
-The LLM and finance providers are injected (real ones arrive in Stages 3 and 5), so
-tests can pass stubs. With no LLM, planning continues with empty preferences (§10).
+The LLM and finance providers can be injected, so tests can pass stubs. Finance
+defaults to Nessie when NESSIE_API_KEY is set (Stage 5). With no LLM, planning
+continues with empty preferences (§10).
 """
 
 from collections.abc import Callable
@@ -18,6 +19,7 @@ from app.providers.protocols import (
     PlacesProvider,
     RoutingProvider,
 )
+from app.providers.real.nessie import NessieFinance
 from app.providers.real.photon import PhotonMessaging
 from app.settings import Settings
 
@@ -59,6 +61,6 @@ def build_deps(
         places=MockPlaces(),
         routing=MockRouting(settings),
         llm=llm,
-        finance=finance,
+        finance=finance or (NessieFinance(settings) if settings.nessie_api_key else None),
         clock=clock or utcnow,
     )

@@ -101,6 +101,9 @@ class StubLLM:
 def harness(tmp_path):
     settings = Settings(
         _env_file=None,
+        # Pin these so shell variables (e.g. PROVIDER_MESSAGING=photon) can't leak in.
+        provider_messaging="sim",
+        nessie_api_key="",
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'e2e.db'}",
         poll_timeout_sec=3600,
     )

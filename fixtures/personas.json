@@ -1,0 +1,109 @@
+{
+  "merchants": [
+    {
+      "key": "bagels",
+      "name": "Collegetown Bagels",
+      "category": "restaurant",
+      "nessie_merchant_id": "db0d355f-ea74-4c0f-9180-715829caa3dc"
+    },
+    {
+      "key": "cinema",
+      "name": "Cinemapolis",
+      "category": "entertainment",
+      "nessie_merchant_id": "474d1801-7216-4817-a1b4-445f7daab141"
+    },
+    {
+      "key": "grocery",
+      "name": "Wegmans",
+      "category": "grocery",
+      "nessie_merchant_id": "dcfb313f-57ab-42fd-adf2-b76070438c3c"
+    }
+  ],
+  "personas": [
+    {
+      "name": "Maya",
+      "bank_code": "MAYA1",
+      "expected_limit": 30,
+      "checking_balance": 1200,
+      "bills": [
+        {
+          "payee": "Rent share",
+          "amount": 400
+        }
+      ],
+      "purchases": [
+        {
+          "merchant": "bagels",
+          "amount": 18
+        },
+        {
+          "merchant": "cinema",
+          "amount": 22
+        },
+        {
+          "merchant": "bagels",
+          "amount": 25
+        },
+        {
+          "merchant": "bagels",
+          "amount": 30
+        }
+      ],
+      "nessie_customer_id": "1f0d8698-2def-4d31-a55b-c5dcc379d5a9"
+    },
+    {
+      "name": "Sam",
+      "bank_code": "SAM1",
+      "expected_limit": 50,
+      "checking_balance": 3500,
+      "bills": [
+        {
+          "payee": "Phone",
+          "amount": 150
+        }
+      ],
+      "purchases": [
+        {
+          "merchant": "bagels",
+          "amount": 35
+        },
+        {
+          "merchant": "cinema",
+          "amount": 40
+        },
+        {
+          "merchant": "bagels",
+          "amount": 50
+        },
+        {
+          "merchant": "grocery",
+          "amount": 120
+        }
+      ],
+      "nessie_customer_id": "4257e5da-6051-4272-90d3-80e2326daa03"
+    },
+    {
+      "name": "Jordan",
+      "bank_code": "JORDAN1",
+      "expected_limit": 15,
+      "checking_balance": 500,
+      "bills": [
+        {
+          "payee": "Tuition payment",
+          "amount": 300
+        }
+      ],
+      "purchases": [
+        {
+          "merchant": "bagels",
+          "amount": 12
+        },
+        {
+          "merchant": "cinema",
+          "amount": 15
+        }
+      ],
+      "nessie_customer_id": "69921357-04bb-432f-9e16-91ce1dd3e060"
+    }
+  ]
+}
