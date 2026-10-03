@@ -18,6 +18,7 @@ from app.providers.protocols import (
     PlacesProvider,
     RoutingProvider,
 )
+from app.providers.real.photon import PhotonMessaging
 from app.settings import Settings
 
 
@@ -43,15 +44,18 @@ def build_deps(
     finance: FinanceProvider | None = None,
     clock: Callable[[], datetime] | None = None,
 ) -> Deps:
-    if settings.provider_messaging != "sim":
-        raise NotImplementedError("Photon messaging arrives in Stage 6; use PROVIDER_MESSAGING=sim")
+    messaging: MessagingProvider
+    if settings.provider_messaging == "photon":
+        messaging = PhotonMessaging(settings)
+    else:
+        messaging = SimMessaging()
     if settings.provider_places != "mock":
         raise NotImplementedError("OSM places arrive in Stage 4; use PROVIDER_PLACES=mock")
     if settings.provider_routing != "mock":
         raise NotImplementedError("ORS routing arrives in Stage 4; use PROVIDER_ROUTING=mock")
     return Deps(
         settings=settings,
-        messaging=SimMessaging(),
+        messaging=messaging,
         places=MockPlaces(),
         routing=MockRouting(settings),
         llm=llm,
