@@ -14,6 +14,7 @@ from app.providers.real.google_places import (
     CATEGORY_TYPES,
     EXCLUDED_PRIMARY_TYPES,
     FIELD_MASK,
+    LOOKUP_FIELD_MASK,
     GooglePlaces,
     hours_status,
     place_cost,
@@ -31,7 +32,6 @@ CENTER = LatLng(lat=42.444049, lng=-76.483012)
 SETTINGS = Settings(
     _env_file=None,
     google_places_api_key="k",
-    venues_path=str(FIXTURES / "venues_test.json"),
 )
 
 
@@ -48,11 +48,10 @@ def test_priced_restaurant_maps_to_candidate() -> None:
     assert c.source == "google"
 
 
-def test_missing_price_is_estimated_from_category() -> None:
+def test_missing_price_is_unknown_never_guessed() -> None:
     c = to_candidate(PLACES["ChIJgimme"], "cafe", SAT_6PM)
-    assert c.est_cost_pp.value == 12
-    assert c.est_cost_pp.status == "estimated"
-    assert c.est_cost_pp.source == "category_estimate"
+    assert c.est_cost_pp.value is None
+    assert c.est_cost_pp.status == "unknown"
     assert c.cuisines == ["coffee"]
 
 
@@ -113,9 +112,11 @@ class StubGoogle(GooglePlaces):
         super().__init__(SETTINGS, RecordReplayCache("off"))
         self.response = response
         self.bodies: list[dict] = []
+        self.calls: list[tuple] = []
 
-    async def _post(self, body: dict) -> dict:
+    async def _post(self, body: dict, url=None, field_mask=None, method="search_nearby") -> dict:
         self.bodies.append(body)
+        self.calls.append((method, field_mask))
         if isinstance(self.response, Exception):
             raise self.response
         return self.response
@@ -154,29 +155,56 @@ async def test_same_place_in_two_categories_appears_once() -> None:
     assert {c.category for c in results} == {"food"}  # first category wins
 
 
-async def test_google_failure_falls_back_to_curated_fixture() -> None:
+async def test_google_failure_means_no_venues_not_a_local_list() -> None:
     results = await StubGoogle(ConnectionError("down")).search_nearby(CENTER, 2500, [], SAT_6PM)
-    assert results
-    assert {c.source for c in results} == {"osm_fixture"}
+    assert results == []
 
 
-async def test_geocoding_is_not_limited_to_the_demo_area() -> None:
-    class FakeCache:
-        requests: list = []
+# --- typed places: Text Search ------------------------------------------------------------
 
-        async def call(self, provider, method, request, fn):
-            self.requests.append(request)
-            return [{"lat": "40.7580", "lon": "-73.9855", "name": "Times Square"}]
+BARBERSHOP = {  # a Text Search result, shaped like Places API (New)
+    "places": [
+        {
+            "id": "ChIJyoungboys",
+            "displayName": {"text": "Young Boys barbershop", "languageCode": "en"},
+            "location": {"latitude": 42.4418, "longitude": -76.4853},
+            "shortFormattedAddress": "111 Dryden Rd Apt D, Ithaca",
+            "formattedAddress": "111 Dryden Rd Apt D, Ithaca, NY 14850, USA",
+        }
+    ]
+}
 
-    settings = SETTINGS.model_copy(update={"nominatim_user_agent": "test/0.1 (t@example.com)"})
-    g = GooglePlaces(settings, FakeCache())
-    near_nyc = LatLng(lat=40.75, lng=-73.99)
-    coords, label = await g.geocode("times square", near_nyc)
-    assert label == "Times Square"
-    params = g.fallback.cache.requests[0]
-    assert params["bounded"] == 0
-    x1, y1, x2, y2 = (float(v) for v in params["viewbox"].split(","))
-    assert x1 < near_nyc.lng < x2 and y2 < near_nyc.lat < y1  # prefers results near them
+
+async def test_typed_place_is_resolved_with_text_search_biased_to_ithaca() -> None:
+    g = StubGoogle(BARBERSHOP)
+    near = LatLng(lat=42.44, lng=-76.50)
+    place = await g.geocode("  I'm at   Young Boys Barbershop ", near)
+    assert place.label == "Young Boys barbershop, 111 Dryden Rd Apt D, Ithaca"
+    assert place.place_id == "ChIJyoungboys"
+    assert (place.location.lat, place.location.lng) == (42.4418, -76.4853)
+    [body] = g.bodies
+    assert body["textQuery"] == "I'm at Young Boys Barbershop"
+    assert body["pageSize"] == 1
+    circle = body["locationBias"]["circle"]  # a bias (not a limit) around Ithaca
+    assert circle == {"center": {"latitude": 42.44, "longitude": -76.5}, "radius": 10000.0}
+    [(method, mask)] = g.calls
+    assert method == "lookup" and mask == LOOKUP_FIELD_MASK
+    assert "priceLevel" not in mask and "rating" not in mask  # cheap lookup fields only
+
+
+async def test_nothing_found_or_google_down_is_none_never_a_default() -> None:
+    near = LatLng(lat=42.44, lng=-76.50)
+    assert await StubGoogle({}).geocode("asdkjh qwe zzz", near) is None
+    assert await StubGoogle({"places": []}).geocode("asdkjh qwe zzz", near) is None
+    assert await StubGoogle(ConnectionError("down")).geocode("olin", near) is None
+    assert await StubGoogle(BARBERSHOP).geocode("   ", near) is None
+
+
+async def test_free_text_venue_search_returns_candidates() -> None:
+    g = StubGoogle(SAMPLE)
+    results = await g.text_search("cheap food near Collegetown", CENTER)
+    assert results and all(c.source == "google" for c in results)
+    assert g.bodies[0]["textQuery"] == "cheap food near Collegetown"
 
 
 # --- real prices (priceRange) -------------------------------------------------------
@@ -198,24 +226,25 @@ def test_price_range_beats_the_price_level_tier() -> None:
 
 def test_open_ended_and_foreign_price_ranges() -> None:
     open_ended = {"priceRange": {"startPrice": {"currencyCode": "USD", "units": "50"}}}
-    cost = place_cost(open_ended, "food")
+    cost = place_cost(open_ended)
     assert (cost.value, cost.high) == (50, None)  # "More than $50"
     euros = {
         "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
         "priceRange": {"startPrice": {"currencyCode": "EUR", "units": "10"}},
     }
-    assert place_cost(euros, "food").source == "google"  # USD-only: falls back to the tier
+    assert place_cost(euros).source == "google"  # USD-only: falls back to the tier
     cents = {
         "priceRange": {"startPrice": {"currencyCode": "USD", "units": "9", "nanos": 500000000}}
     }
-    assert place_cost(cents, "food").value == Decimal("9.5")
+    assert place_cost(cents).value == Decimal("9.5")
 
 
-def test_parks_and_animals_are_activities_and_parks_are_free() -> None:
+def test_parks_and_animals_are_activities_and_unpriced_places_are_unknown() -> None:
     for t in ("park", "hiking_area", "zoo", "aquarium", "museum"):
         assert t in CATEGORY_TYPES["activity"]
-    assert place_cost({"primaryType": "state_park"}, "activity").value == 0
-    assert place_cost({"primaryType": "museum"}, "activity").value == 12  # $ estimate
+    assert place_cost({"primaryType": "state_park"}).status == "unknown"  # no guessing
+    free = {"primaryType": "park", "priceLevel": "PRICE_LEVEL_FREE"}
+    assert place_cost(free).value == 0  # Google says it's free
 
 
 def test_activities_get_their_kind_for_variety_and_the_poll() -> None:

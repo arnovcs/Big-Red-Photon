@@ -37,14 +37,14 @@ GOOGLE_TRAVEL_MODE = {
 }
 
 
-def directions_url(destination: LatLng, mode: Mode) -> str:
-    """Google Maps directions to the venue. No origin: Maps starts from the phone's
-    current location, so nobody's starting point ever goes into a message."""
-    query = {
-        "api": "1",
-        "destination": f"{destination.lat:.5f},{destination.lng:.5f}",
-        "travelmode": GOOGLE_TRAVEL_MODE[mode],
-    }
+def directions_url(destination: LatLng, mode: Mode, origin: LatLng | None = None) -> str:
+    """Google Maps directions to the venue, from this person's own starting point (the
+    link only ever goes into their own DM). No origin: Maps uses the phone's location."""
+    query = {"api": "1"}
+    if origin is not None:
+        query["origin"] = f"{origin.lat:.5f},{origin.lng:.5f}"
+    query["destination"] = f"{destination.lat:.5f},{destination.lng:.5f}"
+    query["travelmode"] = GOOGLE_TRAVEL_MODE[mode]
     return "https://www.google.com/maps/dir/?" + urlencode(query)
 
 
@@ -54,6 +54,7 @@ def itinerary_text(
     steps: list[RouteStep],
     tz: ZoneInfo,
     pickup_wait_min: int,
+    origin: LatLng | None = None,
 ) -> str:
     venue = plan.candidate
     leave_local = assignment.leave_by.astimezone(tz)
@@ -72,23 +73,26 @@ def itinerary_text(
     ]
     if assignment.mode != Mode.RIDESHARE:
         lines.extend(f"• {step.instruction}" for step in steps[:MAX_STEPS_SHOWN])
-    lines.append(copy.maps_line(directions_url(venue.location, assignment.mode)))
+    lines.append(copy.maps_line(directions_url(venue.location, assignment.mode, origin)))
     food = _food_cost(plan, assignment)
     lines.append(copy.cost_line(arrive_local, food, assignment.fare_usd, assignment.mode.value))
     return "\n".join(lines)
 
 
-def _food_cost(plan: Plan, assignment: PersonAssignment) -> Decimal:
-    value = plan.candidate.est_cost_pp.value
-    return value if value is not None else assignment.venue_cost_usd
+def _food_cost(plan: Plan, assignment: PersonAssignment) -> Decimal | None:
+    """The venue's own estimate; None when Google has no price (never the stand-in)."""
+    return plan.candidate.est_cost_pp.value
 
 
 def own_amounts(plan: Plan, assignment: PersonAssignment) -> frozenset[int]:
     """The whole-dollar amounts this person's own itinerary shows (food, fare, total)."""
     food = _food_cost(plan, assignment)
-    return frozenset(
-        int(x.quantize(Decimal(1))) for x in (food, assignment.fare_usd, food + assignment.fare_usd)
+    amounts = (
+        [assignment.fare_usd]
+        if food is None
+        else [food, assignment.fare_usd, food + assignment.fare_usd]
     )
+    return frozenset(int(x.quantize(Decimal(1))) for x in amounts)
 
 
 @dataclass(frozen=True)
@@ -119,16 +123,34 @@ async def prepare(deps: Deps, session_id: uuid.UUID, plan: Plan) -> list[Itinera
         if user is None:
             continue
         steps: list[RouteStep] = []
+        # This member's own starting point → the venue: one Routes call per person.
         origin = origins.get(user.id)
+        source = "none"
         if origin is not None:
             try:
                 detail = await deps.routing.route(
                     origin, plan.candidate.location, assignment.mode, depart_at=assignment.leave_by
                 )
-                steps = detail.steps
+                steps, source = detail.steps, detail.source
             except Exception:
                 log.warning(kv("route_detail_failed", mode=assignment.mode.value), exc_info=True)
-        text = itinerary_text(plan, assignment, steps, tz, deps.settings.rideshare_pickup_wait_min)
+        log.info(
+            kv(
+                "member_route",
+                user=user.id.hex[:8],
+                mode=assignment.mode.value,
+                has_origin=origin is not None,
+                source=source,
+                steps=len(steps),
+            )
+        )
+        if origin is not None:  # coordinates: DEBUG only (CLAUDE.md rule 7)
+            log.debug(
+                kv("member_route_origin", user=user.id.hex[:8], lat=origin.lat, lng=origin.lng)
+            )
+        text = itinerary_text(
+            plan, assignment, steps, tz, deps.settings.rideshare_pickup_wait_min, origin
+        )
         personal.append(
             Itinerary(user.handle, PrivateMessage(text=text), own_amounts(plan, assignment))
         )

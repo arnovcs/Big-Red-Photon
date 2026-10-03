@@ -24,23 +24,38 @@ class Uncertain[T](BaseModel):
     low: T | None = None
     high: T | None = None
     status: Literal["known", "estimated", "unknown"]
-    source: str  # "osm_fixture" | "hand_entered" | "formula" | "ors" | "gemini:<url>"
+    source: str  # "google" | "google_price_range" | "formula" | "ors" | "gemini:<url>"
 
 
 class Candidate(BaseModel):
-    candidate_id: str  # "osm:<node|way>/<id>" | "google:<place id>" | "ev:<hash>"
+    candidate_id: str  # "google:<place id>"
     name: str
     category: str  # food | bar | cafe | dessert | activity | event
     cuisines: list[str] = []
-    location: LatLng  # REQUIRED, from the OSM fixture or Nominatim — never from the LLM
+    location: LatLng  # REQUIRED, from Google Places — never from the LLM
     address: str
     est_cost_pp: Uncertain[Decimal]
     open_at_target: Literal["open", "closed", "unknown"] = "unknown"
     closes_at: datetime | None = None
     typical_duration_min: int  # category default: food 60, cafe 45, dessert 30, bar 90, activity 90
     rating: float | None = None
-    source: Literal["osm_fixture", "google", "event"]
-    novelty_tags: list[str] = []
+    source: Literal["google", "event"]
+
+
+class ResolvedPlace(BaseModel):
+    """A place someone typed ("Young Boys Barbershop"), resolved by Google Places."""
+
+    location: LatLng
+    name: str
+    address: str  # short address, e.g. "111 Dryden Rd Apt D, Ithaca"; may be ""
+    place_id: str | None = None
+
+    @property
+    def label(self) -> str:
+        """What we confirm back: "Young Boys barbershop, 111 Dryden Rd Apt D, Ithaca"."""
+        if not self.address or self.address.lower().startswith(self.name.lower()):
+            return self.address or self.name
+        return f"{self.name}, {self.address}"
 
 
 class EventFinding(BaseModel):

@@ -105,7 +105,7 @@ def _option_line(option: GroupPlanOption) -> str:
     )
     return (
         f"{option.label}: {option.title} · ≤{option.max_travel_min} min for everyone · "
-        f"{option.price_tier} · {arrival}"
+        f"{'price ?' if option.price_tier == '?' else option.price_tier} · {arrival}"
     )
 
 
@@ -169,9 +169,10 @@ ASK_LOCATION = (
     '"done"), or type a landmark like "Olin Library" or "Collegetown".'
 )
 LOCATION_NOT_FOUND = (
-    'I couldn\'t find that. Share your location with me and say "done", or try a nearby '
-    'landmark like "Olin Library".'
+    "I couldn't find that place. Try the name of a business or building near you, "
+    'like "Collegetown Bagels", or share your location with me and say "done".'
 )
+LIVE_LOCATION_LABEL = "your live location"
 LOCATION_FIRST = (
     'Almost done! First, where are you starting from? Share your location and say "done", '
     'or type a landmark like "Olin Library".'
@@ -255,7 +256,11 @@ def maps_line(url: str) -> str:
     return f"🗺️ Directions: {url}"
 
 
-def cost_line(arrive_local: datetime, food: Decimal, fare: Decimal, mode: str) -> str:
+def cost_line(arrive_local: datetime, food: Decimal | None, fare: Decimal, mode: str) -> str:
+    if food is None:  # Google has no price for this venue
+        fare_name = "ride" if mode == "rideshare" else "gas + parking"
+        travel = f"{fare_name} {approx_usd(fare)} + " if fare > 0 else ""
+        return f"Arrive ~{clock_time(arrive_local)}. Cost: {travel}food (price unknown)."
     total = approx_usd(food + fare)
     if fare > 0:
         fare_name = "ride" if mode == "rideshare" else "gas + parking"

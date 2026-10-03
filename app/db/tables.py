@@ -62,6 +62,7 @@ class PrivateProfileRow(Base):
     # When the person last TYPED their origin (None = it came from location sharing).
     # A typed origin wins over live location for the plan it was typed in.
     origin_typed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    origin_place_id: Mapped[str | None] = mapped_column(String, nullable=True)  # Google's id
     modes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

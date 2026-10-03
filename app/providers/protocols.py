@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Protocol
 
-from app.models.candidates import Candidate, EventFinding
+from app.models.candidates import Candidate, EventFinding, ResolvedPlace
 from app.models.conversation import GroupPreferences, PseudonymousMessage
 from app.models.outbound import GroupSafeMessage, PrivateMessage
 from app.models.private import FinancialSnapshot, LatLng
@@ -49,11 +49,9 @@ class PlacesProvider(Protocol):
 
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
 
-    async def geocode(self, text: str, near: LatLng) -> tuple[LatLng, str] | None:
-        """Returns (coords, clean label), or None if nothing matched.
-
-        Checks demo_locations first, then Nominatim.
-        """
+    async def geocode(self, text: str, near: LatLng) -> ResolvedPlace | None:
+        """The place someone typed, searched near `near`. None if nothing matched or the
+        lookup failed: callers ask the person to rephrase, never substitute a default."""
         ...
 
 

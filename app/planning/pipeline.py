@@ -164,6 +164,8 @@ class PlanningResult:
     facts: list[dict] = field(default_factory=list)  # group-safe, one per plan (§13.8)
     hint: str | None = None  # "nothing fits" suggestion, when plans is []
     blurbs: list[str] = field(default_factory=list)  # checked explanations (§13.8)
+    # Members with no starting point (or travel answer): asked, never given a default.
+    missing: list[uuid.UUID] = field(default_factory=list)
 
 
 async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> PlanningResult:
@@ -192,11 +194,16 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
         await db.commit()
         pid_map = make_pid_map([m.id for m in members])
         constraints = await vault.constraints_for(db, pid_map)
+        missing = [uid for pid, uid in pid_map.items() if pid not in constraints]
         pid_map = {pid: uid for pid, uid in pid_map.items() if pid in constraints}
         user_to_pid = {uid: pid for pid, uid in pid_map.items()}
         transcript = await _transcript(db, session, user_to_pid, tz)
 
     empty = GroupPreferences(constraints=[], group_intent="either")
+    log.info(kv("planning_members", ready=len(pid_map), missing=len(missing)))
+    if missing:
+        # Someone has no starting point: ask them rather than plan without (or for) them.
+        return PlanningResult(pid_map=pid_map, preferences=empty, plans=[], missing=missing)
     if len(pid_map) < 2:
         return PlanningResult(pid_map=pid_map, preferences=empty, plans=[])
 

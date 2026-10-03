@@ -13,14 +13,16 @@ from app.conversation.commands import (
 from app.db import queries
 from app.db.tables import UserRow
 from app.deps import Deps
+from app.logging import get_logger, kv
 from app.messaging.outbound import send_private
 from app.models.identity import OnboardingState
 from app.models.outbound import PrivateMessage
 from app.models.private import LatLng
 from app.private import vault
-from app.providers.mock.places import load_demo_locations, near_label
 
 # Short replies that mean "I shared my location" rather than a place name.
+log = get_logger(__name__)
+
 SHARE_REPLIES = {"done", "shared", "shared it", "sent", "sent it", "here", "i shared", "ok done"}
 # Any reply containing one of these ("I shared my live location", "ok") means "look at
 # what I shared", not a place name.
@@ -71,7 +73,7 @@ class Onboarding:
             coords = None
         if coords is None:
             return None
-        return coords, near_label(coords, load_demo_locations())
+        return coords, copy.LIVE_LOCATION_LABEL
 
     async def handle_dm(self, db: AsyncSession, user: UserRow, text: str, first_dm: bool) -> None:
         """Advance a not-yet-READY user by one step."""
@@ -165,29 +167,36 @@ class Onboarding:
             # A command (e.g. @plan) sent mid-setup is not a place name.
             await self._reply(user, copy.LOCATION_FIRST)
             return
-        typed = False
         if is_share_reply(text):
             found = await self._shared_location(user)
             if found is None:
                 await self._reply(user, copy.SHARE_NOT_SEEN)
                 return
-        else:
-            settings = self.deps.settings
-            center = LatLng(lat=settings.demo_center_lat, lng=settings.demo_center_lng)
-            try:
-                found = await self.deps.places.geocode(text, center)
-            except Exception:
-                found = None
-            typed = found is not None
-            if found is None:
-                # Not a place we know; maybe they shared their location instead.
-                found = await self._shared_location(user)
-            if found is None:
-                await self._reply(user, copy.LOCATION_NOT_FOUND)
-                return
-        coords, label = found
-        await vault.set_origin(db, user.id, coords, label, typed=typed)
-        await self._reply(user, copy.confirm_location(label))
+            coords, label = found
+            await vault.set_origin(db, user.id, coords, label)
+            log.info(kv("origin_stored", user=user.id.hex[:8], source="shared"))
+            await self._reply(user, copy.confirm_location(label))
+            return
+
+        # Typed text: Google Places only. Nothing found (or Google down) → ask them to
+        # rephrase. Never substitute a default or their shared location: that was the
+        # "near Olin Library" loop.
+        settings = self.deps.settings
+        center = LatLng(lat=settings.demo_center_lat, lng=settings.demo_center_lng)
+        log.debug(kv("location_text", user=user.id.hex[:8], text=text))
+        try:
+            place = await self.deps.places.geocode(text, center)
+        except Exception:
+            place = None
+        if place is None:
+            log.info(kv("origin_not_found", user=user.id.hex[:8]))
+            await self._reply(user, copy.LOCATION_NOT_FOUND)
+            return
+        await vault.set_origin(
+            db, user.id, place.location, place.label, typed=True, place_id=place.place_id
+        )
+        log.info(kv("origin_stored", user=user.id.hex[:8], source="typed"))
+        await self._reply(user, copy.confirm_location(place.label))
 
     async def ask_trip_modes(self, db: AsyncSession, user: UserRow) -> None:
         """At @plan / join: forget last time's answer and ask how they're getting there."""

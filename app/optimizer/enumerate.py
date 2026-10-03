@@ -113,6 +113,15 @@ def _build_plan(
     )
 
 
+def unknown_price_stand_in(candidates: list[Candidate]) -> Decimal | None:
+    """Median budget-check cost of the venues that do have a price (None if none do)."""
+    costs = sorted(c for c, unknown in map(venue_cost, candidates) if c is not None and not unknown)
+    if not costs:
+        return None
+    mid = len(costs) // 2
+    return costs[mid] if len(costs) % 2 else (costs[mid - 1] + costs[mid]) / 2
+
+
 def rank(
     candidates: list[Candidate],
     estimates: EstimateIndex,
@@ -132,11 +141,16 @@ def rank(
     ready = {pid: arrival.ready_time(pid, preferences, now, params) for pid in pids}
     limits = {pid: hard_limits(pid, preferences, now) for pid in pids}
 
+    stand_in = unknown_price_stand_in(candidates)
     plans = []
     for candidate in candidates:
         cost, price_unknown = venue_cost(candidate)
+        if cost is None and price_unknown:
+            # No price from Google: use what nearby venues actually cost (never a guess
+            # by category). The unknown-price safety margin then applies in budgets.
+            cost = stand_in
         if cost is None or is_vetoed(candidate, preferences) or is_known_closed(candidate):
-            continue  # no price to check against budgets, vetoed, or closed
+            continue  # no price at all nearby to check budgets against, vetoed, or closed
         per_person = [
             _person_options(
                 pid,

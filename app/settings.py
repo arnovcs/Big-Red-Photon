@@ -30,11 +30,6 @@ class Settings(BaseSettings):
     # Routes API; empty = use the Places key (same Google Cloud project).
     google_routes_api_key: str = ""
 
-    # OpenStreetMap community services
-    nominatim_base_url: str = "https://nominatim.openstreetmap.org"
-    nominatim_user_agent: str = ""  # required by Nominatim's usage policy
-    overpass_url: str = "https://overpass-api.de/api/interpreter"  # scripts/fetch_venues.py only
-
     # Capital One Nessie
     nessie_api_key: str = ""
     nessie_base_url: str = "http://api.nessieisreal.com"
@@ -48,7 +43,8 @@ class Settings(BaseSettings):
 
     # Provider selection
     provider_messaging: Literal["photon", "sim"] = "sim"
-    provider_places: Literal["google", "osm", "mock"] = "mock"
+    # All place data comes from Google Places (no local venue/landmark files).
+    provider_places: Literal["google"] = "google"
     # google = Google Routes for every mode (live traffic for driving), ORS as fallback.
     provider_routing: Literal["google", "ors", "mock"] = "mock"
     provider_finance: Literal["nessie"] = "nessie"
@@ -56,14 +52,12 @@ class Settings(BaseSettings):
     # Record/replay cache (§14.1)
     cache_mode: Literal["off", "record", "replay"] = "off"
 
-    # Hand-curated venue fixture (§9.3). Tests point this at tests/fixtures/.
-    venues_path: str = "fixtures/venues.json"
-
     # Demo area
     demo_timezone: str = "America/New_York"
     demo_area_label: str = "Ithaca, NY"
-    demo_center_lat: float = 42.4440
-    demo_center_lng: float = -76.4830
+    # Typed places are searched near here (a 10 km bias, not a limit): central Ithaca.
+    demo_center_lat: float = 42.44
+    demo_center_lng: float = -76.50
 
     # Own car
     drive_cost_per_mile_usd: Decimal = Decimal("0.20")

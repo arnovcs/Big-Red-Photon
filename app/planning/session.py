@@ -235,6 +235,16 @@ class PlanningSessions:
             if session is None or session.state != SessionState.RUNNING:
                 return  # cancelled while the pipeline ran
 
+            if result is not None and result.missing:
+                users = await queries.users_by_ids(db, result.missing)
+                for member in users.values():
+                    member.onboarding_state = OnboardingState.AWAITING_LOCATION
+                    await self._reply(member, copy.ASK_TRIP_LOCATION)
+                session.state = SessionState.COLLECTING
+                await db.commit()
+                names = [m.display_name or "someone" for m in users.values()]
+                await self._tell_group(db, group_id, session_id, copy.waiting_on(names))
+                return
             if result is None:
                 notice = copy.PIPELINE_FAILED
             elif len(result.pid_map) < MIN_GROUP_SIZE:

@@ -39,7 +39,7 @@ def venue(
         address="1 Test St",
         est_cost_pp=cost if cost is not None else tier_cost(tier),
         typical_duration_min=DEFAULT_DURATION_MIN[category],
-        source="osm_fixture",
+        source="google",
         **extra,
     )
 

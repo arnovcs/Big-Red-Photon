@@ -10,12 +10,17 @@ open point and no close. utcOffsetMinutes gives the venue's own timezone, so
 
 One call per category the group wants, through the record/replay cache, plus one
 call for the cuisines people asked for (e.g. "japanese" → japanese, sushi, ramen...
-restaurant types), so matching places are among the options. If Google
-fails or finds nothing, the curated fixture (OsmPlaces) answers instead.
-Geocoding stays on demo landmarks + Nominatim, without the demo-area restriction.
+restaurant types), so matching places are among the options. Google is the only
+source of place data: if it fails or finds nothing, the result is empty and the bot
+says so (no local fallback list).
+
+Typed places ("Young Boys Barbershop", "I'm at Collegetown Bagels") are resolved
+with Text Search: POST https://places.googleapis.com/v1/places:searchText,
+{textQuery, pageSize, locationBias: {circle: {center, radius}}} — biased to, not
+restricted to, the area around `near` (LOOKUP_BIAS_RADIUS_M).
 
 Prices: priceRange (real "$10–20" per person, USD) when Google has it, else the
-priceLevel tier, else a category estimate. Budgets check the range's high end.
+priceLevel tier, else unknown (never guessed; the optimizer decides what to do).
 
 Only real, open-for-customers venues are kept: businessStatus OPERATIONAL, not a
 "pure service area business" (caterers, home kitchens: no storefront), and at least
@@ -31,18 +36,24 @@ import httpx
 from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt
 
 from app.logging import get_logger, kv
-from app.models.candidates import DEFAULT_DURATION_MIN, Candidate, Uncertain
+from app.models.candidates import DEFAULT_DURATION_MIN, Candidate, ResolvedPlace, Uncertain
 from app.models.private import LatLng
 from app.optimizer import cuisines as cuisine_families
 from app.providers.cache import RecordReplayCache
 from app.providers.costs import tier_cost
 from app.providers.opening_hours import Status
-from app.providers.real.osm_places import OsmPlaces
 from app.settings import Settings
 
 log = get_logger(__name__)
 
 NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby"
+TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText"
+# Typed-place lookups need only these (Text Search "Pro" fields: no price/rating).
+LOOKUP_FIELD_MASK = (
+    "places.id,places.displayName,places.location,"
+    "places.shortFormattedAddress,places.formattedAddress"
+)
+LOOKUP_BIAS_RADIUS_M = 10_000.0
 FIELDS = [
     "id",
     "displayName",
@@ -108,18 +119,6 @@ PRICE_TIERS = {
     "PRICE_LEVEL_MODERATE": "$$",
     "PRICE_LEVEL_EXPENSIVE": "$$$",
     "PRICE_LEVEL_VERY_EXPENSIVE": "$$$$",
-}
-# When Google has no price level: a typical tier for the category, marked estimated.
-CATEGORY_DEFAULT_TIER = {"food": "$$", "cafe": "$", "bar": "$$", "dessert": "$", "activity": "$"}
-# Places that are free to visit unless Google says otherwise.
-FREE_PRIMARY_TYPES = {
-    "park",
-    "state_park",
-    "national_park",
-    "hiking_area",
-    "botanical_garden",
-    "garden",
-    "wildlife_refuge",
 }
 CUISINE_FROM_TYPE = {
     "coffee_shop": "coffee",
@@ -257,17 +256,29 @@ def price_from_range(place: dict) -> Uncertain[Decimal] | None:
     )
 
 
-def place_cost(place: dict, category: str) -> Uncertain[Decimal]:
-    """Best price we have: real range, then Google's $ level, then a category guess."""
+def place_cost(place: dict) -> Uncertain[Decimal]:
+    """Best price Google has: the real range, then its $ level, else unknown (no guess)."""
     from_range = price_from_range(place)
     if from_range is not None:
         return from_range
     tier = PRICE_TIERS.get(place.get("priceLevel", ""))
     if tier is not None:
         return tier_cost(tier, source="google")
-    if place.get("primaryType") in FREE_PRIMARY_TYPES:
-        return tier_cost("free", source="category_estimate")
-    return tier_cost(CATEGORY_DEFAULT_TIER.get(category), source="category_estimate")
+    return Uncertain[Decimal](value=None, status="unknown", source="google")
+
+
+def to_resolved_place(place: dict) -> ResolvedPlace | None:
+    """A Text Search result → the place someone typed. None without a name or location."""
+    location = place.get("location") or {}
+    name = (place.get("displayName") or {}).get("text")
+    if not name or "latitude" not in location or "longitude" not in location:
+        return None
+    return ResolvedPlace(
+        location=LatLng(lat=location["latitude"], lng=location["longitude"]),
+        name=name,
+        address=place.get("shortFormattedAddress") or place.get("formattedAddress") or "",
+        place_id=place.get("id"),
+    )
 
 
 def to_candidate(place: dict, category: str, at: datetime) -> Candidate | None:
@@ -277,7 +288,7 @@ def to_candidate(place: dict, category: str, at: datetime) -> Candidate | None:
     name = (place.get("displayName") or {}).get("text")
     if not name or "latitude" not in location or "longitude" not in location:
         return None
-    cost = place_cost(place, category)
+    cost = place_cost(place)
     status, closes_at = hours_status(place, at)
     return Candidate(
         candidate_id=f"google:{place.get('id', name)}",
@@ -299,10 +310,16 @@ class GooglePlaces:
     def __init__(self, settings: Settings, cache: RecordReplayCache) -> None:
         self.settings = settings
         self.cache = cache
-        # Fixture search as the fallback; geocoding without the demo-area restriction.
-        self.fallback = OsmPlaces(settings, cache, bounded=False)
 
-    async def _post(self, body: dict) -> dict:
+    async def _post(
+        self,
+        body: dict,
+        url: str = NEARBY_URL,
+        field_mask: str = FIELD_MASK,
+        method: str = "search_nearby",
+    ) -> dict:
+        """POST through the record/replay cache. Retries network errors / 5xx once."""
+
         async def live() -> dict:
             start = time.monotonic()
             async for attempt in AsyncRetrying(
@@ -313,11 +330,11 @@ class GooglePlaces:
                 with attempt:
                     async with httpx.AsyncClient(timeout=self.settings.http_timeout_sec) as c:
                         response = await c.post(
-                            NEARBY_URL,
+                            url,
                             json=body,
                             headers={
                                 "X-Goog-Api-Key": self.settings.google_places_api_key,
-                                "X-Goog-FieldMask": FIELD_MASK,
+                                "X-Goog-FieldMask": field_mask,
                             },
                         )
                         response.raise_for_status()
@@ -325,15 +342,15 @@ class GooglePlaces:
                 kv(
                     "provider_call",
                     provider="google_places",
-                    method="search_nearby",
+                    method=method,
                     status=response.status_code,
                     latency_ms=round((time.monotonic() - start) * 1000),
                 )
             )
             return response.json()
 
-        request = {"body": body, "field_mask": FIELD_MASK}
-        return await self.cache.call("google_places", "search_nearby", request, live)
+        request = {"body": body, "field_mask": field_mask}
+        return await self.cache.call("google_places", method, request, live)
 
     def _nearby_body(
         self, center: LatLng, radius_m: int, type_filter: str, types: list[str], n: int
@@ -388,13 +405,66 @@ class GooglePlaces:
                 candidate = to_candidate(place, category, open_at)
                 if candidate and candidate.candidate_id not in found:
                     found[candidate.candidate_id] = candidate
-        if found:
-            return list(found.values())
-        log.warning(kv("google_places_empty_using_fixture"))
-        return await self.fallback.search_nearby(center, radius_m, categories, open_at)
+        log.info(
+            kv(
+                "venue_candidates",
+                searches=len(searches),
+                found=len(found),
+                categories=",".join(wanted),
+                cuisines=",".join(cuisines or []),
+            )
+        )
+        if not found:
+            log.warning(kv("google_places_no_venues"))
+        return list(found.values())
+
+    def _text_body(self, query: str, near: LatLng, page_size: int) -> dict:
+        return {
+            "textQuery": query,
+            "pageSize": page_size,
+            "locationBias": {
+                "circle": {
+                    "center": {"latitude": round(near.lat, 4), "longitude": round(near.lng, 4)},
+                    "radius": LOOKUP_BIAS_RADIUS_M,
+                }
+            },
+        }
 
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]:
-        return await self.fallback.text_search(query, near)
+        """Venues matching free text ("cheap food near Collegetown"), as candidates."""
+        query = " ".join(query.split())
+        if not query:
+            return []
+        try:
+            response = await self._post(
+                self._text_body(query, near, MAX_RESULTS),
+                TEXT_SEARCH_URL,
+                FIELD_MASK,
+                "search_text",
+            )
+        except Exception as exc:
+            log.warning(kv("google_text_search_failed", error=type(exc).__name__))
+            return []
+        now = datetime.now(UTC)
+        found = [to_candidate(p, "food", now) for p in response.get("places") or []]
+        return [c for c in found if c is not None]
 
-    async def geocode(self, text: str, near: LatLng) -> tuple[LatLng, str] | None:
-        return await self.fallback.geocode(text, near)
+    async def geocode(self, text: str, near: LatLng) -> ResolvedPlace | None:
+        """The place someone typed, via Text Search biased to `near`. None if Google finds
+        nothing or fails: the caller asks them to rephrase (never a default place)."""
+        query = " ".join(text.split())
+        if not query:
+            return None
+        try:
+            response = await self._post(
+                self._text_body(query, near, 1), TEXT_SEARCH_URL, LOOKUP_FIELD_MASK, "lookup"
+            )
+        except Exception as exc:
+            log.warning(kv("place_lookup_failed", error=type(exc).__name__))
+            return None
+        places = response.get("places") or []
+        place = to_resolved_place(places[0]) if places else None
+        # What they typed and where it resolved are private: DEBUG only (CLAUDE.md rule 7).
+        log.info(kv("place_lookup", found=place is not None))
+        log.debug(kv("place_lookup_detail", query=query, result=place.label if place else None))
+        return place

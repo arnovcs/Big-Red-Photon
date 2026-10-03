@@ -5,7 +5,6 @@ import json
 import random
 from datetime import timedelta
 from decimal import Decimal
-from pathlib import Path
 
 from app.models.candidates import Uncertain
 from app.models.conversation import ConstraintField as F
@@ -15,14 +14,12 @@ from app.models.routing import Mode
 from app.optimizer import OptimizerParams, rank, select
 from app.optimizer.facts import nothing_fits_hint, plan_facts
 from app.optimizer.feasibility import allowed_modes
-from app.providers.mock.places import MockPlaces, match_demo_location
 from app.providers.mock.routing import MockRouting
 from app.settings import Settings
-from tests.optimizer_helpers import NOW, index, person, pref, prefs, run, trip, venue
+from tests.optimizer_helpers import HERE, NOW, index, person, pref, prefs, run, trip, venue
+from tests.places_stub import StubPlaces
 
 WALK, BIKE, DRIVE, RIDE = Mode.WALK, Mode.BIKE, Mode.DRIVE, Mode.RIDESHARE
-# A frozen copy: fixtures/venues.json is hand-curated and will change.
-TEST_VENUES = Path(__file__).parent / "fixtures" / "venues_test.json"
 
 
 def ids(plans) -> list[str]:
@@ -50,7 +47,7 @@ def test_budget_filter_drops_plan_one_person_cannot_afford() -> None:
 
 
 def test_unknown_price_must_fit_within_a_safety_margin() -> None:
-    unknown = Uncertain[Decimal](value=Decimal(25), status="unknown", source="osm_fixture")
+    unknown = Uncertain[Decimal](value=Decimal(25), status="unknown", source="google")
     mystery = venue("mystery", cost=unknown)
     estimates = index(trip("p1", "mystery", WALK, 5), trip("p2", "mystery", WALK, 5))
 
@@ -274,7 +271,7 @@ def test_same_inputs_same_order_regardless_of_input_order() -> None:
 
 def test_facts_are_group_safe_aggregates() -> None:
     a = venue("koko", cuisines=("korean",))
-    b = venue("viva", cuisines=("mexican",), novelty_tags=["new_spot"])
+    b = venue("viva", cuisines=("mexican",))
     people = [person("p1", 30), person("p2", 50)]
     estimates = index(
         trip("p1", "koko", WALK, 22),
@@ -285,7 +282,7 @@ def test_facts_are_group_safe_aggregates() -> None:
     preferences = prefs(
         pref("p1", F.CUISINE, "korean", K.SOFT),
         pref("p2", F.CUISINE, "sushi", K.VETO, polarity="avoid"),
-        pref("p2", F.NOVELTY, 1.0, K.SOFT),
+        pref("p2", F.NOVELTY, 1.0, K.SOFT),  # "something new": not scored (no data)
         pref("p1", F.AVAILABLE_UNTIL, "21:00", K.HARD),
     )
     plans = select(run([a, b], estimates, people, preferences), k=3)
@@ -297,7 +294,7 @@ def test_facts_are_group_safe_aggregates() -> None:
     assert koko["vetoes_respected"] == ["sushi"]
     assert koko["matches_group_wants"] == ["korean"]
     viva = next(f for f in facts if f["venue"] == "Viva")
-    assert viva["matches_group_wants"] == ["something new"]
+    assert viva["matches_group_wants"] == []
     assert facts[0]["next_best_max_travel_min"] == facts[1]["max_travel_min"]
     assert facts[-1]["next_best_max_travel_min"] is None
     # No pseudonyms, limits, or personal times anywhere in the facts.
@@ -334,7 +331,7 @@ def test_nothing_fits_hint_names_the_narrowest_soft_venue_preference() -> None:
 def test_demo_origins_sam_rides_and_jordan_walks_with_default_weights() -> None:
     """§18 with realistic starts. Default OptimizerParams: nothing tuned for this outcome."""
     settings = Settings(_env_file=None)
-    locations = json.loads(Path("fixtures/demo_locations.json").read_text())
+    places = StubPlaces()
     starts = {"maya": "collegetown", "sam": "north campus", "jordan": "downtown"}
     people = {
         "maya": person("maya", 30, bike=True),
@@ -343,7 +340,7 @@ def test_demo_origins_sam_rides_and_jordan_walks_with_default_weights() -> None:
     }
     for pid, text in starts.items():
         people[pid] = people[pid].model_copy(
-            update={"origin": match_demo_location(text, locations)[0]}
+            update={"origin": asyncio.run(places.geocode(text, HERE)).location}
         )
     preferences = prefs(
         pref("maya", F.CATEGORY, "food", K.INFERRED),
@@ -357,9 +354,7 @@ def test_demo_origins_sam_rides_and_jordan_walks_with_default_weights() -> None:
         center_lat = sum(o.lat for o in origins.values()) / len(origins)
         center_lng = sum(o.lng for o in origins.values()) / len(origins)
         center = origins["maya"].model_copy(update={"lat": center_lat, "lng": center_lng})
-        candidates = await MockPlaces(venues_path=TEST_VENUES).search_nearby(
-            center, 2500, ["food", "cafe", "dessert"], NOW
-        )
+        candidates = await places.search_nearby(center, 2500, ["food", "cafe", "dessert"], NOW)
         estimates = await MockRouting(settings).matrix(
             origins,
             {c.candidate_id: c.location for c in candidates},
@@ -380,3 +375,48 @@ def test_demo_origins_sam_rides_and_jordan_walks_with_default_weights() -> None:
     # ...and Jordan can't take one: any fare on top of a $15 meal breaks a $15 limit.
     jordan = next(a for a in best.assignments if a.pid == "jordan")
     assert jordan.venue_cost_usd + settings.rideshare_min_fare_usd > Decimal(15)
+
+
+# --- Unknown prices: no guessing by category ------------------------------------------------
+
+
+def test_unknown_price_uses_nearby_median_with_the_safety_margin() -> None:
+    from app.optimizer.enumerate import unknown_price_stand_in
+
+    unpriced = venue(
+        "park",
+        category="activity",
+        cost=Uncertain[Decimal](value=None, status="unknown", source="google"),
+    )
+    cheap, pricey = venue("cheap", tier="$"), venue("pricey", tier="$$$")  # highs 15 and 60
+    assert unknown_price_stand_in([unpriced, cheap, pricey]) == Decimal("37.5")
+    assert unknown_price_stand_in([unpriced]) is None
+
+    estimates = index(*(trip("p1", c, WALK, 5) for c in ("park", "cheap", "pricey")))
+    # $50 limit: stand-in 37.5 ≤ 80% × 50, so the unpriced park is a real option, flagged.
+    plans = {p.plan_id: p for p in run([unpriced, cheap, pricey], estimates, [person("p1", 50)])}
+    assert "price unknown" in plans["park"].risk_flags
+    # $40 limit: 37.5 > 80% × 40, so it's left out rather than risk the budget.
+    plans = {p.plan_id: p for p in run([unpriced, cheap, pricey], estimates, [person("p1", 40)])}
+    assert "park" not in plans
+    # Nothing nearby has a price: nothing to check a budget against, so it's left out.
+    assert run([unpriced], index(trip("p1", "park", WALK, 5)), [person("p1", 50)]) == []
+
+
+def test_poll_and_itinerary_say_price_unknown() -> None:
+    from app.conversation import copy
+    from app.decision.poll import _price_tier
+
+    unpriced = venue(
+        "park",
+        category="activity",
+        cost=Uncertain[Decimal](value=None, status="unknown", source="google"),
+    )
+    cheap = venue("cheap", tier="$")
+    estimates = index(trip("p1", "park", WALK, 5), trip("p1", "cheap", WALK, 5))
+    plan = next(
+        p for p in run([unpriced, cheap], estimates, [person("p1", 50)]) if p.plan_id == "park"
+    )
+    assert _price_tier(plan) == "?"
+    line = copy.cost_line(NOW, None, Decimal(0), "walk")
+    assert "price unknown" in line and "$" not in line

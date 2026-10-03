@@ -29,7 +29,7 @@ def test_models_construct() -> None:
             value=Decimal("25"), status="estimated", source="hand_entered"
         ),
         typical_duration_min=60,
-        source="osm_fixture",
+        source="google",
     )
     est = RouteEstimate(
         origin_pid="p1",
@@ -81,7 +81,7 @@ def test_settings_v2_defaults(monkeypatch) -> None:
     monkeypatch.delenv("PROVIDER_PLACES", raising=False)
     monkeypatch.delenv("PROVIDER_ROUTING", raising=False)
     settings = Settings(_env_file=None)
-    assert settings.provider_places == "mock"
+    assert settings.provider_places == "google"  # the only place data source
     assert settings.provider_routing == "mock"
     assert settings.rideshare_min_fare_usd == Decimal("8.00")
     assert settings.rideshare_pickup_wait_min == 6

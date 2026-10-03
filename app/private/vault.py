@@ -23,11 +23,11 @@ from typing import Literal
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.conversation import copy
 from app.db.tables import PrivateProfileRow
 from app.logging import get_logger, kv
 from app.models.private import LatLng, PrivateConstraints, TravelModes
 from app.private import budget
-from app.providers.mock.places import load_demo_locations, near_label
 from app.providers.protocols import FinanceProvider, MessagingProvider
 
 log = get_logger(__name__)
@@ -113,14 +113,21 @@ async def set_limit(
 
 
 async def set_origin(
-    db: AsyncSession, user_id: uuid.UUID, origin: LatLng, label: str, typed: bool = False
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    origin: LatLng,
+    label: str,
+    typed: bool = False,
+    place_id: str | None = None,
 ) -> None:
-    """`typed`: the person typed this place (it then wins over live location for the
-    plan it was typed in); False when it came from location sharing."""
+    """Stored per person (their own profile row). `typed`: they typed this place (it
+    then wins over live location for the plan it was typed in); False when it came from
+    location sharing. `place_id`: Google's id for a typed place."""
     profile = await _profile(db, user_id)
     if profile is None:
         return
     profile.origin_lat, profile.origin_lng, profile.origin_label = origin.lat, origin.lng, label
+    profile.origin_place_id = place_id
     profile.origin_typed_at = _now() if typed else None
     profile.updated_at = _now()
     await db.flush()
@@ -148,11 +155,10 @@ async def refresh_shared_origins(
     results = await asyncio.gather(
         *(messaging.shared_location(handles[u]) for u in user_ids), return_exceptions=True
     )
-    locations = load_demo_locations()
     refreshed = 0
     for user_id, coords in zip(user_ids, results, strict=True):
         if isinstance(coords, LatLng):
-            await set_origin(db, user_id, coords, near_label(coords, locations))
+            await set_origin(db, user_id, coords, copy.LIVE_LOCATION_LABEL)
             refreshed += 1
     log.info(
         kv(
@@ -170,6 +176,8 @@ async def clear_origin(db: AsyncSession, user_id: uuid.UUID) -> None:
     if profile is None:
         return
     profile.origin_lat = profile.origin_lng = profile.origin_label = None
+    profile.origin_place_id = None
+    profile.origin_typed_at = None
     await db.flush()
 
 

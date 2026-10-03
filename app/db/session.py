@@ -43,7 +43,10 @@ def session_factory() -> async_sessionmaker[AsyncSession]:
 
 # Columns added after the first release: (table, column, SQL type). create_all() makes
 # new tables but never alters existing ones, so existing app.db files get these here.
-ADDED_COLUMNS = [("private_profiles", "origin_typed_at", "DATETIME")]
+ADDED_COLUMNS = [
+    ("private_profiles", "origin_typed_at", "DATETIME"),
+    ("private_profiles", "origin_place_id", "VARCHAR"),
+]
 
 
 async def init_db() -> None:

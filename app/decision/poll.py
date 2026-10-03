@@ -36,6 +36,11 @@ def _walking_level(plan: Plan) -> str:
     return "high"
 
 
+def _price_tier(plan: Plan) -> str:
+    value = plan.candidate.est_cost_pp.value
+    return "?" if value is None else tier_for_cost(value)
+
+
 def build_options(
     plans: list[Plan], facts: list[dict], blurbs: list[str] | None = None
 ) -> list[GroupPlanOption]:
@@ -54,7 +59,7 @@ def build_options(
                 title=_title(plan),
                 max_travel_min=fact["max_travel_min"],
                 walking_level=_walking_level(plan),
-                price_tier=tier_for_cost(plan.candidate.est_cost_pp.value or 0),
+                price_tier=_price_tier(plan),
                 arrival_window_min=fact["arrival_window_min"],
                 blurb=blurb,
             )

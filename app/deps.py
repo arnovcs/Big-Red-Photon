@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from app.providers.cache import RecordReplayCache
-from app.providers.mock.places import MockPlaces
 from app.providers.mock.routing import MockRouting
 from app.providers.mock.sim_messaging import SimMessaging
 from app.providers.protocols import (
@@ -25,7 +24,6 @@ from app.providers.real.google_places import GooglePlaces
 from app.providers.real.google_routes import GoogleRoutes
 from app.providers.real.nessie import NessieFinance
 from app.providers.real.ors import OrsRouting
-from app.providers.real.osm_places import OsmPlaces, resolve_path
 from app.providers.real.photon import PhotonMessaging
 from app.settings import Settings
 
@@ -51,20 +49,16 @@ def build_deps(
     llm: LLMProvider | None = None,
     finance: FinanceProvider | None = None,
     clock: Callable[[], datetime] | None = None,
+    places: PlacesProvider | None = None,
 ) -> Deps:
+    """`places` lets tests plug in a fake; otherwise it's Google Places."""
     messaging: MessagingProvider
     if settings.provider_messaging == "photon":
         messaging = PhotonMessaging(settings)
     else:
         messaging = SimMessaging()
     cache = RecordReplayCache(settings.cache_mode)
-    places: PlacesProvider
-    if settings.provider_places == "google":
-        places = GooglePlaces(settings, cache)
-    elif settings.provider_places == "osm":
-        places = OsmPlaces(settings, cache)
-    else:
-        places = MockPlaces(venues_path=resolve_path(settings.venues_path))
+    places = places or GooglePlaces(settings, cache)
     routing: RoutingProvider
     if settings.provider_routing == "google":
         routing = GoogleRoutes(settings, cache)

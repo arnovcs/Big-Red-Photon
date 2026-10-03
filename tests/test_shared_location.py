@@ -13,13 +13,12 @@ from fastapi.testclient import TestClient
 from app.deps import build_deps
 from app.main import create_app
 from app.models.private import LatLng
-from app.providers.mock.places import load_demo_locations, near_label
 from app.providers.real.photon import PhotonMessaging
 from app.settings import Settings
+from tests.places_stub import StubPlaces
 
 HANDLE = "+16075550101"
-LOCATIONS = {loc["name"]: loc for loc in load_demo_locations()}
-COLLEGETOWN = LatLng(lat=LOCATIONS["Collegetown"]["lat"], lng=LOCATIONS["Collegetown"]["lng"])
+COLLEGETOWN = LatLng(lat=42.4422, lng=-76.4852)
 FAR_AWAY = LatLng(lat=40.7128, lng=-74.0060)
 
 
@@ -29,10 +28,9 @@ def client(tmp_path):
         _env_file=None,
         provider_messaging="sim",
         nessie_api_key="",
-        venues_path="tests/fixtures/venues_test.json",
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'loc.db'}",
     )
-    app = create_app(build_deps(settings))
+    app = create_app(build_deps(settings, places=StubPlaces()))
     with TestClient(app) as c:
         yield c
 
@@ -70,14 +68,14 @@ def test_done_without_sharing_explains(client) -> None:
 def test_done_after_sharing_uses_it_and_names_the_nearest_landmark(client) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, "Done!") == "Got it: near Collegetown. Right? (yes/no)"
+    assert dm(client, "Done!") == "Got it: your live location. Right? (yes/no)"
     assert dm(client, "yes").startswith("You're set!")
 
 
 def test_far_away_share_gets_a_generic_label(client) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = FAR_AWAY
-    assert dm(client, "shared") == "Got it: your shared location. Right? (yes/no)"
+    assert dm(client, "shared") == "Got it: your live location. Right? (yes/no)"
 
 
 def test_command_during_location_step_is_not_geocoded(client) -> None:
@@ -90,7 +88,7 @@ def test_command_during_location_step_is_not_geocoded(client) -> None:
 def test_casual_share_replies_use_the_shared_location(client, reply) -> None:
     to_location_step(client)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, reply) == "Got it: near Collegetown. Right? (yes/no)"
+    assert dm(client, reply) == "Got it: your live location. Right? (yes/no)"
 
 
 def test_typed_landmark_still_wins(client) -> None:
@@ -99,11 +97,13 @@ def test_typed_landmark_still_wins(client) -> None:
     assert dm(client, "olin") == "Got it: Olin Library. Right? (yes/no)"
 
 
-def test_unknown_text_falls_back_to_shared_location(client) -> None:
+def test_unknown_text_asks_again_and_never_uses_the_shared_location(client) -> None:
+    """The bug: unknown typed text silently became "near Olin Library" (their share)."""
     to_location_step(client)
-    assert "couldn't find that" in dm(client, "my dorm")
-    sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, "my dorm") == "Got it: near Collegetown. Right? (yes/no)"
+    sim(client).shared[HANDLE] = COLLEGETOWN  # sharing, but typed something unknown
+    for _ in range(2):
+        assert dm(client, "my dorm").startswith("I couldn't find that place.")
+    assert stored_label(client, HANDLE) is None  # nothing stored, no default
 
 
 def test_location_command_resends_the_card(client) -> None:
@@ -114,11 +114,12 @@ def test_location_command_resends_the_card(client) -> None:
     assert sim(client).location_requests == [HANDLE, HANDLE]
 
 
-def test_near_label_never_contains_coordinates() -> None:
-    locations = load_demo_locations()
-    assert near_label(COLLEGETOWN, locations) == "near Collegetown"
-    assert near_label(FAR_AWAY, locations) == "your shared location"
-    assert not any(ch.isdigit() for ch in near_label(FAR_AWAY, locations))
+def test_shared_location_label_never_contains_coordinates(client) -> None:
+    to_location_step(client)
+    sim(client).shared[HANDLE] = FAR_AWAY
+    reply = dm(client, "done")
+    assert reply == "Got it: your live location. Right? (yes/no)"
+    assert not any(ch.isdigit() for ch in reply)
 
 
 # --- Photon provider (bridge stubbed) -------------------------------------------------
@@ -171,7 +172,7 @@ def test_already_sharing_skips_the_card(client) -> None:
     for text in ["start", "Maya", "MAYA1"]:
         dm(client, text)
     sim(client).shared[HANDLE] = COLLEGETOWN
-    assert dm(client, "yes") == "Got it: near Collegetown. Right? (yes/no)"
+    assert dm(client, "yes") == "Got it: your live location. Right? (yes/no)"
     assert sim(client).location_requests == []  # nothing to tap: they already share
     assert dm(client, "yes").startswith("You're set!")
 
@@ -206,7 +207,7 @@ def test_go_refreshes_origins_from_live_shares(client, caplog) -> None:
     sim(client).shared[HANDLE] = COLLEGETOWN  # Maya walked to Collegetown since setup
     dm(client, "@go")
 
-    assert stored_label(client, HANDLE) == "near Collegetown"  # refreshed
+    assert stored_label(client, HANDLE) == "your live location"  # refreshed
     assert stored_label(client, sam) == "Collegetown"  # not sharing: onboarding origin kept
     assert "shared_origins_refreshed refreshed=1 members=2" in caplog.text
 
@@ -274,7 +275,7 @@ def test_typed_place_this_plan_beats_live_location_at_go(client, caplog) -> None
     for text in ["neither", "same"]:
         client.post("/sim/message", json={"sender_handle": sam, "text": text})
     dm(client, "@go")
-    assert stored_label(client, HANDLE) == "near Collegetown"
+    assert stored_label(client, HANDLE) == "your live location"
 
 
 def test_go_waits_for_where_from_and_commands_still_work_mid_question(client) -> None:

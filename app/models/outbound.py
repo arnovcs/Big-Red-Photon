@@ -17,7 +17,7 @@ class GroupPlanOption(BaseModel):
     title: str  # "Koko — Korean"
     max_travel_min: int  # "≤22 min for everyone"
     walking_level: Literal["low", "moderate", "high"]
-    price_tier: Literal["$", "$$", "$$$", "$$$$"]
+    price_tier: Literal["$", "$$", "$$$", "$$$$", "?"]  # "?" = Google has no price
     arrival_window_min: int
     blurb: str  # explanation from group-safe facts only
 

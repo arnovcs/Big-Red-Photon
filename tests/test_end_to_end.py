@@ -5,7 +5,6 @@ import json
 import logging
 import re
 from datetime import UTC, datetime, timedelta
-from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
@@ -24,6 +23,7 @@ from app.models.conversation import (
 )
 from app.models.plans import Plan
 from app.settings import Settings
+from tests.places_stub import VENUE_NAMES, StubPlaces
 
 # 18:00 in Ithaca (EDT) on the demo date.
 FIXED_NOW = datetime(2026, 10, 3, 22, 0, tzinfo=UTC)
@@ -86,6 +86,8 @@ class StubLLM:
                 add(m, ConstraintField.AVAILABLE_UNTIL, "21:00", ConstraintKind.HARD)
             if "haven't tried" in text:
                 add(m, ConstraintField.NOVELTY, 1.0, ConstraintKind.SOFT, confidence=0.6)
+            if "love korean" in text:
+                add(m, ConstraintField.CUISINE, "korean", ConstraintKind.SOFT, confidence=0.6)
             if "1 minute away" in text:
                 add(m, ConstraintField.MAX_TRAVEL_MIN, 1, ConstraintKind.HARD)
         return GroupPreferences(constraints=found, group_intent="food")
@@ -101,12 +103,11 @@ def harness(tmp_path):
         # Pin these so shell variables (e.g. PROVIDER_MESSAGING=photon) can't leak in.
         provider_messaging="sim",
         nessie_api_key="",
-        venues_path="tests/fixtures/venues_test.json",
         database_url=f"sqlite+aiosqlite:///{tmp_path / 'e2e.db'}",
         poll_timeout_sec=3600,
     )
     llm = StubLLM()
-    app = create_app(build_deps(settings, llm=llm, clock=lambda: FIXED_NOW))
+    app = create_app(build_deps(settings, llm=llm, clock=lambda: FIXED_NOW, places=StubPlaces()))
     with TestClient(app) as client:
         yield client, llm
 
@@ -141,9 +142,6 @@ def onboard(client: TestClient, persona: tuple) -> None:
     assert "Where are you starting" in dm(client, handle, "yes")
     assert f"Got it: {label}" in dm(client, handle, start)
     assert "join <code>" in dm(client, handle, "yes")  # modes come later, per plan
-
-
-VENUE_NAMES = [v["name"] for v in json.loads(Path("tests/fixtures/venues_test.json").read_text())]
 
 
 def without_venue_names(text: str) -> str:
@@ -331,11 +329,11 @@ def test_nothing_fits_returns_to_collecting_with_a_safe_hint(harness) -> None:
     answer_modes(client, MAYA)
     answer_modes(client, JORDAN)
     dm(client, JORDAN[1], "it has to be 1 minute away")  # HARD: nothing qualifies
-    dm(client, MAYA[1], "something we haven't tried?")  # SOFT: named in the hint
+    dm(client, MAYA[1], "I'd love korean")  # SOFT: named in the hint
     dm(client, MAYA[1], "@go")
 
     expected = (
-        "Nothing fits everyone right now. Being open to somewhere familiar could help. "
+        "Nothing fits everyone right now. Being open to more than korean could help. "
         "Then say @go again."
     )
     for handle in (MAYA[1], JORDAN[1]):

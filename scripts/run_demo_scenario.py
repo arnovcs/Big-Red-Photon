@@ -1,25 +1,22 @@
 """Run the §18 demo (v3, DM-only) through the simulator and print every outbox.
 
-    uv run python scripts/run_demo_scenario.py           # mock places + mock routing
-    uv run python scripts/run_demo_scenario.py --live    # OSM venues + OpenRouteService
-    uv run python scripts/run_demo_scenario.py --live --places google   # Google venues + ORS
-    uv run python scripts/run_demo_scenario.py --live --places google --routing google
-        # + Google Routes for every mode (live traffic for driving; ORS as fallback)
-    uv run python scripts/run_demo_scenario.py --live --places google \
+    uv run python scripts/run_demo_scenario.py                    # Google places + Google routes
+    uv run python scripts/run_demo_scenario.py --routing mock     # Google places, offline routing
+    uv run python scripts/run_demo_scenario.py \
         --starts "Perrigo Park, Redmond WA" "Redmond Town Center" "Marymoor Park" \
         --now 2026-10-04T12:00:00-07:00     # anywhere: 3 starts (Maya, Sam, Jordan)
     (outside Eastern time, also set DEMO_TIMEZONE=America/Los_Angeles etc.)
 
-With --live, CACHE_MODE from .env decides the network use:
-    CACHE_MODE=record  → real ORS (and Nominatim, if needed) calls, saved to fixtures/recorded/
-    CACHE_MODE=replay  → the saved responses, no network
+All place data (typed starting points and venues) comes from Google Places; there is
+no local venue list. CACHE_MODE from .env decides the network use:
+    CACHE_MODE=record  → real Google / ORS / Gemini calls, saved to fixtures/recorded/
+    CACHE_MODE=replay  → the saved responses, no network (the backup demo)
 
-The clock is pinned (--now) so opening hours, venues, and therefore the ORS
+The clock is pinned (--now) so opening hours, venues, and therefore the routing
 requests are identical between runs; that's what makes replay hit every time.
 Messaging is always the simulator and Nessie is off (personas use their fixture
-limits). Gemini reads the preferences when GEMINI_API_KEY is set (and is
-recorded/replayed like routing); without a key, planning uses no preferences.
-Also the backup demo if iMessage fails.
+limits). Gemini reads the preferences when GEMINI_API_KEY is set; without a key,
+planning uses no preferences.
 """
 
 import argparse
@@ -47,9 +44,9 @@ from app.settings import get_settings  # noqa: E402
 
 # (name, handle, bank code, starting point, "car/bike/both/neither")
 PERSONAS = [
-    ("Maya", "+16075550101", "MAYA1", "collegetown", "bike"),
-    ("Sam", "+16075550102", "SAM1", "north campus", "neither"),
-    ("Jordan", "+16075550103", "JORDAN1", "downtown", "neither"),
+    ("Maya", "+16075550101", "MAYA1", "Collegetown Bagels", "bike"),
+    ("Sam", "+16075550102", "SAM1", "Robert Purcell Community Center", "neither"),
+    ("Jordan", "+16075550103", "JORDAN1", "Ithaca Commons", "neither"),
 ]
 PREFERENCES = [
     ("Maya", "I'm starving"),
@@ -85,19 +82,15 @@ def winning_plan(client: TestClient) -> tuple[Plan, dict[str, str]] | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the §18 demo through the simulator.")
-    parser.add_argument("--live", action="store_true", help="use real places + ORS routing")
     parser.add_argument(
-        "--places", choices=["osm", "google"], default="osm", help="venue source with --live"
-    )
-    parser.add_argument(
-        "--routing", choices=["ors", "google"], default="ors", help="routing with --live"
+        "--routing", choices=["google", "ors", "mock"], default="google", help="travel times"
     )
     parser.add_argument("--now", default=DEFAULT_NOW, help="pinned local time (ISO 8601)")
     parser.add_argument(
         "--starts",
         nargs=len(PERSONAS),
         metavar="PLACE",
-        help="starting points for Maya, Sam, Jordan (any place Nominatim can find)",
+        help="starting points for Maya, Sam, Jordan (any place Google can find)",
     )
     args = parser.parse_args()
     starts = args.starts or [start for *_, start, _ in PERSONAS]
@@ -109,8 +102,7 @@ def main() -> None:
     settings = get_settings().model_copy(
         update={
             "provider_messaging": "sim",
-            "provider_places": args.places if args.live else "mock",
-            "provider_routing": args.routing if args.live else "mock",
+            "provider_routing": args.routing,
             "nessie_api_key": "",
             "database_url": f"sqlite+aiosqlite:///{tmp / 'demo.db'}",
             "poll_timeout_sec": 3600,
@@ -170,7 +162,7 @@ def main() -> None:
             origins = {}
             for (name, *_), start in zip(PERSONAS, starts, strict=True):
                 found = await deps.places.geocode(start, center)
-                origins[name] = found[0]
+                origins[name] = found.location
             return await deps.routing.matrix(
                 origins,
                 {plan.candidate.candidate_id: center},

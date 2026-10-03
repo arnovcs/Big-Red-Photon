@@ -18,8 +18,8 @@ The Stage 0b spike showed that Photon's free plan (the only plan available to us
 ### v2 changes (summary)
 v1 used paid Google Maps and xAI Grok APIs. v2 uses only free services plus the team's Gemini key:
 - **LLM:** Grok → **Gemini** (structured output).
-- **Venues:** Google Places → **OpenStreetMap** (Overpass API), pulled once into a hand-checked fixture with hand-entered price tiers.
-- **Geocoding:** Google → **`demo_locations.json` first, then Nominatim**.
+- **Venues:** **Google Places API (New)** (post-v3; the earlier OpenStreetMap fixture was removed).
+- **Typed places / geocoding:** **Google Places Text Search**, biased to Ithaca (post-v3; `demo_locations.json` and Nominatim were removed).
 - **Routing:** Google Routes → **OpenRouteService** (walking, cycling, driving profiles).
 - **Transit removed** (no free schedule-based transit API for Ithaca). **Ride-share added** as a mode, with time from ORS driving + pickup wait and cost from a configurable formula. Modes are now `walk | bike | drive | rideshare`.
 - Arrival-spread scoring term removed (all modes are deterministic, so everyone arrives exactly at `T_target`).
@@ -85,10 +85,9 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 | Database | SQLite via SQLAlchemy | Zero setup. No Postgres or Supabase. |
 | Routing | **OpenRouteService** (matrix + directions; `foot-walking`, `cycling-regular`, `driving-car`) | Free key, no card. Free plan: 2,000 directions/day, 500 matrix/day. |
 | Modes | `walk`, `bike`, `drive` (own car), `rideshare` | No free transit API for Ithaca. Ride-share = ORS driving time + pickup wait, cost from formula. |
-| Venues | **OpenStreetMap via Overpass**, fetched once into `fixtures/venues.json` | Free, no key. No prices in OSM, so price tiers are hand-entered. |
-| Venues, worldwide (post-v3) | **Google Places API (New)** Nearby Search, `PROVIDER_PLACES=google` | Real price level, hours, rating anywhere. Free monthly allowance; key restricted to Places API (New) with a capped daily quota. Falls back to the curated fixture. |
+| Venues (post-v3) | **Google Places API (New)** Nearby Search | Real price range/level, hours, rating anywhere. Free monthly allowance; key restricted to Places API (New) with a capped daily quota. No local fallback list: if Google fails, the bot says so. A venue with no price is "price unknown" (never guessed). |
 | Travel times, all modes, live traffic for driving (post-v3) | **Google Routes API** Compute Route Matrix + Compute Routes, `PROVIDER_ROUTING=google` | One matrix call per travel mode (WALK, BICYCLE, DRIVE; rideshare derived from DRIVE), billed per origin × destination. Only DRIVE uses `TRAFFIC_AWARE` (the Pro SKU). Same key, with Routes API allowed and a capped daily quota. A mode Google can't route (e.g. no bike coverage) falls back to ORS, then mock. |
-| Geocoding | `fixtures/demo_locations.json`, then **Nominatim** | Free. Max ~1 request/second; requires a descriptive User-Agent. |
+| Typed places (post-v3) | **Google Places API (New)** Text Search, `locationBias` circle (10 km) around Ithaca | Returns name, short address, location, place id. Not found / error → "please rephrase"; never a default place. |
 | LLM | **Gemini** (structured output) for extraction and explanation | Team already has a key. Model name is config. Use a Flash model. |
 | Live events | Gemini + Google Search grounding **only if the key's tier supports it**; otherwise a hand-checked list | **Stretch only** (Stage 7). |
 | Finance | Capital One Nessie sandbox + deterministic estimator | LLM never sees balances. |
@@ -205,13 +204,13 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   ├── real/
 │   │   │   ├── photon.py         # calls bridge HTTP endpoints
 │   │   │   ├── gemini.py         # LLMProvider (+ ContextProvider in Stage 7)
-│   │   │   ├── osm_places.py     # PlacesProvider: venue fixture + demo_locations + Nominatim geocoding
+│   │   │   ├── google_places.py  # PlacesProvider: Nearby Search (venues) + Text Search (typed places)
+│   │   │   ├── google_routes.py  # RoutingProvider: Google Routes (ORS fallback)
 │   │   │   ├── ors.py            # RoutingProvider: OpenRouteService (+ ride-share derivation)
 │   │   │   └── nessie.py         # FinanceProvider
 │   │   └── mock/
 │   │       ├── sim_messaging.py  # writes to in-memory outbox (simulator)
-│   │       ├── routing.py        # haversine-based estimates
-│   │       └── places.py         # loads fixtures/venues.json
+│   │       └── routing.py        # haversine-based estimates
 │   │
 │   ├── models/
 │   │   ├── identity.py           # User, Group
@@ -232,8 +231,6 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   └── src/index.ts              # Photon relay (§9.1)
 │
 ├── fixtures/
-│   ├── venues.json               # ~25 real OSM venues around the demo area, hand-checked, with price tiers
-│   ├── demo_locations.json       # named starting points with lat/lng
 │   ├── personas.json             # Nessie seed definitions (§12.3)
 │   ├── events_fallback.json      # hand-checked events for the demo weekend (Stage 7 fallback)
 │   ├── transcripts/              # golden group-chat transcripts + expected extraction
@@ -241,7 +238,6 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │
 ├── scripts/
 │   ├── seed_nessie.py            # creates demo customers/accounts/purchases/bills
-│   ├── fetch_venues.py           # pulls venues from Overpass into fixtures/venues.json (prices added by hand)
 │   └── run_demo_scenario.py      # drives the full §18 scenario through the simulator
 │
 └── tests/
@@ -265,9 +261,7 @@ All config through `app/settings.py` (pydantic-settings), loaded from `.env`.
 | `GEMINI_MODEL` | (fill from current Gemini docs; a Flash model) | Model id for extraction + explanation |
 | `ORS_API_KEY` | | OpenRouteService |
 | `ORS_BASE_URL` | `https://api.openrouteservice.org` | Verify against ORS docs |
-| `NOMINATIM_BASE_URL` | `https://nominatim.openstreetmap.org` | |
-| `NOMINATIM_USER_AGENT` | `bigredhacks-<name>/0.1 (team email)` | Required by Nominatim's usage policy |
-| `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | Used only by `scripts/fetch_venues.py` |
+| `GOOGLE_PLACES_API_KEY` | | Places API (New): venues and typed places (required) |
 | `NESSIE_API_KEY` | | Nessie |
 | `NESSIE_BASE_URL` | `http://api.nessieisreal.com` | Verify scheme/host against Nessie docs |
 | `BRIDGE_URL` | `http://localhost:3001` | Backend → bridge |
@@ -422,22 +416,21 @@ class Uncertain(BaseModel, Generic[T]):
     low: T | None = None
     high: T | None = None
     status: Literal["known", "estimated", "unknown"]
-    source: str                     # "osm_fixture" | "hand_entered" | "formula" | "ors" | "gemini:<url>"
+    source: str                     # "google" | "google_price_range" | "formula" | "ors" | "gemini:<url>"
 
 class Candidate(BaseModel):
-    candidate_id: str               # "osm:<node|way>/<id>" | "ev:<hash>"
+    candidate_id: str               # "google:<place id>"
     name: str
     category: str                   # food | bar | cafe | dessert | activity | event
     cuisines: list[str] = []
-    location: LatLng                # REQUIRED, from the OSM fixture or Nominatim — never from the LLM
+    location: LatLng                # REQUIRED, from Google Places — never from the LLM
     address: str
     est_cost_pp: Uncertain[Decimal]
     open_at_target: Literal["open", "closed", "unknown"] = "unknown"
     closes_at: datetime | None = None
     typical_duration_min: int       # category default: food 60, cafe 45, dessert 30, bar 90, activity 90
     rating: float | None = None
-    source: Literal["osm_fixture", "event"]
-    novelty_tags: list[str] = []
+    source: Literal["google", "event"]   # (post-v3: novelty_tags removed; "something new" isn't scored)
 ```
 
 ### 6.5 Routing
@@ -690,7 +683,7 @@ class PlacesProvider(Protocol):
     async def search_nearby(self, center: LatLng, radius_m: int, categories: list[str],
                             open_at: datetime) -> list[Candidate]: ...
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
-    async def geocode(self, text: str, near: LatLng) -> tuple[LatLng, str] | None: ...  # (coords, clean label); demo_locations first, then Nominatim
+    async def geocode(self, text: str, near: LatLng) -> ResolvedPlace | None: ...  # Google Text Search; None → ask to rephrase
 
 class RoutingProvider(Protocol):
     async def matrix(self, origins: dict[str, LatLng], destinations: dict[str, LatLng],
@@ -777,24 +770,17 @@ Original spike questions (answered above):
 - **Rate limits:** free-tier request limits can be low. Record/replay (§14.1) is mandatory during testing so repeated runs don't burn quota. One `@go` should cost exactly 2 Gemini calls (extract + explain).
 - **Stage 7 only:** `find_events` uses Gemini with Google Search grounding **if the key's tier supports it** (check the Gemini pricing/rate-limit page for your key). 20 s hard timeout. Results must be resolved to coordinates via `PlacesProvider.geocode`; unresolved events are dropped. If grounding is unavailable, use `fixtures/events_fallback.json`.
 
-### 9.3 OpenStreetMap venues + geocoding (`providers/real/osm_places.py`, `scripts/fetch_venues.py`)
+### 9.3 Google Places: venues + typed places (`providers/real/google_places.py`)
 
-**Venue fixture (run once, by `scripts/fetch_venues.py`):**
-- Query Overpass for `amenity` in (`restaurant`, `cafe`, `fast_food`, `bar`, `pub`, `ice_cream`) and `leisure`/`amenity` activity tags (e.g. `bowling_alley`, `cinema`, `escape_game` if present) within ~2.5 km of the demo center. Use `out center;` so ways get a center point.
-- Map OSM tags → `Candidate`: `name`, `cuisine` (split on `;`), category from `amenity`, `opening_hours` kept as the raw string, address from `addr:*` tags.
-- Write `fixtures/venues.json`. Then a teammate **hand-checks** it: remove closed/irrelevant places, keep ~25 with category variety, and **enter a price tier per venue** (`$`, `$$`, `$$$`, `$$$$`).
-- Tier → cost: `$` → $12 (8–15), `$$` → $25 (15–35), `$$$` → $45 (35–60), `$$$$` → $75 (60–100); `status="estimated"`, `source="hand_entered"`. Free activities → $0.
+Post-v3 this replaced the OpenStreetMap fixture (`fixtures/venues.json`), `demo_locations.json`, and Nominatim; all of those were deleted.
 
-**Opening hours:** parse OSM `opening_hours` only for the simple common forms (e.g. `Mo-Su 11:00-22:00`, `Mo-Fr 07:00-20:00; Sa-Su 09:00-20:00`). Anything else → `open_at_target="unknown"` (no crash, no guess). Do not add a heavy parsing dependency.
+**`search_nearby`:** Places API (New) Nearby Search, one call per wanted category (plus one for wanted cuisines), through the record/replay cache. Only operating venues with a storefront and ≥ 10 reviews. Hours from `regularOpeningHours` + `utcOffsetMinutes` (venue-local). Price: `priceRange` (real USD range) → `priceLevel` tier → **unknown** (never guessed). If Google fails or finds nothing, the result is empty and the bot says nothing fits.
 
-**Runtime `search_nearby`:** reads the fixture, filters by category and distance from `center`, and returns `Candidate`s. No live Overpass calls at runtime.
+**Unknown prices in the optimizer:** a venue with no price is budget-checked against the median price of the venues in the same search that do have one, under the existing unknown-price safety margin (`unknown_cost_limit_fraction`), and flagged "price unknown" (poll shows "price ?"). If no nearby venue has a price, it's skipped.
 
-**Runtime `geocode`:**
-1. Fuzzy-match the text against `fixtures/demo_locations.json` (names + aliases like "Olin", "Olin Library", "Collegetown").
-2. Otherwise call Nominatim `/search?q=<text>&format=jsonv2&limit=1&viewbox=<demo bbox>&bounded=1` with the configured User-Agent, through the cache.
-3. Otherwise return `None` (onboarding re-asks).
+**`geocode` (typed starting points):** Text Search `POST /v1/places:searchText` with `textQuery`, `pageSize=1`, and a 10 km `locationBias` circle around `DEMO_CENTER` (central Ithaca); field mask `id, displayName, location, shortFormattedAddress, formattedAddress`. Returns `ResolvedPlace(location, name, address, place_id)`; onboarding confirms "Got it: <name>, <address>. Right?" and stores lat/lng, label, and place id on that person's profile. Nothing found or an API error → `None` → "I couldn't find that place…" (never a default, never their shared location).
 
-`text_search` = same as `geocode` but returns a `Candidate`-shaped result (used only by Stage 7).
+`text_search` = Text Search returning venue `Candidate`s.
 
 ### 9.4 OpenRouteService (`providers/real/ors.py`)
 
@@ -1025,7 +1011,7 @@ Do not include `binding_constraint` facts that name a person.
 ### 14.2 Mocks (only these)
 - `mock/sim_messaging.py`: appends to an in-memory outbox per handle (v3); used by the simulator and tests.
 - `mock/routing.py`: haversine × 1.3 detour. Walk 3 mph. Bike 10 mph. Drive 18 mph + 5 min parking. Ride-share = drive speed + pickup wait, fare from the same formula as `ors.py` (share the formula function). Used in tests and as fallback.
-- `mock/places.py`: returns `fixtures/venues.json`, filtered by category and distance; geocodes only from `demo_locations.json`.
+- Places: no mock in the app (post-v3). Tests use `tests/places_stub.py`, passed in with `build_deps(..., places=...)`.
 
 There is no mock LLM or mock finance. Tests that need them use recorded responses in replay mode, or stub the provider directly in the test.
 

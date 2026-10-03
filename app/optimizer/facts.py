@@ -23,7 +23,8 @@ OPTION_LABELS = ("A", "B", "C")
 
 # Preference fields that describe venues, so they can be named to the whole group
 # without pointing at anyone. Times, walking/travel limits and modes are personal.
-_VENUE_FIELDS = (ConstraintField.CUISINE, ConstraintField.CATEGORY, ConstraintField.NOVELTY)
+# Novelty ("something new") isn't a venue fact we have (Google has no such data).
+_VENUE_FIELDS = (ConstraintField.CUISINE, ConstraintField.CATEGORY)
 _SAFE_VALUE = re.compile(r"^[a-z][a-z _-]{0,29}$")
 
 
@@ -58,10 +59,7 @@ def _wants_matched(candidate: Candidate, preferences: GroupPreferences) -> list[
             continue
         if not satisfies(c, candidate):
             continue
-        if c.field == ConstraintField.NOVELTY:
-            matched.add("something new")
-        else:
-            matched.update(safe for v in values_of(c) if (safe := _safe_value(v)))
+        matched.update(safe for v in values_of(c) if (safe := _safe_value(v)))
     return sorted(matched)
 
 
@@ -106,12 +104,10 @@ def nothing_fits_hint(preferences: GroupPreferences, candidates: list[Candidate]
     for c in preferences.constraints:
         if c.kind != ConstraintKind.SOFT or c.field not in _VENUE_FIELDS:
             continue
-        value = None
-        if c.field != ConstraintField.NOVELTY:
-            value = next((s for v in values_of(c) if (s := _safe_value(v))), None)
-            if value is None:
-                continue
-        scored.append((_share_satisfied(c, candidates), -c.confidence, value or "", c, value))
+        value = next((s for v in values_of(c) if (s := _safe_value(v))), None)
+        if value is None:
+            continue
+        scored.append((_share_satisfied(c, candidates), -c.confidence, value, c, value))
     if not scored:
         return None
     _, _, _, constraint, value = min(scored, key=lambda row: row[:3])
