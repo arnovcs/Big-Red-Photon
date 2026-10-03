@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from app.models.outbound import GroupPlanOption
 
-BOT_NAME = "[NAME]"  # replace with the product name (§19 open decision 4)
+BOT_NAME = "Huddle"  # product name (§19 open decision 4)
 
 # --- Virtual group (v3: every message is a DM) --------------------------------
 
@@ -237,6 +237,36 @@ def waiting_on(names: list[str]) -> str:
 
 
 YOU_ARE_SET = "You're set! Start a plan with @plan, or join a friend's with join <code>."
+
+# --- Web signup, finished by text (app/onboarding/web_claim.py) -----------------
+
+
+def claim_linked(name: str, limit: Decimal) -> str:
+    return (
+        f"Thanks, {name}! Your demo bank is linked. About {usd(limit)} looks comfortable "
+        "tonight. Use that? (yes / or type a number)"
+    )
+
+
+def web_intro(name: str) -> str:
+    return (
+        f"Hi {name}! You're set up. Start a plan with @plan, or join a friend's with join <code>."
+    )
+
+
+def web_signup_nudge(name: str, token: str) -> str:
+    return f"Hi {name}! To finish signing up, reply: start {token}"
+
+
+CLAIM_UNKNOWN = "I couldn't find that signup code. Check it, or sign up again on the website."
+CLAIM_USED = "That signup code was already used."
+CLAIM_EXPIRED = "That signup code expired. Please sign up again on the website."
+CLAIM_WRONG_PHONE = (
+    "That code was made for a different phone number. Text it from the phone you signed up with."
+)
+CLAIM_ALREADY_SET = "You're already set up. Text help for options."
+CLAIM_BANK_GONE = "I couldn't link that demo bank. Please sign up again on the website."
+
 ALREADY_SET = "You're already set. Text help for options."
 UPDATED = "Updated."
 HELP = (

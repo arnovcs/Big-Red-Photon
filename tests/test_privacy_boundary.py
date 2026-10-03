@@ -26,10 +26,13 @@ WRITE_API = {
     "set_drive",
 }
 REFRESH_API = {"refresh_shared_origins"}
+PUBLIC_API = {"bank_choices"}  # demo bank codes + names only, for the signup form
 ALLOWED = {
     "planning/pipeline.py": READ_API | REFRESH_API,
     "delivery/itinerary.py": READ_API,
     "onboarding/fsm.py": WRITE_API,
+    "onboarding/web_claim.py": WRITE_API,  # a web signup finished by text
+    "web/routes_signup.py": PUBLIC_API,
 }
 OPTIMIZER_FORBIDDEN = (
     "sqlalchemy",
@@ -85,10 +88,10 @@ def _private_usage(tree: ast.Module) -> tuple[bool, set[str]]:
 def test_vault_api_is_fully_classified() -> None:
     public = {
         name
-        for name, fn in inspect.getmembers(vault, inspect.iscoroutinefunction)
+        for name, fn in inspect.getmembers(vault, inspect.isfunction)
         if not name.startswith("_") and fn.__module__ == vault.__name__
     }
-    assert public == READ_API | WRITE_API | REFRESH_API, "classify new vault functions"
+    assert public == READ_API | WRITE_API | REFRESH_API | PUBLIC_API, "classify new vault functions"
 
 
 def test_only_allowed_modules_use_app_private_and_only_their_functions() -> None:

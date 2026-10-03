@@ -7,7 +7,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from sqlalchemy import DateTime, Float, ForeignKey, Numeric, String, Text, Uuid
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Numeric, String, Text, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -112,3 +112,25 @@ class ProcessedMessageRow(Base):
     __tablename__ = "processed_messages"
 
     message_id: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class PendingSignupRow(Base):
+    """A web signup waiting for "start <token>" from the same phone (app/web, app/onboarding).
+
+    Holds no budget, balance, or location: those are written to the vault at claim time.
+    """
+
+    __tablename__ = "pending_signups"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    token: Mapped[str] = mapped_column(String(8), unique=True, index=True)
+    first_name: Mapped[str] = mapped_column(String)
+    phone: Mapped[str] = mapped_column(String, index=True)  # canonical form, e.g. +16075551234
+    bank_code: Mapped[str] = mapped_column(String)  # demo persona code, e.g. MAYA1
+    # The bot line Photon assigned this person (their "TEXTS ON" number); None until known.
+    bot_phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    claimed: Mapped[bool] = mapped_column(Boolean, default=False)
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    claimed_user_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"), nullable=True)

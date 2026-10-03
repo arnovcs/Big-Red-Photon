@@ -21,6 +21,7 @@ from app.models.conversation import InboundMessage
 from app.models.identity import OnboardingState
 from app.models.outbound import PrivateMessage
 from app.onboarding.fsm import Onboarding
+from app.onboarding.web_claim import WebClaim, parse_start_token
 from app.planning.session import PlanningSessions
 
 log = get_logger(__name__)
@@ -34,6 +35,7 @@ class Router:
         self._lock = asyncio.Lock()
         self._tasks: set[asyncio.Task[None]] = set()
         self.onboarding = Onboarding(deps)
+        self.web_claim = WebClaim(deps, self.onboarding)
         self.sessions = PlanningSessions(deps, self.run_locked, self.spawn)
 
     async def run_locked(self, fn: Callable[[], Awaitable[None]]) -> None:
@@ -80,7 +82,10 @@ class Router:
             user.dm_chat_id = msg.chat_id
 
             parsed = parse_session_command(msg.text)
-            if (
+            if (token := parse_start_token(msg.text)) is not None:
+                # "start <TOKEN>": finishing a web signup (a bare "start" is normal setup).
+                await self.web_claim.handle(db, user, token)
+            elif (
                 parsed
                 and user.onboarding_state in PLAN_QUESTION_STATES
                 and await queries.active_group_for_user(db, user.id) is not None

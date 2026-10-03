@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     nessie_api_key: str = ""
     nessie_base_url: str = "http://api.nessieisreal.com"
 
+    # Photon Spectrum project (same values as bridge/.env). The backend uses them only to
+    # register web signups as project users and read the line each one should text.
+    photon_project_id: str = ""
+    photon_project_secret: str = ""
+    photon_api_url: str = "https://spectrum.photon.codes"
+
     # Bridge <-> backend
     bridge_url: str = "http://localhost:3001"
     backend_url: str = "http://localhost:8000"
@@ -80,6 +86,14 @@ class Settings(BaseSettings):
     http_timeout_sec: float = 10.0
     # A Find My location older than this counts as "not sharing" (they likely stopped).
     shared_location_max_age_min: int = 120
+
+    # Web signup (app/web/). Who signed up is visible in Photon's dashboard (Users tab).
+    app_name: str = "Huddle"  # product name shown on the web pages
+    bot_phone_number: str = ""  # the bot's iMessage number, for the "text to finish" link
+    # Free shared Photon lines can't text a number first. Only if true, nudge new signups
+    # by text right after the form is submitted.
+    photon_can_initiate: bool = False
+    signup_token_ttl_hours: int = 24
 
 
 @lru_cache

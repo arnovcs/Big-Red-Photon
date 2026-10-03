@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Sign up · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-bold tracking-tight">Plan nights out with friends</h1>
+<p class="mt-2 text-slate-600">Sign up here, then send one text to finish. Your budget stays private: friends never see it.</p>
+
+{% if notice %}
+<div class="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-amber-900" role="status">{{ notice }}</div>
+{% endif %}
+{% if errors %}
+<div class="mt-6 rounded-xl border border-red-300 bg-red-50 p-4 text-red-800" role="alert">Please fix the highlighted fields.</div>
+{% endif %}
+
+<form method="post" action="/signup" class="mt-6 space-y-5" novalidate>
+  {% set field = "w-full h-12 rounded-xl border bg-white px-4 text-base outline-none focus:ring-4" %}
+  {% set ok = "border-slate-300 focus:border-red-500 focus:ring-red-100" %}
+  {% set bad = "border-red-500 focus:ring-red-100" %}
+
+  <div>
+    <label for="first_name" class="mb-1.5 block font-medium">First name</label>
+    <input id="first_name" name="first_name" autocomplete="given-name" required
+           value="{{ values.first_name or '' }}"
+           class="{{ field }} {{ bad if errors.first_name else ok }}"
+           {% if errors.first_name %}aria-invalid="true" aria-describedby="first_name_error"{% endif %}>
+    {% if errors.first_name %}<p id="first_name_error" class="mt-1.5 text-sm text-red-700">{{ errors.first_name }}</p>{% endif %}
+  </div>
+
+  <div>
+    <label for="phone" class="mb-1.5 block font-medium">Phone number</label>
+    <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required
+           placeholder="(607) 555-0123" value="{{ values.phone or '' }}"
+           class="{{ field }} {{ bad if errors.phone else ok }}"
+           {% if errors.phone %}aria-invalid="true" aria-describedby="phone_error"{% endif %}>
+    {% if errors.phone %}<p id="phone_error" class="mt-1.5 text-sm text-red-700">{{ errors.phone }}</p>
+    {% else %}<p class="mt-1.5 text-sm text-slate-500">The number you use for iMessage. You'll text the bot from it.</p>{% endif %}
+  </div>
+
+  <div>
+    <label for="bank_code" class="mb-1.5 block font-medium">Demo bank account</label>
+    <select id="bank_code" name="bank_code" required
+            class="{{ field }} {{ bad if errors.bank_code else ok }}"
+            {% if errors.bank_code %}aria-invalid="true" aria-describedby="bank_code_error"{% endif %}>
+      <option value="">Choose one…</option>
+      {% for code, name in banks %}
+      <option value="{{ code }}" {% if (values.bank_code or '')|upper == code %}selected{% endif %}>{{ name }}'s account</option>
+      {% endfor %}
+    </select>
+    {% if errors.bank_code %}<p id="bank_code_error" class="mt-1.5 text-sm text-red-700">{{ errors.bank_code }}</p>
+    {% else %}<p class="mt-1.5 text-sm text-slate-500">Sandbox data from Capital One's Nessie API, used to suggest a budget.</p>{% endif %}
+  </div>
+
+  <button type="submit" class="h-14 w-full rounded-xl bg-red-600 text-lg font-semibold text-white shadow-sm hover:bg-red-700 focus:outline-none focus:ring-4 focus:ring-red-200 active:bg-red-800">
+    Continue
+  </button>
+  <p class="text-center text-sm text-slate-500">Each plan, the bot asks how you're getting there and where you're starting from.</p>
+</form>
+{% endblock %}

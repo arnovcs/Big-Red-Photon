@@ -1,8 +1,8 @@
-# [NAME] — Architecture & Implementation Plan
+# Huddle — Architecture & Implementation Plan
 
 > An iMessage agent that turns a group's "where should we go?" into a plan everyone can afford and reach, and gets the whole group there at the same time.
 
-**Status:** v3 — DM-only pivot. Stages 0, 0.5, and 0b are complete. Stage 1 was built against v2; apply the Stage 1.5 migration (§15) next.
+**Status:** v3 + post-v3 updates. Stages 0–6 (including 0.5, 0b, and 1.5) are complete; Stage 4 was later moved from OpenStreetMap to Google Places + Routes (see "Post-v3 changes"). Remaining: phase-2 scoring, Stage 7 (stretch), Stage 8.
 
 ### v3 changes (summary) — DM-only "virtual group"
 The Stage 0b spike showed that Photon's free plan (the only plan available to us) uses a **shared line pool**: each person is assigned their own bot number, and **group chats are not supported**. Only the paid Business plan (one dedicated number) supports groups. DMs work both ways. So in v3 there is no iMessage group chat. The bot is the hub of a **virtual group** made of DMs:
@@ -12,15 +12,26 @@ The Stage 0b spike showed that Photon's free plan (the only plan available to us
 - **Voting:** a text poll in each DM; members reply `A`, `B`, or `C`. No native polls. (§7.3)
 - **Interface change:** `MessagingProvider.send_group(chat_id, msg)` → `send_group(handles, msg)` (§8).
 - **Model change:** `Group.chat_id` → `Group.join_code` (§6.1, §6.8).
-- **Location (post-v3):** Find My sharing via Photon's Advanced iMessage `locations` API (bridge `/request_location`, `/location`). If someone already shares with the bot, onboarding uses it; at **@go** every sharing member's origin is refreshed to where they are now (`vault.refresh_shared_origins`, called only by the pipeline). Typed landmarks remain the fallback.
-- Unchanged: optimizer, budgets, Nessie, routing, places, Gemini, record/replay, privacy rules.
+- Unchanged in v3: optimizer, budgets, Nessie, routing, places, Gemini, record/replay, privacy rules.
+
+### Post-v3 changes (summary) — team decisions 2026-10-03
+These came after v3 and supersede the matching v2/v3 text below.
+- **Places:** **Google Places API (New)** for all place data: venues (Nearby Search, plus Text Search for named cuisines/activities) and typed starting points (Text Search, 10 km bias around Ithaca). The OSM fixture, `demo_locations.json`, Nominatim, Overpass, `fetch_venues.py`, and the in-app mock places provider were removed. A place Google can't find gets "please rephrase", never a default. (§9.3)
+- **Routing:** **Google Routes API** for every mode with live traffic for driving (`PROVIDER_ROUTING=google`); OpenRouteService is the fallback, then mock. (§2, §9.4)
+- **Location:** Find My sharing via Photon's Advanced iMessage `locations` API (bridge `/request_location`, `/location`). If someone shares with the bot, onboarding and the per-plan location question use it; at **@go** every sharing member's origin is refreshed (`vault.refresh_shared_origins`, called only by the pipeline), unless they typed a place during this plan. Typed places remain the fallback. (§7.2, §9.1)
+- **Travel modes are per plan:** setup no longer asks. At `@plan` / `join` the bot clears the stored modes and asks "how are you getting there?" (one mode: car, bike, walk, uber, or neither), then "where from?". "actually I'll drive" during COLLECTING replaces the answer. No answer by `@go` → walking, and they're told. (§7.2, §7.3)
+- **Interface additions (§8):** `MessagingProvider.request_location()` / `shared_location()`; `PlacesProvider.search_nearby(..., cuisines=, activities=)`; `geocode()` returns a `ResolvedPlace`.
+- **Preferences:** `ConstraintField.ACTIVITY` ("pickleball") and a `sports` category; cuisine matching through `optimizer/cuisines.py` ("asian" matches sushi). Novelty is no longer scored (Google has no such data).
+- **Delivery:** each itinerary DM includes a Google Maps directions link from that person's own start. Venues with no price show "?" in the poll; typical-cost estimates are marked "est.".
+- **Data:** `private_profiles` gained `origin_typed_at` and `origin_place_id` (added to existing databases by `init_db`). Record/replay recordings were cleared with the provider change and need re-recording (§14.1).
+- **Web signup:** a one-page form; the person finishes by texting `start <TOKEN>` to the bot number Photon assigned them. Who signed up is visible in Photon's dashboard (Users tab); the app has no dashboard of its own. (§7.5)
 
 ### v2 changes (summary)
 v1 used paid Google Maps and xAI Grok APIs. v2 uses only free services plus the team's Gemini key:
 - **LLM:** Grok → **Gemini** (structured output).
-- **Venues:** **Google Places API (New)** (post-v3; the earlier OpenStreetMap fixture was removed).
-- **Typed places / geocoding:** **Google Places Text Search**, biased to Ithaca (post-v3; `demo_locations.json` and Nominatim were removed).
-- **Routing:** Google Routes → **OpenRouteService** (walking, cycling, driving profiles).
+- **Venues:** Google Places → OpenStreetMap (Overpass), pulled into a hand-checked fixture. *(Superseded post-v3: Google Places again.)*
+- **Geocoding:** `demo_locations.json`, then Nominatim. *(Superseded post-v3: Google Places Text Search.)*
+- **Routing:** Google Routes → **OpenRouteService** (walking, cycling, driving profiles). *(Post-v3: Google Routes is primary again; ORS is the fallback.)*
 - **Transit removed** (no free schedule-based transit API for Ithaca). **Ride-share added** as a mode, with time from ORS driving + pickup wait and cost from a configurable formula. Modes are now `walk | bike | drive | rideshare`.
 - Arrival-spread scoring term removed (all modes are deterministic, so everyone arrives exactly at `T_target`).
 - New definitions: `FinancialSnapshot`, `EventFinding` (§6.9).
@@ -70,7 +81,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 - **Synchronized arrival:** work backward from a shared target arrival time to compute each person's leave-by time.
 - **Privacy by construction:** budgets never reach other members or the LLM, and preferences are shared privately, one DM per person. Enforced by module boundaries, types, and an output scanner.
 - **Grounded LLM use:** the LLM extracts preferences and phrases explanations, but every number (time, distance, cost, hours) comes from routing data or deterministic formulas, and explanations are checked against computed facts.
-- **Built on open data:** venues and routing come from OpenStreetMap (Overpass, Nominatim, OpenRouteService).
+- **Real-world data:** venues and typed places from Google Places, travel times from Google Routes with live traffic (OpenRouteService as fallback).
 
 ---
 
@@ -83,8 +94,8 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 | Group model (v3) | **DMs only**; a virtual group joined by code | Free plan = shared line pool: a different bot number per person and no group chats. |
 | Bridge ↔ backend | Plain JSON over HTTP on **localhost** | Both run on one laptop. No HMAC, no auth. |
 | Database | SQLite via SQLAlchemy | Zero setup. No Postgres or Supabase. |
-| Routing | **OpenRouteService** (matrix + directions; `foot-walking`, `cycling-regular`, `driving-car`) | Free key, no card. Free plan: 2,000 directions/day, 500 matrix/day. |
-| Modes | `walk`, `bike`, `drive` (own car), `rideshare` | No free transit API for Ithaca. Ride-share = ORS driving time + pickup wait, cost from formula. |
+| Routing fallback | **OpenRouteService** (matrix + directions; `foot-walking`, `cycling-regular`, `driving-car`) | Used when Google Routes can't route a mode (post-v3). Free key: 2,000 directions/day, 500 matrix/day. |
+| Modes | `walk`, `bike`, `drive` (own car), `rideshare`; asked per plan (post-v3) | No transit yet. Ride-share = driving time (Google or ORS) + pickup wait, cost from formula. |
 | Venues (post-v3) | **Google Places API (New)** Nearby Search | Real price range/level, hours, rating anywhere. Free monthly allowance; key restricted to Places API (New) with a capped daily quota. No local fallback list: if Google fails, the bot says so. A venue with no price is "price unknown" (never guessed). |
 | Travel times, all modes, live traffic for driving (post-v3) | **Google Routes API** Compute Route Matrix + Compute Routes, `PROVIDER_ROUTING=google` | One matrix call per travel mode (WALK, BICYCLE, DRIVE; rideshare derived from DRIVE), billed per origin × destination. Only DRIVE uses `TRAFFIC_AWARE` (the Pro SKU). Same key, with Routes API allowed and a capped daily quota. A mode Google can't route (e.g. no bike coverage) falls back to ORS, then mock. |
 | Typed places (post-v3) | **Google Places API (New)** Text Search, `locationBias` circle (10 km) around Ithaca | Returns name, short address, location, place id. Not found / error → "please rephrase"; never a default place. |
@@ -92,7 +103,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 | Live events | Gemini + Google Search grounding **only if the key's tier supports it**; otherwise a hand-checked list | **Stretch only** (Stage 7). |
 | Finance | Capital One Nessie sandbox + deterministic estimator | LLM never sees balances. |
 | Optimizer | Exact enumeration, hard filters, min-max + mean burden | Small search space; fully explainable; no solver dependency. |
-| Demo reliability | Record/replay cache + simulator + two small mocks | Real data on stage without live-API risk. |
+| Demo reliability | Record/replay cache + simulator + mock routing (places have no in-app mock post-v3; tests use a stub) | Real data on stage without live-API risk, once the demo is recorded (§14.1). |
 | Hosting | One team laptop + phone hotspot backup | Spectrum holds an outgoing connection; no public URL needed. |
 | ML | None | No fake ML. |
 
@@ -169,11 +180,14 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   └── copy.py               # ALL user-facing strings and message templates
 │   │
 │   ├── onboarding/
-│   │   └── fsm.py                # DM onboarding state machine (§7.2)
+│   │   ├── fsm.py                # DM onboarding state machine (§7.2)
+│   │   └── web_claim.py          # "start <TOKEN>": finish a web signup by text (§7.5)
 │   │
 │   ├── planning/
 │   │   ├── session.py            # Group planning state machine (§7.3)
-│   │   └── pipeline.py           # Orchestrates §10
+│   │   ├── pipeline.py           # Orchestrates §10
+│   │   ├── extraction.py         # LLM output validation (§6.3)
+│   │   └── explain.py            # explanation phrasing + number check (§13.8)
 │   │
 │   ├── optimizer/                # PURE PYTHON. No I/O.
 │   │   ├── enumerate.py          # venue × per-person mode combinations
@@ -182,7 +196,8 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   ├── burden.py             # per-person burden terms
 │   │   ├── score.py              # group objective J
 │   │   ├── select.py             # top-3 with diversity
-│   │   └── facts.py              # group-safe fact extraction for explanations
+│   │   ├── facts.py              # group-safe fact extraction for explanations
+│   │   └── cuisines.py           # cuisine families ("asian" matches sushi)
 │   │
 │   ├── private/                  # ONLY place that touches money/location
 │   │   ├── vault.py              # read/write PrivateProfile; issue PrivateConstraints
@@ -192,7 +207,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   └── poll.py               # send text poll to all members, tally DM votes, pick winner
 │   │
 │   ├── delivery/
-│   │   └── itinerary.py          # directions for winner; per-person DMs; map image (stretch, `staticmap` + OSM tiles)
+│   │   └── itinerary.py          # directions for winner; per-person DMs with a Google Maps link
 │   │
 │   ├── messaging/
 │   │   ├── outbound.py           # send_group / send_private wrappers
@@ -203,6 +218,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   ├── cache.py              # record/replay cache (§14.1)
 │   │   ├── real/
 │   │   │   ├── photon.py         # calls bridge HTTP endpoints
+│   │   │   ├── photon_users.py   # UserDirectoryProvider: Photon project users (web signup)
 │   │   │   ├── gemini.py         # LLMProvider (+ ContextProvider in Stage 7)
 │   │   │   ├── google_places.py  # PlacesProvider: Nearby Search (venues) + Text Search (typed places)
 │   │   │   ├── google_routes.py  # RoutingProvider: Google Routes (ORS fallback)
@@ -221,6 +237,14 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   ├── plans.py              # PersonAssignment, Plan, PlanScore, BurdenBreakdown
 │   │   └── outbound.py           # GroupSafeMessage, PrivateMessage, GroupPlanOption, PersonalItinerary
 │   │
+│   ├── web/                      # web signup form (§7.5)
+│   │   ├── routes_signup.py      # GET/POST /signup, GET /signup/done/{token}
+│   │   ├── tunnel.py             # tunnel visitors only reach /signup and /static
+│   │   ├── forms.py              # signup form validation (Pydantic)
+│   │   ├── qr.py                 # QR code as inline SVG
+│   │   ├── templates/            # Jinja2: base, signup, signup_done
+│   │   └── static/
+│   │
 │   └── db/
 │       ├── tables.py             # SQLAlchemy models (§6.8)
 │       └── session.py            # engine, async session factory, init_db()
@@ -234,19 +258,21 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   ├── personas.json             # Nessie seed definitions (§12.3)
 │   ├── events_fallback.json      # hand-checked events for the demo weekend (Stage 7 fallback)
 │   ├── transcripts/              # golden group-chat transcripts + expected extraction
-│   └── recorded/                 # record/replay cache files (committed)
+│   └── recorded/                 # record/replay cache files (committed; currently empty, see §14.1)
 │
 ├── scripts/
 │   ├── seed_nessie.py            # creates demo customers/accounts/purchases/bills
 │   └── run_demo_scenario.py      # drives the full §18 scenario through the simulator
 │
-└── tests/
-    ├── test_optimizer.py
-    ├── test_arrival.py
+└── tests/                        # one file per area; highlights:
+    ├── test_optimizer.py, test_arrival.py
+    ├── test_privacy_guard.py, test_privacy_boundary.py
     ├── test_budget.py
-    ├── test_privacy_guard.py
     ├── test_extraction.py        # golden transcripts (uses replay cache)
-    └── test_end_to_end.py        # full scenario via simulator, all mocks
+    ├── test_google_places.py, test_google_routes.py, test_ors.py
+    ├── test_shared_location.py   # Find My onboarding and @go refresh
+    ├── places_stub.py            # fake PlacesProvider for tests
+    └── test_end_to_end.py        # full scenario via simulator
 ```
 
 ---
@@ -258,19 +284,21 @@ All config through `app/settings.py` (pydantic-settings), loaded from `.env`.
 | Variable | Example | Purpose |
 |---|---|---|
 | `GEMINI_API_KEY` | | Gemini |
-| `GEMINI_MODEL` | (fill from current Gemini docs; a Flash model) | Model id for extraction + explanation |
+| `GEMINI_MODEL` | `gemini-3.5-flash-lite` | Model id for extraction + explanation (Flash-Lite: its own free-tier quota) |
 | `ORS_API_KEY` | | OpenRouteService |
 | `ORS_BASE_URL` | `https://api.openrouteservice.org` | Verify against ORS docs |
 | `GOOGLE_PLACES_API_KEY` | | Places API (New): venues and typed places (required) |
+| `GOOGLE_ROUTES_API_KEY` | | Routes API; empty = use the Places key |
 | `NESSIE_API_KEY` | | Nessie |
 | `NESSIE_BASE_URL` | `http://api.nessieisreal.com` | Verify scheme/host against Nessie docs |
 | `BRIDGE_URL` | `http://localhost:3001` | Backend → bridge |
 | `BACKEND_URL` | `http://localhost:8000` | Bridge → backend (bridge's own env) |
-| `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET` | | Bridge only |
+| `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET` | | Bridge; also the backend, to register web signups as Photon users (§7.5) |
+| `PHOTON_API_URL` | `https://spectrum.photon.codes` | Spectrum API host for user registration |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./app.db` | |
 | `PROVIDER_MESSAGING` | `photon` \| `sim` | |
-| `PROVIDER_PLACES` | `osm` \| `mock` | |
-| `PROVIDER_ROUTING` | `ors` \| `mock` | |
+| `PROVIDER_PLACES` | `google` | Only option (post-v3); tests inject a stub via `build_deps(places=...)` |
+| `PROVIDER_ROUTING` | `google` \| `ors` \| `mock` | Default `mock`. `google` falls back to ORS, then mock |
 | `PROVIDER_FINANCE` | `nessie` | (no mock; seeded customers serve that role) |
 | `CACHE_MODE` | `off` \| `record` \| `replay` | §14.1 |
 | `DEMO_TIMEZONE` | `America/New_York` | All "by 9" style times are local |
@@ -288,6 +316,11 @@ All config through `app/settings.py` (pydantic-settings), loaded from `.env`.
 | `POLL_TIMEOUT_SEC` | `300` | Auto-pick the leader after this |
 | `LLM_TIMEOUT_SEC` | `20` | |
 | `HTTP_TIMEOUT_SEC` | `10` | Default provider timeout |
+| `SHARED_LOCATION_MAX_AGE_MIN` | `120` | A Find My location older than this counts as "not sharing" |
+| `APP_NAME` | `Huddle` | Product name on the web pages |
+| `BOT_PHONE_NUMBER` | `+16075550000` | Fallback number on the signup page when Photon hasn't assigned one (§7.5) |
+| `PHOTON_CAN_INITIATE` | `false` | Only if true, text new signups their finish code right after the form (free shared lines can't) |
+| `SIGNUP_TOKEN_TTL_HOURS` | `24` | How long a signup code works |
 
 ---
 
@@ -303,7 +336,7 @@ class OnboardingState(StrEnum):
     AWAITING_BANK_CODE = "awaiting_bank_code"
     AWAITING_LIMIT_CONFIRM = "awaiting_limit_confirm"
     AWAITING_LOCATION = "awaiting_location"
-    AWAITING_MODES = "awaiting_modes"      # v2: was AWAITING_CAR
+    AWAITING_MODES = "awaiting_modes"      # v2: was AWAITING_CAR. Post-v3: the per-plan "how are you getting there?"
     READY = "ready"
 
 class User(BaseModel):
@@ -326,6 +359,7 @@ v3: one `Group` per `@plan`. A user may be in **at most one group with an active
 
 ```python
 class TravelModes(BaseModel):          # v2: bike + rideshare added
+                                       # post-v3: the mode(s) this person will use for the current plan
     walk: bool = True
     bike: bool = False
     drive: bool = False                   # own car
@@ -342,7 +376,9 @@ class PrivateProfile(BaseModel):
     limit_source: Literal["nessie_estimate", "user_override"]
     origin: LatLng
     origin_label: str               # "Olin Library" — DM only
-    modes: TravelModes
+    origin_typed_at: datetime | None   # post-v3: when they typed it (None = from Find My)
+    origin_place_id: str | None        # post-v3: Google place id of a typed origin
+    modes: TravelModes                  # post-v3: cleared at each @plan / join, then asked
     updated_at: datetime
 
 class PrivateConstraints(BaseModel):   # the only private data the optimizer sees
@@ -381,8 +417,9 @@ class ConstraintField(StrEnum):
     AVAILABLE_UNTIL = "available_until"     # "HH:MM" local
     AVAILABLE_FROM = "available_from"       # "HH:MM" local
     CUISINE = "cuisine"
-    CATEGORY = "category"                   # food | bar | cafe | dessert | activity | event
-    NOVELTY = "novelty"                     # 0..1
+    CATEGORY = "category"                   # food | bar | cafe | dessert | activity | sports | event
+    ACTIVITY = "activity"                   # post-v3: a specific thing to do ("pickleball", "bowling")
+    NOVELTY = "novelty"                     # 0..1 (post-v3: extracted but not scored)
     MODE_PREFERENCE = "mode_preference"     # "walk" | "bike" | "drive" | "rideshare" with polarity
 
 class ExtractedConstraint(BaseModel):
@@ -513,7 +550,8 @@ class GroupPlanOption(BaseModel):    # group-safe
     title: str                       # "Koko — Korean"
     max_travel_min: int              # "≤22 min for everyone"
     walking_level: Literal["low", "moderate", "high"]
-    price_tier: Literal["$", "$$", "$$$", "$$$$"]
+    price_tier: Literal["$", "$$", "$$$", "$$$$", "?"]   # post-v3: "?" = Google has no price
+    price_estimated: bool = False    # post-v3: typical cost for this kind of place, shown as "est."
     arrival_window_min: int
     blurb: str                       # explanation from group-safe facts only
 
@@ -547,13 +585,14 @@ v3: "group" messages are delivered to each member's DM (§8), but the rule is un
 | `users` | id, handle (unique), display_name, dm_chat_id, onboarding_state, created_at | |
 | `groups` | id, join_code (unique), active_session_id, created_at | v3: `join_code` replaces `chat_id` |
 | `group_members` | group_id, user_id | |
-| `private_profiles` | user_id (PK), nessie_customer_id, spend_limit_usd, limit_source, origin_lat, origin_lng, origin_label, modes_json, updated_at | **Only `app/private/` may query this table.** |
+| `private_profiles` | user_id (PK), nessie_customer_id, spend_limit_usd, limit_source, origin_lat, origin_lng, origin_label, origin_typed_at, origin_place_id, modes_json, updated_at | **Only `app/private/` may query this table.** |
 | `sessions` | id, group_id, state, started_at, target_time, pid_map_json, preferences_json, plans_json, poll_id, winner_plan_id | `plans_json` stores full plans; `pid_map_json` maps pid → user_id. v3: `poll_id` stays null (text polls only) |
 | `session_messages` | id, session_id, message_id (unique), sender_user_id, text, ts | Only messages during COLLECTING. Deleted when session reaches DONE or CANCELLED. |
 | `votes` | session_id, user_id, option_label, ts | One row per user per session (upsert) |
 | `processed_messages` | message_id (PK) | Idempotency for webhook retries |
+| `pending_signups` | id, token (unique), first_name, phone, bank_code, bot_phone, created_at, expires_at, claimed, claimed_at, claimed_user_id | Web signups waiting for `start <TOKEN>` (§7.5). No budget, balance, or location. |
 
-Use `create_all()` on startup. No migrations.
+Use `create_all()` on startup. No migration tool: columns added later are listed in `db/session.py` (`ADDED_COLUMNS`) and added to existing SQLite files by `init_db()`.
 
 ### 6.9 Supporting models (v2: previously undefined)
 
@@ -580,11 +619,11 @@ class EventFinding(BaseModel):          # app/models/candidates.py — Stage 7 o
 v3: **every inbound message is a DM.** (`is_group` is always false; if a group message ever arrives, ignore it.) For every inbound message:
 1. If `message_id` is in `processed_messages`, ignore. Otherwise insert it.
 2. Upsert the `User` by handle.
-3. If the user is **not READY** → onboarding FSM (§7.2). If they sent `join <code>`, reply "Let's get you set up first, then send `join <code>` again." and start onboarding.
+3. If the user is **not READY** → onboarding FSM (§7.2). If they sent `join <code>`, reply "Let's get you set up first, then send `join <code>` again." and start onboarding. Post-v3 exception: a member answering a plan question (AWAITING_MODES / AWAITING_LOCATION) inside an active group can still send session commands (`@go`, `@cancel`, ...).
 4. If the user is READY, look up their **active group** (the one group with an active session they belong to, if any) and handle, in this order:
    - **Session commands:** `@plan`, `join <code>`, `@go`, `@cancel`, `@pick A|B|C`, and vote replies `A`/`B`/`C` (only while POLLING). See §7.3.
    - **Settings commands:** `budget <n>`, `location`, `car yes|no`, `help`.
-   - **Otherwise,** if their group's session is COLLECTING, store the text in `session_messages` (sender = this user). Reply `copy.NOTED` only to that member's **first** stored message in the session, to keep the DM quiet.
+   - **Otherwise,** if their group's session is COLLECTING, store the text in `session_messages` (sender = this user). Reply `copy.NOTED` only to that member's **first** stored message in the session, to keep the DM quiet. Post-v3: a mode statement ("actually I'll drive") also replaces their travel mode for this plan.
    - **Otherwise** reply with `copy.HELP` (a short list of commands).
 
 Commands are case-insensitive and may appear with surrounding text ("ok @go"). Join codes are matched case-insensitively.
@@ -596,16 +635,25 @@ NEW ──"start" (or any first DM)──► ask name if unknown, then:
 AWAITING_BANK_CODE ──valid code──► vault.link_customer() → budget.estimate()
                                    → "About $25 looks comfortable tonight. Use that? (yes / or type a number)"
 AWAITING_LIMIT_CONFIRM ──"yes" | number──► save limit (source = estimate | override)
-AWAITING_LOCATION ──text──► places.geocode(text, near=demo center) → "Got it: Olin Library. Right? (yes/no)"
-                    ──"no"──► ask again
-AWAITING_MODES ──"car" | "bike" | "both" | "neither"──► TravelModes(drive=…, bike=…)  (walk + rideshare always on;
-                    user may reply "no rideshare" to turn it off)
+AWAITING_LOCATION ──(asked with a Find My card)──►
+                    already sharing ──► "Got it: your live location. Right? (yes/no)"
+                    "done"/"shared"  ──► read the shared location, confirm yes/no
+                    typed text       ──► Google Text Search → "Got it: <name, address>. Right? (yes/no)"
+                    not found        ──► "please rephrase" (never a default place)
+                    "no"             ──► ask again
+                    "yes"            ──► READY
 READY ──► DM: "You're set! Start a plan with @plan, or join a friend's with join <code>."
+
+Per plan (post-v3), at @plan / join:
+READY ──clear modes──► AWAITING_MODES "How are you getting there?"
+AWAITING_MODES ──car | bike | both | walk | uber | neither──► TravelModes (the mode they'll use;
+                    "no rideshare" rules a ride out) ──► sharing? READY : AWAITING_LOCATION "Where from?"
+                    ("same" keeps last time's start)
 ```
 
 - **Bank code:** a short code per seeded persona (e.g. `MAYA1`), mapped to a Nessie customer id in `fixtures/personas.json` after seeding. This simulates "linking a bank account."
 - v3: typed landmarks only. In the spike, a shared location *message* arrived as `custom` content with no usable coordinates.
-- Post-v3: Find My sharing (`locations.get`) does give coordinates. Onboarding uses it when available, and @go refreshes every sharing member's origin before planning. Commands (`@…`) sent during the location step are never geocoded.
+- Post-v3: Find My sharing (`locations.get`) does give coordinates. Onboarding uses it when available, and @go refreshes every sharing member's origin before planning. Commands (`@…`) sent during the location step are never geocoded. Replies containing share words ("done", "shared", "location", "ok", ...) are read as "I shared it", not as a place name.
 - Any invalid input re-asks with a short hint. Never echo dollar amounts in any group-safe message.
 
 ### 7.3 Planning session FSM (`planning/session.py`)
@@ -622,10 +670,10 @@ v3: a session lives in a virtual group created by `@plan`. "Tell the group" mean
 any state ──@cancel (any member)──► CANCELLED
 ```
 
-- **`@plan`** (READY user, not in an active group): create a `Group` with a fresh join code and the sender as its first member, create a session in COLLECTING, and reply with `copy.PLAN_STARTED` (includes the code). If the user is already in an active group: "You're already in a plan (code K7QP). Say @cancel to start over."
+- **`@plan`** (READY user, not in an active group): create a `Group` with a fresh join code and the sender as its first member, create a session in COLLECTING, and reply with `copy.PLAN_STARTED` (includes the code). Post-v3: then ask this member's travel mode for the plan (§7.2); `join` does the same for each joiner. If the user is already in an active group: "You're already in a plan (code K7QP). Say @cancel to start over."
 - **`join <code>`** (READY user): if the code matches a group whose session is COLLECTING, add the user and tell the group "✅ Sam joined (2 people)." If the session is past COLLECTING: "That plan already started. Ask them to @plan again." Unknown code: "I don't know that code. Check it and try again." Already in another active group: same reply as for `@plan`. Cap at 6 members.
 - **COLLECTING:** the bot only stores DMs sent **after** the member joined. (Photon cannot fetch chat history.) Nothing is relayed to other members.
-- **`@go`** (any member): require at least 2 members, else "I need at least 2 people. Share code K7QP first." Then tell the group "🔎 Looking at options…" and run the pipeline (§10) as a background task.
+- **`@go`** (any member): require at least 2 members, else "I need at least 2 people. Share code K7QP first." Post-v3: members who never answered "how are you getting there?" are planned as walking (and told); members still answering "where from?" are re-asked, and the sender is told who the plan is waiting on. Then tell the group "🔎 Looking at options…" and run the pipeline (§10) as a background task. If a member turns out to have no starting point, they're asked and the session returns to COLLECTING.
 - **POLLING:** text poll only; the same poll message goes to every member. Votes are DM replies `A`, `B`, or `C` (latest vote per user wins; upsert into `votes`). Winner = first option to reach ⌈N/2⌉ votes, or `@pick X` by any member, or the leader after `POLL_TIMEOUT_SEC` (ties → better score). Optionally tell the group "🗳️ 2 of 3 voted" (counts only, never who voted for what).
 - **DELIVERING:** compute detailed routes for the winner, send the group confirmation, then each person's itinerary DM (so the route lands right under the confirmation).
 - **DONE / CANCELLED:** set `groups.active_session_id = null` and delete the session's `session_messages`. The join code is retired. A new `@plan` creates a new group and code.
@@ -633,7 +681,7 @@ any state ──@cancel (any member)──► CANCELLED
 ### 7.4 Message copy (all in `conversation/copy.py`)
 
 Welcome (first DM from a new user, before onboarding):
-> Hi! I'm [NAME]. I help friends pick a plan everyone can afford and reach, and I get you there at the same time. Let's set you up. It's private: I never share your money or location with anyone.
+> Hi! I'm Huddle. I help friends pick a plan everyone can afford and reach, and I get you there at the same time. Let's set you up. It's private: I never share your money or location with anyone.
 
 `PLAN_STARTED` (reply to `@plan`):
 > Plan started! 🎉 Tell your friends to text me: **join K7QP**
@@ -662,6 +710,18 @@ Personal DM:
 
 Keep copy short, warm, and free of jargon.
 
+### 7.5 Web signup (`app/web/`, `onboarding/web_claim.py`)
+
+An alternative to setting up by text. Free Photon lines can't message a number that hasn't texted them, so **the website never sends the first text**: the person texts the bot, which also proves they own the number.
+
+1. **`/signup`:** first name, phone, demo bank (dropdown of `fixtures/personas.json` names via `vault.bank_choices()`). The phone is normalized to the iMessage handle form (`+` and digits; 10 digits → `+1`). A phone that already belongs to a READY user gets "already set up". Otherwise a `pending_signups` row is saved with a 4-character token (join-code alphabet, never reused) that expires after `SIGNUP_TOKEN_TTL_HOURS`; an older unclaimed code for that phone stops working. No location and no travel modes: both are asked per plan (§7.2).
+   On submit the phone is also **registered as a user of the Photon project** (`UserDirectoryProvider.register`, `providers/real/photon_users.py`): `GET /projects/{id}/users/?search=<phone>`, else `POST /projects/{id}/users/` with `{"type": "shared", "phoneNumber", "firstName"}`, Basic auth with the project id/secret (shapes from `spectrum.photon.codes/openapi/json`). On the free shared pool this is what lets the bot talk to the number at all, and the user's `assignedPhoneNumber` is the line they text; it is saved as `pending_signups.bot_phone`.
+2. **`/signup/done/{token}`:** "1. Text this number" (the assigned line, else `BOT_PHONE_NUMBER`; if neither, "refresh in a minute", and each refresh retries the lookup), "2. Send this message: start <TOKEN>", a "Text the bot to finish" `sms:` link with both filled in, and a QR code of the same link for laptops. It never shows the name, the person's own phone, or the bank.
+3. **`start <TOKEN>` by text:** the token must exist, be unexpired and unclaimed, and the sender's handle must equal the signup's phone. Then the bank is linked through the vault (same Nessie estimate as text setup), the token is marked claimed, and the bot asks the person to confirm or override the budget. On "yes" or a number they become READY and get: "Hi <name>! You're set up. Start a plan with @plan, or join a friend's with join <code>." Any problem gets a short reply, then normal text setup carries on. A bare `start` is unchanged.
+4. **`PHOTON_CAN_INITIATE=true`** (off by default): also text the finish code right after the form. Nothing else depends on it.
+5. **No team dashboard:** who signed up, and their assigned line, is in Photon's dashboard (Users tab, "TEXTS ON" column), since signup registers every number there.
+6. **Exposure:** the form may be shared through a tunnel (cloudflared, ngrok). Requests carrying tunnel forwarding headers can only reach `/signup` and `/static` (`web/tunnel.py`): the bridge webhook trusts localhost, and a tunnel also connects from localhost, so without this anyone could post a fake DM "from" any phone.
+
 ---
 
 ## 8. Provider interfaces (`app/providers/protocols.py`)
@@ -670,10 +730,17 @@ Do not change these signatures without asking. Implementations live in `provider
 
 **v3 interface change:** `send_group` now takes the members' handles instead of a group chat id, and returns nothing (text polls only, so there is no poll_id).
 
+**Post-v3 additions:** `request_location` / `shared_location` on `MessagingProvider` (Find My), optional `cuisines` / `activities` on `search_nearby`, and `geocode` returning `ResolvedPlace` (location, name, short address, place id).
+
 ```python
 class MessagingProvider(Protocol):
     async def send_group(self, handles: list[str], msg: GroupSafeMessage) -> None: ...  # v3: same message to each member's DM
     async def send_private(self, handle: str, msg: PrivateMessage) -> None: ...
+    async def request_location(self, handle: str) -> bool: ...   # post-v3: send a Find My card; True if sent
+    async def shared_location(self, handle: str) -> LatLng | None: ...  # post-v3: None if not sharing (or stale)
+
+class UserDirectoryProvider(Protocol):   # web signup (§7.5): Photon project users
+    async def register(self, phone: str, first_name: str) -> str | None: ...  # idempotent; the line they text, or None
 
 class FinanceProvider(Protocol):
     async def get_customer(self, customer_id: str) -> dict: ...
@@ -681,7 +748,8 @@ class FinanceProvider(Protocol):
 
 class PlacesProvider(Protocol):
     async def search_nearby(self, center: LatLng, radius_m: int, categories: list[str],
-                            open_at: datetime) -> list[Candidate]: ...
+                            open_at: datetime, cuisines: list[str] | None = None,
+                            activities: list[str] | None = None) -> list[Candidate]: ...  # post-v3: cuisines/activities
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
     async def geocode(self, text: str, near: LatLng) -> ResolvedPlace | None: ...  # Google Text Search; None → ask to rephrase
 
@@ -718,7 +786,7 @@ Every real provider:
 
 > These shapes are best-known as of planning. **Verify each against current official docs before implementing**, and adapt the provider internals, not the interfaces.
 >
-> **Free-tier etiquette:** Nominatim and Overpass are community-run. Send a descriptive User-Agent, stay under ~1 request/second, and never call them in loops. All live calls go through the record/replay cache (§14.1).
+> **Quotas:** Google Places and Routes keys are restricted to those APIs with capped daily quotas; Gemini and ORS have free-tier limits. Never call them in loops. All live calls go through the record/replay cache (§14.1).
 
 ### 9.1 Photon bridge (`bridge/src/index.ts`)
 
@@ -738,7 +806,10 @@ Responsibilities, and nothing else:
    - `POST /send_dm` `{handle, text}`: the only send endpoint v3 uses. **Verified working.**
    - `POST /send` `{chat_id, text}` and `POST /send_poll`: group-only, **unused in v3**.
    - `POST /send_image` returns 501 (stretch).
+   - `POST /request_location` `{handle}` → `{status, reason}`: sends Apple's Find My "share your location" card (post-v3).
+   - `POST /location` `{handle}` → `{lat, lng, label, accuracy_m, at, type}` or 404 if not shared (post-v3). Coordinates are never logged.
    - `GET /health`
+   - The location endpoints use the Advanced iMessage client through `spectrum-ts` internals (`app.__internal.platforms`), which is not a public API.
 5. Log every in/out event to the console (handle truncated to last 4 digits; never log locations).
 
 The bridge holds no state and makes no decisions. If the backend is down, log and drop.
@@ -747,7 +818,7 @@ The bridge holds no state and makes no decisions. If the backend is down, log an
 - DMs: inbound ✅ and outbound ✅ on real phones.
 - Group chats: ❌ on the free plan. Shared line pool, so each person gets a different bot number; Photon's docs say group chats need the paid Business plan. Our live test received nothing from a group. This is why v3 is DM-only.
 - Allowlist: the bot only talks to phones registered as users in the Photon project, and each person must text their bot line first. Register every demo phone.
-- Shared location: arrived as `custom` content (most likely the SDK's "unsupported message"; not yet confirmed) with no usable coordinates, so typed landmarks only.
+- Shared location: a shared-location *message* arrived as `custom` content with no usable coordinates. Post-v3: Find My sharing via the `locations` API does return coordinates (§7.2).
 
 Original spike questions (answered above):
 - Do group messages and DMs arrive through the same handler, and how is group vs DM distinguished?
@@ -786,7 +857,9 @@ Post-v3 this replaced the OpenStreetMap fixture (`fixtures/venues.json`), `demo_
 
 **Travel modes (post-v3):** the per-plan answer is the mode the person will use (car → drive, bike, walk, uber → rideshare, neither → walk or a ride if needed). "actually I'll drive" in chat replaces it. No answer by @go → walking, and they're told. Each person's mode comes only from these, so modes the LLM reads from chat are not applied as constraints. Transit: later.
 
-### 9.4 OpenRouteService (`providers/real/ors.py`)
+### 9.4 OpenRouteService (`providers/real/ors.py`) — fallback post-v3
+
+Post-v3, `providers/real/google_routes.py` (Compute Route Matrix + Compute Routes, live traffic for DRIVE) is primary when `PROVIDER_ROUTING=google`; ORS handles any mode Google can't route. The derived-mode rules below (parking, ride-share formula) apply to both.
 
 - Auth: `Authorization: <ORS_API_KEY>` header. Coordinates are **`[lng, lat]`** order. Verify endpoint shapes in the ORS API docs.
 - **Profiles:** `foot-walking` (WALK), `cycling-regular` (BIKE), `driving-car` (DRIVE and RIDESHARE).
@@ -822,21 +895,24 @@ Triggered by `@go`. Target end-to-end latency: ≤ 15 s live, ≤ 3 s in replay.
 1. Snapshot
    - members = the virtual group's members (all READY: enforced at join)
    - handles = members' handles, used for every send_group(handles, ...) below
+   - post-v3: vault.refresh_shared_origins(...) swaps in each sharing member's current Find My location
+     (except members who typed a place during this plan); members with no origin → ask them, back to COLLECTING
    - pid_map = {"p1": user_id, ...}  (random order per session; saved in session)
    - constraints = vault.constraints_for(members, pid_map) -> dict[pid, PrivateConstraints]
    - transcript = session_messages → PseudonymousMessage list
 
 2. Extract   (LLMProvider.extract_preferences + validation)
    - On failure or timeout: retry once; then continue with empty preferences and intent "either".
+   - post-v3: MODE_PREFERENCE constraints are dropped (each person's mode is their own per-plan answer)
 
-3. Discover  (PlacesProvider — reads the OSM venue fixture)
+3. Discover  (PlacesProvider — Google Places, post-v3)
    - center = centroid of origins (computed inside the pipeline from PrivateConstraints; never sent to the LLM)
-   - categories from group_intent and CATEGORY constraints
-   - search_nearby(center, radius 2500 m, categories, open_at = now + 30 min)
-   - Pre-filter: vetoed cuisines/categories, known-closed; keep top ~20 by rating with category variety
+   - categories from group_intent and CATEGORY constraints; wanted cuisines and activities from preferences
+   - search_nearby(center, radius, categories, open_at = now + 30 min, cuisines=..., activities=...)
+   - Shortlist: requested matches first, then the rest closest first, taking turns between kinds of place
    - [Stage 7] ContextProvider.find_events in parallel (Gemini grounding or fallback list); resolved events added as candidates
 
-4. Route     (RoutingProvider.matrix — ORS, one call per needed profile; drive/rideshare derived)
+4. Route     (RoutingProvider.matrix — Google Routes, ORS fallback; one call per needed mode; drive/rideshare derived)
    - origins = {pid: origin}, destinations = {candidate_id: location}
    - modes = {pid: allowed modes}
    - depart_at = now + 5 min
@@ -857,7 +933,7 @@ Triggered by `@go`. Target end-to-end latency: ≤ 15 s live, ≤ 3 s in replay.
 
 After the winner is chosen (`delivery/itinerary.py`):
 ```
-details = {pid: routing.route(origin, venue, mode, depart_at=leave_by)}   # ORS directions for steps
+details = {pid: routing.route(origin, venue, mode, depart_at=leave_by)}   # Google Routes (ORS fallback) steps + a Google Maps link
 send_group(handles, confirmation with the shared arrival time, rounded to the minute)   # v3: sent first
 for each person in winner.assignments:
     send_private(handle, PrivateMessage(text=itinerary text))       # leave_by from the optimizer is exact
@@ -871,13 +947,13 @@ If `route()` fails for someone, fall back to the screening estimate and a generi
 | Layer | Mechanism |
 |---|---|
 | **Storage** | `private_profiles` is read/written only by `app/private/vault.py`. Group and session tables hold no money or location fields. |
-| **Module boundary** | Only `planning/pipeline.py` and `delivery/itinerary.py` may import `app.private.vault`, and only the functions `constraints_for()` and `itinerary_context_for()`. Add a test that greps the codebase for other imports of `app.private` and fails if found. |
+| **Module boundary** | Read API (`constraints_for`, `itinerary_context_for`, `guard_secrets_for`): only `planning/pipeline.py` and `delivery/itinerary.py`. Write API (`link_customer`, `set_limit`, `set_origin`, `clear_origin`, `confirm_origin`, `set_modes`, `clear_modes`, `set_drive`): only `onboarding/fsm.py` and `onboarding/web_claim.py`. Public API (`bank_choices`: demo bank codes + names only): only `web/routes_signup.py`. Refresh API (`refresh_shared_origins`, post-v3): only `planning/pipeline.py`. `tests/test_privacy_boundary.py` enforces this and fails if a new vault function isn't classified. |
 | **Pseudonyms** | Optimizer and LLM see `p1..pN` only. The mapping lives in the session row and is resolved only in delivery. |
 | **LLM minimization** | Extraction receives transcript text + pids, with no budgets, balances, locations, or names. Explanation receives aggregate group-safe facts only. |
 | **Types** | Group messages are built only from `GroupSafeMessage` / `GroupPlanOption`, which have no per-person fields. |
 | **Group-safe fan-out (v3)** | A message sent to every member goes through `send_group(handles, GroupSafeMessage)`, never through a loop of `send_private`. That keeps the type rule and the guard in one place. |
 | **Aggregation** | Group output never shows per-person cost, per-person travel time, limits, or counts of who is constrained. Infeasible plans are hidden. Prices appear as tiers. Travel appears as "≤N min for everyone." |
-| **Output guard** | `messaging/guard.py` scans every outbound group message for: any member's limit (±$1, formats `$25`, `25 dollars`, `25.00`), origin labels, street addresses from profiles, Nessie ids, phone numbers. On match: block, log `privacy_block` (without the value), send a safe template. |
+| **Output guard** | `messaging/guard.py` scans every outbound group message for: any member's limit (±$1, formats `$25`, `25 dollars`, `25.00`), origin labels, Nessie ids, phone numbers, and members' preference DMs. Personal itineraries are checked for *other* members' values (their own computed amounts are exempt). Venue names/addresses are public and skipped. On match: block, log `privacy_block` (kinds only, never the value), send a safe template. |
 | **Member input** | Preferences DMed during COLLECTING are stored only in `session_messages`. They are never relayed to other members, and the bot never repeats money info from them. Join notices show only display names. |
 | **Data retention** | `session_messages` are deleted when a session ends. |
 
@@ -946,7 +1022,8 @@ The only coupling between people is `T_target`: one slow mode pushes everyone's 
 money_i = total_cost_i / limit_i
 time_i  = duration_i / τ_i          τ_i = stated max_travel (any kind) or 30
 pref_i  = 1 − sat_i                 sat_i = Σ(conf × match) / Σ conf over i's SOFT + INFERRED prefs; 0.5 if none
-          match = 1 if the candidate satisfies the preference (cuisine/category/novelty/mode), 0 otherwise
+          match = 1 if the candidate satisfies the preference (cuisine/category/activity/mode), 0 otherwise
+          (post-v3: novelty is not scored; cuisines match by family via optimizer/cuisines.py)
           ("avoid" polarity: match = 1 if NOT satisfied)
 B_i = 0.40·money_i + 0.35·time_i + 0.25·pref_i
 ```
@@ -1011,6 +1088,7 @@ Do not include `binding_constraint` facts that name a person.
 - `CACHE_MODE=record`: call live, write the response.
 - `CACHE_MODE=replay`: return the file if present; on a miss, call live and record it (log `cache_miss`).
 - Rehearse the exact demo in `record` mode, commit the recordings, and run the stage demo in `replay` mode.
+- Post-v3: the earlier OSM/ORS/Gemini recordings were removed with the provider switch (their request shapes changed), so `fixtures/recorded/` is empty until the demo is re-recorded. Until then `replay` calls live APIs, and the golden-transcript extraction test skips without a Gemini key.
 
 ### 14.2 Mocks (only these)
 - `mock/sim_messaging.py`: appends to an in-memory outbox per handle (v3); used by the simulator and tests.
@@ -1024,7 +1102,7 @@ There is no mock LLM or mock finance. Tests that need them use recorded response
 - `GET /sim/outbox/{handle}` → list of messages sent to that handle (group-safe and private).
 - `POST /sim/reset` → clears DB and outbox.
 
-`scripts/run_demo_scenario.py` drives the full §18 script through these endpoints and prints each person's outbox. It doubles as the backup demo if iMessage fails.
+`scripts/run_demo_scenario.py` drives the full §18 script through these endpoints and prints each person's outbox. It doubles as the backup demo if iMessage fails. Post-v3 it uses Google Places (needs the key or recordings); `--routing mock` keeps travel times offline.
 
 ---
 
@@ -1034,22 +1112,22 @@ Work assignment for 4 people (all code against the Stage 0 models and protocols,
 - **A — Core:** Stages 0, 1, 2 (router, FSMs, optimizer).
 - **B — Photon:** Stage 0b, then 6.
 - **C — LLM:** Stage 3 (Gemini), then 7 (stretch).
-- **D — Data:** Stages 4 and 5 (OSM fixture, ORS, Nominatim, Nessie, record/replay).
+- **D — Data:** Stages 4 and 5 (Google Places + Routes post-v3, ORS fallback, Nessie, record/replay).
 
 Suggested clock targets assume Saturday daytime start; adjust to actual time but **keep the 3 AM freeze**.
 
 | Stage | Deliverable | Depends on | Exit criterion | Target |
 |---|---|---|---|---|
 | **0. Skeleton** ✅ done | `pyproject.toml`, settings, logging, all models (§6), protocols (§8), DB tables, `GET /health`, ruff + pytest set up | — | App boots; models import; empty test suite passes | done |
-| **0.5. v2 migration** | Apply the v2 changes to Stage 0 code: settings (§5), `Mode`, `TravelModes`, `OnboardingState`, `RouteStep`, `RouteEstimate.source`, `Candidate.source`, `Uncertain` source comment, `FinancialSnapshot`/`EventFinding` (§6.9), deps (§20), `.env.example`. Update `test_skeleton.py` | 0 | Tests + ruff pass; no references to `xai`, `grok`, `google_maps`, `transit` remain in `app/` | +0.5 h |
+| **0.5. v2 migration** ✅ done | Apply the v2 changes to Stage 0 code: settings (§5), `Mode`, `TravelModes`, `OnboardingState`, `RouteStep`, `RouteEstimate.source`, `Candidate.source`, `Uncertain` source comment, `FinancialSnapshot`/`EventFinding` (§6.9), deps (§20), `.env.example`. Update `test_skeleton.py` | 0 | Tests + ruff pass; no references to `xai`, `grok`, `google_maps`, `transit` remain in `app/` | +0.5 h |
 | **0b. Photon spike** ✅ done | Bridge built (`bridge/`); DMs verified both ways; groups not available on the free plan, which led to the v3 pivot. Answers in README / §9.1 | — | All §9.1 spike questions answered | done |
-| **1. Mock vertical slice** | Simulator, sim messaging, mock routing + places, router, onboarding FSM (bank code can be stubbed to a fixed limit), session FSM, phase-1 optimizer, text poll, personal DMs | 0 | `test_end_to_end.py` runs §18 through the simulator with mocks and a stubbed LLM | +6 h |
-| **1.5. v3 DM-only migration** | Apply the Stage 1.5 checklist below to the Stage 1 code | 1 | `test_end_to_end.py` runs the **v3** §18 script (DMs + join code) through the simulator; tests + ruff pass | +1.5 h |
-| **2. Optimizer + privacy** | Full feasibility filters, arrival logic, diversity selection, facts, PrivacyGuard, all §13.7 and privacy tests | 1 | All optimizer and guard tests pass | +8 h |
-| **3. Gemini extraction** | Real extraction + validation; explanation + number check; 3–5 golden transcripts | 1 | ≥ 90% of expected constraints extracted on golden transcripts; template fallback on failure | +8 h |
-| **4. OSM + ORS** | `fetch_venues.py` (Overpass) + hand-checked fixture with price tiers; `osm_places.py` with Nominatim geocoding; `ors.py` matrix + directions + ride-share derivation; record/replay cache | 1 | Real 3-person scenario returns ORS durations for walk/bike/drive and correct ride-share costs | +9 h |
-| **5. Nessie** | `seed_nessie.py`, real FinanceProvider, budget estimator + tests, link-by-bank-code onboarding | 1 | Three personas produce expected limits; override works | +9 h |
-| **6. Photon integration** | `providers/real/photon.py` (`send_group` = `/send_dm` per handle; `send_private` = `/send_dm`), webhook wired to the bridge, text poll | 0b, 1.5 | Full v3 §18 demo on real phones with mock data providers | +12 h |
+| **1. Mock vertical slice** ✅ done | Simulator, sim messaging, mock routing + places, router, onboarding FSM (bank code can be stubbed to a fixed limit), session FSM, phase-1 optimizer, text poll, personal DMs | 0 | `test_end_to_end.py` runs §18 through the simulator with mocks and a stubbed LLM | +6 h |
+| **1.5. v3 DM-only migration** ✅ done | Apply the Stage 1.5 checklist below to the Stage 1 code | 1 | `test_end_to_end.py` runs the **v3** §18 script (DMs + join code) through the simulator; tests + ruff pass | +1.5 h |
+| **2. Optimizer + privacy** ✅ done | Full feasibility filters, arrival logic, diversity selection, facts, PrivacyGuard, all §13.7 and privacy tests | 1 | All optimizer and guard tests pass | +8 h |
+| **3. Gemini extraction** ✅ done | Real extraction + validation; explanation + number check; 3–5 golden transcripts | 1 | ≥ 90% of expected constraints extracted on golden transcripts; template fallback on failure | +8 h |
+| **4. Places + routing** ✅ done | Built first as OSM + ORS; post-v3 replaced by `google_places.py` (Nearby + Text Search) and `google_routes.py` (ORS fallback); record/replay cache | 1 | Real 3-person scenario returns real durations for walk/bike/drive and correct ride-share costs | done |
+| **5. Nessie** ✅ done | `seed_nessie.py`, real FinanceProvider, budget estimator + tests, link-by-bank-code onboarding | 1 | Three personas produce expected limits; override works | +9 h |
+| **6. Photon integration** ✅ done | `providers/real/photon.py` (`send_group` = `/send_dm` per handle; `send_private` = `/send_dm`), webhook wired to the bridge, text poll | 0b, 1.5 | Full v3 §18 demo on real phones with mock data providers | +12 h |
 | **— Full-loop checkpoint** | Everything real, end to end on phones | 2–6 | One complete live run | +13 h |
 | **Phase 2 scoring** | walk/sched burden terms, arrival spread, uncertainty penalty | checkpoint | Tests still pass; demo outcome still sensible | +15 h |
 | **7. Events (stretch)** | `find_events` via Gemini grounding (if tier allows) or `events_fallback.json`; geocode resolution | 3, 4 | At least one event appears as a candidate with a source URL | +16 h |
@@ -1136,7 +1214,7 @@ Match on `(pid, field, value, kind)`; ignore confidence.
 4. **Bot → all three:** "🔎 Looking at options…" then the same 3-option poll with one-line explanations.
 5. **Vote:** two people reply `A` → all three get "🎉 Plan A: Koko. Everyone arrives around 6:42. Your route is below 👇" followed by their own itinerary.
 6. **Reveal:** hold up the three phones. Sam takes a ~$9 ride-share and leaves last. Maya bikes. Jordan walks, because a ride-share would break his budget, so he leaves first. Different modes and leave-by times, same arrival. Nobody ever saw anyone else's budget, location, or what they asked for.
-7. **Explain the tech (60 s):** fairness objective (show the λ trade-off), synchronized arrival, money-vs-time mode choice per person, privacy guard (show that the LLM prompt contains no money), Nessie-derived limits, built on OpenStreetMap.
+7. **Explain the tech (60 s):** fairness objective (show the λ trade-off), synchronized arrival, money-vs-time mode choice per person, privacy guard (show that the LLM prompt contains no money), Nessie-derived limits, real venues and live-traffic travel times from Google Places and Routes.
 
 **Fallbacks:** if iMessage fails, run `scripts/run_demo_scenario.py` and show outboxes; if that fails, play the backup video.
 
@@ -1151,11 +1229,13 @@ Match on `(pid, field, value, kind)`; ignore confidence.
 | Inbound DMs stop arriving after a bridge restart (seen once in 0b, not yet explained) | Verify inbound with a "ping" DM after every bridge start; don't restart the bridge during judging | Stage 6 |
 | Bot cannot see messages before `@plan` | Designed in: collection starts at `@plan` | — |
 | No transit mode | Ride-share replaces it in the story; GTFS transit is a post-freeze stretch | — |
-| OSM data gaps (missing hours, odd names) | Hand-checked fixture; unknown hours treated as unknown, not guessed | Stage 4 |
-| Free-tier rate limits (Gemini, ORS, Nominatim) | Record/replay during all testing; 2 Gemini calls and 2–3 ORS calls per `@go` | Stages 3–4 |
+| Google Places gaps (no price, missing hours) | No price → "?" (activities) or a typical-cost estimate marked "est."; unknown hours treated as unknown, not guessed | Stage 4 |
+| Google quota or billing exhausted mid-demo | Capped daily quotas; record the rehearsal and run `replay`; `PROVIDER_ROUTING` can drop to `ors`/`mock` | Stage 8 |
+| Find My endpoints rely on `spectrum-ts` internals (`app.__internal`) | Pin `spectrum-ts`; typed places still work if the location calls fail (they never raise) | Stage 6, 8 |
+| Free-tier rate limits (Gemini, Google, ORS) | Record/replay during all testing; 2 Gemini calls and one routing matrix call per mode per `@go` | Stages 3–4 |
 | LLM latency or bad JSON | Temperature 0, schema, validation, one retry, empty-preferences fallback | Stage 3 |
 | Nessie slow/flaky | Record/replay; snapshot at onboarding | Stage 5 |
-| API keys missing | Get Gemini, ORS, and Nessie keys during Stage 0.5 | Stage 0.5 |
+| API keys missing | Gemini, Google (Places + Routes), ORS, and Nessie keys in `.env` | Stage 0.5 |
 | Venue wifi drops during judging | Replay mode; phone hotspot; simulator backup; video | Stage 8 |
 | Privacy leak through explanation text | Number check + PrivacyGuard + tests | Stage 2 |
 
@@ -1163,7 +1243,7 @@ Match on `(pid, field, value, kind)`; ignore confidence.
 1. Demo area: **Ithaca (Collegetown/campus)**.
 2. Group size: **3 in the demo**, cap at 6.
 3. Driving cost: **miles × $0.20 + $3 parking**. Ride-share formula defaults in §5 (estimates; tune so a typical Collegetown → downtown ride is ~$9–12).
-4. Product name: replace `[NAME]` everywhere (`copy.py`, README, Devpost).
+4. Product name: **Huddle** (decided 2026-10-03; `copy.BOT_NAME`, `APP_NAME`, README, Devpost).
 
 ---
 
