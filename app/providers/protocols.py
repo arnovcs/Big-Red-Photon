@@ -17,6 +17,16 @@ class MessagingProvider(Protocol):
 
     async def send_private(self, handle: str, msg: PrivateMessage) -> None: ...
 
+    async def request_location(self, handle: str) -> bool:
+        """Ask this person to share their location (iMessage: a Find My card). True if sent."""
+        ...
+
+    async def shared_location(self, handle: str) -> LatLng | None:
+        """Their current shared location, or None if they aren't sharing with the bot.
+
+        Private: only onboarding may store it, through the vault (§11)."""
+        ...
+
 
 class FinanceProvider(Protocol):
     async def get_customer(self, customer_id: str) -> dict: ...
@@ -31,7 +41,11 @@ class PlacesProvider(Protocol):
         radius_m: int,
         categories: list[str],
         open_at: datetime,
-    ) -> list[Candidate]: ...
+        cuisines: list[str] | None = None,
+    ) -> list[Candidate]:
+        """`cuisines` (e.g. ["japanese"]): wanted cuisines a provider may search for
+        specifically, so matching venues are among the results. Optional to honour."""
+        ...
 
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
 

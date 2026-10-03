@@ -21,6 +21,8 @@ from app.providers.protocols import (
     RoutingProvider,
 )
 from app.providers.real.gemini import GeminiLLM
+from app.providers.real.google_places import GooglePlaces
+from app.providers.real.google_routes import GoogleRoutes
 from app.providers.real.nessie import NessieFinance
 from app.providers.real.ors import OrsRouting
 from app.providers.real.osm_places import OsmPlaces, resolve_path
@@ -57,12 +59,16 @@ def build_deps(
         messaging = SimMessaging()
     cache = RecordReplayCache(settings.cache_mode)
     places: PlacesProvider
-    if settings.provider_places == "osm":
+    if settings.provider_places == "google":
+        places = GooglePlaces(settings, cache)
+    elif settings.provider_places == "osm":
         places = OsmPlaces(settings, cache)
     else:
         places = MockPlaces(venues_path=resolve_path(settings.venues_path))
     routing: RoutingProvider
-    if settings.provider_routing == "ors":
+    if settings.provider_routing == "google":
+        routing = GoogleRoutes(settings, cache)
+    elif settings.provider_routing == "ors":
         routing = OrsRouting(settings, cache)
     else:
         routing = MockRouting(settings)

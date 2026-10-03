@@ -165,9 +165,21 @@ def confirm_limit(amount: Decimal) -> str:
 
 LIMIT_INVALID = "Reply yes, or type a number like 25."
 ASK_LOCATION = (
-    'Where are you starting from? A landmark works, like "Olin Library" or "Collegetown".'
+    "Where are you starting from? Share your location with me (tap the card, then say "
+    '"done"), or type a landmark like "Olin Library" or "Collegetown".'
 )
-LOCATION_NOT_FOUND = 'I couldn\'t find that. Try a nearby landmark, like "Olin Library".'
+LOCATION_NOT_FOUND = (
+    'I couldn\'t find that. Share your location with me and say "done", or try a nearby '
+    'landmark like "Olin Library".'
+)
+LOCATION_FIRST = (
+    'Almost done! First, where are you starting from? Share your location and say "done", '
+    'or type a landmark like "Olin Library".'
+)
+SHARE_NOT_SEEN = (
+    'I can\'t see your location yet. Give it a few seconds and say "done" again, '
+    'or type a landmark like "Olin Library".'
+)
 
 
 def confirm_location(label: str) -> str:
@@ -178,7 +190,28 @@ ASK_MODES = (
     "Last one: do you have a car or a bike with you? Reply car, bike, both, or neither. "
     '(Add "no rideshare" if you\'d rather not take one.)'
 )
+ASK_TRIP_MODES = (
+    "How are you getting there this time? Reply car, bike, both, or neither. "
+    '(Add "no rideshare" if you\'d rather not take one.)'
+)
 MODES_INVALID = "Reply car, bike, both, or neither."
+MODES_FIRST = "First, how are you getting there this time? Reply car, bike, both, or neither."
+TRIP_MODES_SET = "Got it. Now tell me what you're in the mood for!"
+TRIP_LIVE_LOCATION = (
+    "Got it. I'll plan from your live location "
+    '(text "location" to use a different spot). Now tell me what you\'re in the mood for!'
+)
+ASK_TRIP_LOCATION = (
+    "Where are you starting from this time? Share your location with me (tap the card, "
+    'then say "done"), type a place like "Olin Library", or say "same" to start where '
+    "you did last time."
+)
+
+
+def waiting_on(names: list[str]) -> str:
+    return f"Still waiting on {', '.join(names)} to answer my questions."
+
+
 YOU_ARE_SET = "You're set! Start a plan with @plan, or join a friend's with join <code>."
 ALREADY_SET = "You're already set. Text help for options."
 UPDATED = "Updated."
@@ -216,6 +249,10 @@ def leave_line(
     if mode == "drive":
         return f"🚗 Leave by {t} and drive about {travel_min} min (including parking)."
     return f"🚗 Request a ride by {t} (about {pickup_min} min pickup + {ride_min} min drive)."
+
+
+def maps_line(url: str) -> str:
+    return f"🗺️ Directions: {url}"
 
 
 def cost_line(arrive_local: datetime, food: Decimal, fare: Decimal, mode: str) -> str:

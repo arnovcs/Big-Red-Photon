@@ -25,6 +25,8 @@ from app.planning.session import PlanningSessions
 
 log = get_logger(__name__)
 
+PLAN_QUESTION_STATES = {OnboardingState.AWAITING_MODES, OnboardingState.AWAITING_LOCATION}
+
 
 class Router:
     def __init__(self, deps: Deps) -> None:
@@ -77,8 +79,16 @@ class Router:
             first_dm = user.dm_chat_id is None
             user.dm_chat_id = msg.chat_id
 
-            if user.onboarding_state != OnboardingState.READY:
-                parsed = parse_session_command(msg.text)
+            parsed = parse_session_command(msg.text)
+            if (
+                parsed
+                and user.onboarding_state in PLAN_QUESTION_STATES
+                and await queries.active_group_for_user(db, user.id) is not None
+            ):
+                # Mid-question in a plan ("how are you getting there?", "where from?") but
+                # sent @go / @cancel: plan commands still work (@go waits for answers).
+                await self.sessions.handle_command(db, user, msg)
+            elif user.onboarding_state != OnboardingState.READY:
                 if parsed and parsed.command == SessionCommand.JOIN and parsed.arg:
                     await self.onboarding.join_before_ready(user, parsed.arg, first_dm)
                 else:

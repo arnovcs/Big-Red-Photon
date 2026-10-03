@@ -80,9 +80,12 @@ def resolve_path(path: str) -> Path:
 
 
 class OsmPlaces:
-    def __init__(self, settings: Settings, cache: RecordReplayCache) -> None:
+    def __init__(self, settings: Settings, cache: RecordReplayCache, bounded: bool = True) -> None:
         self.settings = settings
         self.cache = cache
+        # True: Nominatim only searches the demo area. False: anywhere, preferring
+        # results near the person (worldwide mode).
+        self.bounded = bounded
         self.tz = ZoneInfo(settings.demo_timezone)
         self.venues: list[dict] = json.loads(
             resolve_path(settings.venues_path).read_text(encoding="utf-8")
@@ -112,7 +115,12 @@ class OsmPlaces:
         )
 
     async def search_nearby(
-        self, center: LatLng, radius_m: int, categories: list[str], open_at: datetime
+        self,
+        center: LatLng,
+        radius_m: int,
+        categories: list[str],
+        open_at: datetime,
+        cuisines: list[str] | None = None,  # the fixture is small: filtering happens later
     ) -> list[Candidate]:
         radius_mi = radius_m / METERS_PER_MILE
         return [
@@ -151,24 +159,27 @@ class OsmPlaces:
         found = match_demo_location(text, self.locations)
         if found is not None:
             return found
-        return await self._nominatim(text)
+        return await self._nominatim(text, near)
 
-    async def _nominatim(self, text: str) -> tuple[LatLng, str] | None:
+    async def _nominatim(self, text: str, near: LatLng) -> tuple[LatLng, str] | None:
         query = " ".join(text.split())
         if not query:
             return None
         if not self.settings.nominatim_user_agent:
             log.warning(kv("nominatim_skipped", reason="NOMINATIM_USER_AGENT not set"))
             return None
-        lat, lng = self.settings.demo_center_lat, self.settings.demo_center_lng
+        if self.bounded:
+            lat, lng = self.settings.demo_center_lat, self.settings.demo_center_lng
+        else:
+            lat, lng = near.lat, near.lng
         params = {
             "q": query,
             "format": "jsonv2",
             "limit": 1,
-            # x1,y1,x2,y2 = lon/lat corners
+            # x1,y1,x2,y2 = lon/lat corners. bounded=1 filters to the box; 0 only prefers it.
             "viewbox": f"{lng - VIEWBOX_DLNG},{lat + VIEWBOX_DLAT},"
             f"{lng + VIEWBOX_DLNG},{lat - VIEWBOX_DLAT}",
-            "bounded": 1,
+            "bounded": 1 if self.bounded else 0,
         }
 
         async def live() -> list[dict]:

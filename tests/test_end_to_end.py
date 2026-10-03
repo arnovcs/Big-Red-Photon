@@ -118,10 +118,19 @@ def outbox(client: TestClient, handle: str) -> list[dict]:
 
 
 def dm(client: TestClient, handle: str, text: str) -> str:
-    """Send a DM as `handle`; return the last message the bot sent back to them."""
+    """Send a DM as `handle`; return everything the bot sent back (one message per line)."""
+    before = len(outbox(client, handle))
     resp = client.post("/sim/message", json={"sender_handle": handle, "text": text})
     assert resp.status_code == 200
-    return outbox(client, handle)[-1]["text"]
+    new = [m["text"] for m in outbox(client, handle)[before:]]
+    return "\n".join(new)
+
+
+def answer_modes(client: TestClient, persona: tuple) -> None:
+    """Per-plan questions, one at a time: how (modes), then where from (nobody shares in
+    the sim, so "same" keeps the starting point from setup)."""
+    assert "Where are you starting from this time?" in dm(client, persona[1], persona[-1])
+    assert "Got it" in dm(client, persona[1], "same")
 
 
 def onboard(client: TestClient, persona: tuple) -> None:
@@ -131,8 +140,7 @@ def onboard(client: TestClient, persona: tuple) -> None:
     assert f"${limit}" in dm(client, handle, code)
     assert "Where are you starting" in dm(client, handle, "yes")
     assert f"Got it: {label}" in dm(client, handle, start)
-    assert "car" in dm(client, handle, "yes")
-    assert "join <code>" in dm(client, handle, modes)
+    assert "join <code>" in dm(client, handle, "yes")  # modes come later, per plan
 
 
 VENUE_NAMES = [v["name"] for v in json.loads(Path("tests/fixtures/venues_test.json").read_text())]
@@ -180,10 +188,13 @@ def test_demo_scenario(harness, caplog: pytest.LogCaptureFixture) -> None:
 
     # Form the virtual group.
     started = dm(client, MAYA[1], "@plan")
+    assert "How are you getting there this time?" in started
     code = re.search(r"join ([A-Z0-9]{4})", started).group(1)
     assert not re.search(r"[01OI]", code)
-    assert dm(client, SAM[1], f"join {code.lower()}").startswith("You're in!")
-    assert dm(client, JORDAN[1], f"ok join {code}").startswith("You're in!")
+    assert "You're in!" in dm(client, SAM[1], f"join {code.lower()}")
+    assert "You're in!" in dm(client, JORDAN[1], f"ok join {code}")
+    for persona in PERSONAS:
+        answer_modes(client, persona)
     for handle in handles:
         assert any(m["text"] == "✅ Jordan joined (3 people)." for m in outbox(client, handle))
 
@@ -304,6 +315,7 @@ def test_join_rules(harness) -> None:
 
     # Any member can cancel; everyone hears about it and the code is retired.
     dm(client, SAM[1], f"join {code}")
+    answer_modes(client, SAM)
     dm(client, SAM[1], "@cancel")
     for handle in (MAYA[1], SAM[1]):
         assert outbox(client, handle)[-1]["text"].startswith("Plan cancelled.")
@@ -316,6 +328,8 @@ def test_nothing_fits_returns_to_collecting_with_a_safe_hint(harness) -> None:
     onboard(client, JORDAN)
     code = re.search(r"join ([A-Z0-9]{4})", dm(client, MAYA[1], "@plan")).group(1)
     dm(client, JORDAN[1], f"join {code}")
+    answer_modes(client, MAYA)
+    answer_modes(client, JORDAN)
     dm(client, JORDAN[1], "it has to be 1 minute away")  # HARD: nothing qualifies
     dm(client, MAYA[1], "something we haven't tried?")  # SOFT: named in the hint
     dm(client, MAYA[1], "@go")
@@ -327,6 +341,6 @@ def test_nothing_fits_returns_to_collecting_with_a_safe_hint(harness) -> None:
     for handle in (MAYA[1], JORDAN[1]):
         assert outbox(client, handle)[-1] == {"kind": "group", "text": expected, "poll": None}
     # Back to COLLECTING: @go runs again (and Jordan's HARD limit still rules everything out).
-    assert dm(client, MAYA[1], "@go") == expected
+    assert dm(client, MAYA[1], "@go").endswith(expected)
     texts = [m["text"] for m in outbox(client, MAYA[1])]
     assert texts.count("🔎 Looking at options…") == 2

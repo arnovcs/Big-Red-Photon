@@ -1,0 +1,400 @@
+"""PlacesProvider on Google Places API (New): worldwide venues with price, hours, rating.
+
+Checked against developers.google.com/maps/documentation/places/web-service:
+POST https://places.googleapis.com/v1/places:searchNearby, headers X-Goog-Api-Key and
+X-Goog-FieldMask (required; there are no default fields). maxResultCount is 1–20.
+priceLevel / rating / regularOpeningHours put the call in the "Nearby Search
+Enterprise" SKU. Opening-hours periods use day 0 = Sunday; a 24-hour place has an
+open point and no close. utcOffsetMinutes gives the venue's own timezone, so
+"open at T" works anywhere without knowing the user's timezone.
+
+One call per category the group wants, through the record/replay cache, plus one
+call for the cuisines people asked for (e.g. "japanese" → japanese, sushi, ramen...
+restaurant types), so matching places are among the options. If Google
+fails or finds nothing, the curated fixture (OsmPlaces) answers instead.
+Geocoding stays on demo landmarks + Nominatim, without the demo-area restriction.
+
+Prices: priceRange (real "$10–20" per person, USD) when Google has it, else the
+priceLevel tier, else a category estimate. Budgets check the range's high end.
+
+Only real, open-for-customers venues are kept: businessStatus OPERATIONAL, not a
+"pure service area business" (caterers, home kitchens: no storefront), and at least
+MIN_REVIEWS reviews (ghost listings have none). All three fields are in the same
+Enterprise SKU we already pay for via rating / price / hours.
+"""
+
+import time
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+
+import httpx
+from tenacity import AsyncRetrying, retry_if_exception, stop_after_attempt
+
+from app.logging import get_logger, kv
+from app.models.candidates import DEFAULT_DURATION_MIN, Candidate, Uncertain
+from app.models.private import LatLng
+from app.optimizer import cuisines as cuisine_families
+from app.providers.cache import RecordReplayCache
+from app.providers.costs import tier_cost
+from app.providers.opening_hours import Status
+from app.providers.real.osm_places import OsmPlaces
+from app.settings import Settings
+
+log = get_logger(__name__)
+
+NEARBY_URL = "https://places.googleapis.com/v1/places:searchNearby"
+FIELDS = [
+    "id",
+    "displayName",
+    "location",
+    "shortFormattedAddress",
+    "formattedAddress",
+    "types",
+    "primaryType",
+    "priceLevel",
+    "priceRange",
+    "rating",
+    "userRatingCount",
+    "businessStatus",
+    "pureServiceAreaBusiness",
+    "regularOpeningHours",
+    "utcOffsetMinutes",
+]
+FIELD_MASK = ",".join(f"places.{f}" for f in FIELDS)
+
+# Our categories → Google place types (Places API (New) "Table A" types).
+CATEGORY_TYPES: dict[str, list[str]] = {
+    "food": ["restaurant"],
+    "cafe": ["cafe", "coffee_shop", "bakery"],
+    "bar": ["bar", "pub"],
+    "dessert": ["ice_cream_shop", "dessert_shop"],
+    "activity": [
+        "movie_theater",
+        "bowling_alley",
+        "amusement_center",
+        "amusement_park",
+        # Outdoors and animals ("let's go to a park", "somewhere with animals").
+        "park",
+        "state_park",
+        "national_park",
+        "hiking_area",
+        "botanical_garden",
+        "garden",
+        "zoo",
+        "aquarium",
+        "wildlife_park",
+        "wildlife_refuge",
+        "museum",
+        "art_gallery",
+        "planetarium",
+    ],
+}
+# "restaurant" matches every kind of restaurant (italian_restaurant, ...), so food
+# filters on any type. The other categories must be the place's *primary* type, or
+# Google returns e.g. a 7-Eleven as a cafe.
+MATCH_ANY_TYPE = {"food"}
+# Never venues for a group outing, whatever else they're tagged with.
+EXCLUDED_PRIMARY_TYPES = [
+    "hotel",
+    "lodging",
+    "convenience_store",
+    "grocery_store",
+    "supermarket",
+    "gas_station",
+]
+PRICE_TIERS = {
+    "PRICE_LEVEL_FREE": "free",
+    "PRICE_LEVEL_INEXPENSIVE": "$",
+    "PRICE_LEVEL_MODERATE": "$$",
+    "PRICE_LEVEL_EXPENSIVE": "$$$",
+    "PRICE_LEVEL_VERY_EXPENSIVE": "$$$$",
+}
+# When Google has no price level: a typical tier for the category, marked estimated.
+CATEGORY_DEFAULT_TIER = {"food": "$$", "cafe": "$", "bar": "$$", "dessert": "$", "activity": "$"}
+# Places that are free to visit unless Google says otherwise.
+FREE_PRIMARY_TYPES = {
+    "park",
+    "state_park",
+    "national_park",
+    "hiking_area",
+    "botanical_garden",
+    "garden",
+    "wildlife_refuge",
+}
+CUISINE_FROM_TYPE = {
+    "coffee_shop": "coffee",
+    "bagel_shop": "bagels",
+    "ice_cream_shop": "ice_cream",
+    "dessert_shop": "dessert",
+    "bakery": "bakery",
+    "pizza_restaurant": "pizza",
+    "noodle_shop": "noodles",
+}
+# Restaurant types we search by cuisine, from Places API (New) Table A.
+# A type Google doesn't know makes the whole request fail, so only listed names.
+CUISINE_SEARCH_TYPES = {
+    "noodle_shop",
+    *(
+        f"{name}_restaurant"
+        for name in (
+            "afghani african american asian asian_fusion barbecue brazilian breakfast "
+            "brunch burmese burrito cambodian cantonese caribbean chinese cuban "
+            "dim_sum dumpling ethiopian filipino french german greek hawaiian hot_pot "
+            "indian indonesian italian japanese japanese_curry japanese_izakaya "
+            "korean korean_barbecue lebanese malaysian mediterranean mexican "
+            "middle_eastern mongolian_barbecue north_indian pakistani peruvian pizza "
+            "ramen seafood south_indian spanish sushi taco taiwanese thai tibetan "
+            "tonkatsu turkish vegan vegetarian vietnamese yakiniku yakitori"
+        ).split()
+    ),
+}
+# Fewer reviews than this → probably not a real venue (or too unknown to recommend).
+MIN_REVIEWS = 10
+MAX_RESULTS = 20
+MAX_TYPES_PER_REQUEST = 50  # Google rejects more ("Too many types in included_types")
+MAX_RESULTS_PER_CATEGORY_WHEN_MANY = 10
+MINUTES_PER_WEEK = 7 * 24 * 60
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    if isinstance(exc, httpx.TransportError):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code >= 500
+    return False
+
+
+def _week_minute(point: dict) -> int:
+    return point.get("day", 0) * 1440 + point.get("hour", 0) * 60 + point.get("minute", 0)
+
+
+def hours_status(place: dict, at: datetime) -> tuple[Status, datetime | None]:
+    """Open/closed at `at` (any timezone) from the place's weekly periods, evaluated in
+    the venue's own local time. No hours or no offset → "unknown"."""
+    periods = (place.get("regularOpeningHours") or {}).get("periods") or []
+    offset = place.get("utcOffsetMinutes")
+    if not periods or offset is None:
+        return "unknown", None
+    local = at.astimezone(UTC) + timedelta(minutes=offset)
+    google_day = (local.weekday() + 1) % 7  # Python Monday=0 → Google Sunday=0
+    now = google_day * 1440 + local.hour * 60 + local.minute
+    for period in periods:
+        start = _week_minute(period.get("open") or {})
+        if "close" not in period:
+            return "open", None  # always open
+        end = _week_minute(period["close"])
+        if end <= start:
+            end += MINUTES_PER_WEEK  # wraps past Saturday night
+        for t in (now, now + MINUTES_PER_WEEK):
+            if start <= t < end:
+                return "open", at + timedelta(minutes=end - t)
+    return "closed", None
+
+
+def _cuisines(place: dict) -> list[str]:
+    primary = place.get("primaryType") or ""
+    if primary in CUISINE_FROM_TYPE:
+        return [CUISINE_FROM_TYPE[primary]]
+    # The primary type first, then any other cuisine types the place has (a place
+    # whose primary type is just "restaurant" can still be a japanese_restaurant).
+    out: list[str] = []
+    for t in [primary, *(place.get("types") or [])]:
+        cuisine = CUISINE_FROM_TYPE.get(t) or (
+            t.removesuffix("_restaurant") if t.endswith("_restaurant") else None
+        )
+        if cuisine and cuisine not in out:
+            out.append(cuisine)
+    return out
+
+
+def _activity_kind(place: dict, category: str) -> list[str]:
+    """Activities get their kind ("park", "museum", "zoo") where food gets a cuisine, so
+    the poll shows it and picks a park, a museum, and a zoo rather than three "activity"."""
+    primary = place.get("primaryType") or ""
+    return [primary] if category == "activity" and primary in CATEGORY_TYPES["activity"] else []
+
+
+def cuisine_types(wanted: list[str]) -> list[str]:
+    """Google restaurant types for wanted cuisines and their families, e.g.
+    ["japanese"] → japanese_restaurant, ramen_restaurant, sushi_restaurant, ..."""
+    types = set()
+    for cuisine in wanted:
+        for name in cuisine_families.expand(cuisine):
+            for t in (f"{name}_restaurant", "noodle_shop" if name == "noodles" else ""):
+                if t in CUISINE_SEARCH_TYPES:
+                    types.add(t)
+    return sorted(types)[:MAX_TYPES_PER_REQUEST]
+
+
+def is_real_venue(place: dict) -> bool:
+    """Open for business, has a storefront, and enough reviews to trust."""
+    return (
+        place.get("businessStatus") == "OPERATIONAL"
+        and not place.get("pureServiceAreaBusiness")
+        and (place.get("userRatingCount") or 0) >= MIN_REVIEWS
+    )
+
+
+def _money(m: dict | None) -> Decimal | None:
+    """A Google Money {currencyCode, units, nanos} in USD, else None (USD-only app).
+    `units` is an int64, so it arrives as a JSON string."""
+    if not m or m.get("currencyCode") != "USD":
+        return None
+    return Decimal(str(m.get("units") or 0)) + Decimal(m.get("nanos") or 0) / Decimal(10**9)
+
+
+def price_from_range(place: dict) -> Uncertain[Decimal] | None:
+    """Real per-person prices from priceRange, e.g. $10–20 → typical $15, high $20.
+    endPrice may be unset ("More than $50"): then the start is all we know."""
+    price_range = place.get("priceRange") or {}
+    low = _money(price_range.get("startPrice"))
+    if low is None:
+        return None
+    high = _money(price_range.get("endPrice"))
+    typical = (low + high) / 2 if high is not None else low
+    return Uncertain[Decimal](
+        value=typical, low=low, high=high, status="estimated", source="google_price_range"
+    )
+
+
+def place_cost(place: dict, category: str) -> Uncertain[Decimal]:
+    """Best price we have: real range, then Google's $ level, then a category guess."""
+    from_range = price_from_range(place)
+    if from_range is not None:
+        return from_range
+    tier = PRICE_TIERS.get(place.get("priceLevel", ""))
+    if tier is not None:
+        return tier_cost(tier, source="google")
+    if place.get("primaryType") in FREE_PRIMARY_TYPES:
+        return tier_cost("free", source="category_estimate")
+    return tier_cost(CATEGORY_DEFAULT_TIER.get(category), source="category_estimate")
+
+
+def to_candidate(place: dict, category: str, at: datetime) -> Candidate | None:
+    if not is_real_venue(place):
+        return None
+    location = place.get("location") or {}
+    name = (place.get("displayName") or {}).get("text")
+    if not name or "latitude" not in location or "longitude" not in location:
+        return None
+    cost = place_cost(place, category)
+    status, closes_at = hours_status(place, at)
+    return Candidate(
+        candidate_id=f"google:{place.get('id', name)}",
+        name=name,
+        category=category,
+        cuisines=_cuisines(place) or _activity_kind(place, category),
+        location=LatLng(lat=location["latitude"], lng=location["longitude"]),
+        address=place.get("shortFormattedAddress") or place.get("formattedAddress") or "",
+        est_cost_pp=cost,
+        open_at_target=status,
+        closes_at=closes_at,
+        typical_duration_min=DEFAULT_DURATION_MIN.get(category, 60),
+        rating=place.get("rating"),
+        source="google",
+    )
+
+
+class GooglePlaces:
+    def __init__(self, settings: Settings, cache: RecordReplayCache) -> None:
+        self.settings = settings
+        self.cache = cache
+        # Fixture search as the fallback; geocoding without the demo-area restriction.
+        self.fallback = OsmPlaces(settings, cache, bounded=False)
+
+    async def _post(self, body: dict) -> dict:
+        async def live() -> dict:
+            start = time.monotonic()
+            async for attempt in AsyncRetrying(
+                stop=stop_after_attempt(2),
+                retry=retry_if_exception(_is_retryable),
+                reraise=True,
+            ):
+                with attempt:
+                    async with httpx.AsyncClient(timeout=self.settings.http_timeout_sec) as c:
+                        response = await c.post(
+                            NEARBY_URL,
+                            json=body,
+                            headers={
+                                "X-Goog-Api-Key": self.settings.google_places_api_key,
+                                "X-Goog-FieldMask": FIELD_MASK,
+                            },
+                        )
+                        response.raise_for_status()
+            log.info(
+                kv(
+                    "provider_call",
+                    provider="google_places",
+                    method="search_nearby",
+                    status=response.status_code,
+                    latency_ms=round((time.monotonic() - start) * 1000),
+                )
+            )
+            return response.json()
+
+        request = {"body": body, "field_mask": FIELD_MASK}
+        return await self.cache.call("google_places", "search_nearby", request, live)
+
+    def _nearby_body(
+        self, center: LatLng, radius_m: int, type_filter: str, types: list[str], n: int
+    ) -> dict:
+        return {
+            type_filter: types,
+            "excludedPrimaryTypes": EXCLUDED_PRIMARY_TYPES,
+            "maxResultCount": n,
+            "locationRestriction": {
+                "circle": {
+                    # ~10 m rounding keeps the cache key stable for the same group.
+                    "center": {
+                        "latitude": round(center.lat, 4),
+                        "longitude": round(center.lng, 4),
+                    },
+                    "radius": float(min(radius_m, 50_000)),
+                }
+            },
+        }
+
+    async def search_nearby(
+        self,
+        center: LatLng,
+        radius_m: int,
+        categories: list[str],
+        open_at: datetime,
+        cuisines: list[str] | None = None,
+    ) -> list[Candidate]:
+        wanted = [c for c in (categories or list(CATEGORY_TYPES)) if c in CATEGORY_TYPES]
+        per_call = MAX_RESULTS if len(wanted) == 1 else MAX_RESULTS_PER_CATEGORY_WHEN_MANY
+        # (label, category, body). Wanted cuisines first, so those venues are kept.
+        searches: list[tuple[str, str, dict]] = []
+        types = cuisine_types(cuisines or [])
+        if types:
+            body = self._nearby_body(center, radius_m, "includedTypes", types, MAX_RESULTS)
+            searches.append(("cuisine", "food", body))
+        for category in wanted:
+            type_filter = "includedTypes" if category in MATCH_ANY_TYPE else "includedPrimaryTypes"
+            # Activities span many kinds (parks, museums, zoos...): always the full 20.
+            n = MAX_RESULTS if category == "activity" else per_call
+            body = self._nearby_body(center, radius_m, type_filter, CATEGORY_TYPES[category], n)
+            searches.append((category, category, body))
+
+        found: dict[str, Candidate] = {}
+        for label, category, body in searches:
+            try:
+                response = await self._post(body)
+            except Exception as exc:
+                log.warning(kv("google_places_failed", category=label, error=type(exc).__name__))
+                continue
+            for place in response.get("places") or []:
+                candidate = to_candidate(place, category, open_at)
+                if candidate and candidate.candidate_id not in found:
+                    found[candidate.candidate_id] = candidate
+        if found:
+            return list(found.values())
+        log.warning(kv("google_places_empty_using_fixture"))
+        return await self.fallback.search_nearby(center, radius_m, categories, open_at)
+
+    async def text_search(self, query: str, near: LatLng) -> list[Candidate]:
+        return await self.fallback.text_search(query, near)
+
+    async def geocode(self, text: str, near: LatLng) -> tuple[LatLng, str] | None:
+        return await self.fallback.geocode(text, near)

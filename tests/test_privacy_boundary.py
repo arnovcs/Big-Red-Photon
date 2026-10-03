@@ -22,10 +22,12 @@ WRITE_API = {
     "clear_origin",
     "confirm_origin",
     "set_modes",
+    "clear_modes",
     "set_drive",
 }
+REFRESH_API = {"refresh_shared_origins"}
 ALLOWED = {
-    "planning/pipeline.py": READ_API,
+    "planning/pipeline.py": READ_API | REFRESH_API,
     "delivery/itinerary.py": READ_API,
     "onboarding/fsm.py": WRITE_API,
 }
@@ -86,7 +88,7 @@ def test_vault_api_is_fully_classified() -> None:
         for name, fn in inspect.getmembers(vault, inspect.iscoroutinefunction)
         if not name.startswith("_") and fn.__module__ == vault.__name__
     }
-    assert public == READ_API | WRITE_API, "classify new vault functions as read or write"
+    assert public == READ_API | WRITE_API | REFRESH_API, "classify new vault functions"
 
 
 def test_only_allowed_modules_use_app_private_and_only_their_functions() -> None:

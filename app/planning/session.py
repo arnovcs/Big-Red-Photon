@@ -27,8 +27,10 @@ from app.logging import get_logger, kv
 from app.messaging.guard import PrivacyGuard
 from app.messaging.outbound import send_group, send_private
 from app.models.conversation import InboundMessage
+from app.models.identity import OnboardingState
 from app.models.outbound import GroupSafeMessage, PrivateMessage
 from app.models.plans import Plan
+from app.onboarding.fsm import Onboarding
 from app.planning import pipeline
 from app.planning.pipeline import PlanningResult
 
@@ -38,6 +40,8 @@ JOIN_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # no 0/O/1/I
 JOIN_CODE_LENGTH = 4
 MAX_GROUP_SIZE = 6
 MIN_GROUP_SIZE = 2
+# Plan questions ("how are you getting there?", "where from?") still unanswered.
+QUESTION_STATES = {OnboardingState.AWAITING_MODES, OnboardingState.AWAITING_LOCATION}
 
 RunLocked = Callable[[Callable[[], Awaitable[None]]], Awaitable[None]]
 Spawn = Callable[[Coroutine[Any, Any, None]], None]
@@ -163,6 +167,8 @@ class PlanningSessions:
         group.active_session_id = session.id
         await db.commit()
         await self._reply(user, copy.plan_started(group.join_code))
+        await Onboarding(self.deps).ask_trip_modes(db, user)
+        await db.commit()
 
     async def _join(
         self, db: AsyncSession, user: UserRow, current: GroupRow | None, code: str
@@ -188,6 +194,8 @@ class PlanningSessions:
             db, group.id, session.id, copy.joined(user.display_name or "Someone", count + 1)
         )
         await self._reply(user, copy.YOU_JOINED)
+        await Onboarding(self.deps).ask_trip_modes(db, user)
+        await db.commit()
 
     async def _go(
         self, db: AsyncSession, user: UserRow, group: GroupRow, session: SessionRow
@@ -196,6 +204,14 @@ class PlanningSessions:
             return
         if await queries.member_count(db, group.id) < MIN_GROUP_SIZE:
             await self._reply(user, copy.need_two(group.join_code))
+            return
+        members = await queries.group_members(db, group.id)
+        waiting = [m for m in members if m.onboarding_state in QUESTION_STATES]
+        if waiting:
+            await self._reply(user, copy.waiting_on([m.display_name or "someone" for m in waiting]))
+            for m in waiting:
+                still = m.onboarding_state == OnboardingState.AWAITING_MODES
+                await self._reply(m, copy.ASK_TRIP_MODES if still else copy.ASK_TRIP_LOCATION)
             return
         session.state = SessionState.RUNNING
         await db.commit()
@@ -326,6 +342,9 @@ class PlanningSessions:
         await db.execute(
             delete(SessionMessageRow).where(SessionMessageRow.session_id == session.id)
         )
+        for member in await queries.group_members(db, group.id):
+            if member.onboarding_state in QUESTION_STATES:
+                member.onboarding_state = OnboardingState.READY  # don't strand them
         group.active_session_id = None
         await db.commit()
 

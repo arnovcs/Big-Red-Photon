@@ -3,6 +3,7 @@
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 from app.conversation import copy
@@ -15,6 +16,7 @@ from app.messaging.guard import PrivacyGuard
 from app.messaging.outbound import send_group, send_private
 from app.models.outbound import GroupSafeMessage, PrivateMessage
 from app.models.plans import PersonAssignment, Plan
+from app.models.private import LatLng
 from app.models.routing import Mode, RouteStep
 from app.optimizer.arrival import whole_minutes
 from app.planning.pipeline import load_pid_map
@@ -24,6 +26,26 @@ from app.providers.costs import DRIVE_PARKING_MIN
 log = get_logger(__name__)
 
 MAX_STEPS_SHOWN = 5
+
+# Google Maps URLs (no API key; developers.google.com/maps/documentation/urls).
+# Ride-share gets driving directions: Uber deep links need a registered client_id.
+GOOGLE_TRAVEL_MODE = {
+    Mode.WALK: "walking",
+    Mode.BIKE: "bicycling",
+    Mode.DRIVE: "driving",
+    Mode.RIDESHARE: "driving",
+}
+
+
+def directions_url(destination: LatLng, mode: Mode) -> str:
+    """Google Maps directions to the venue. No origin: Maps starts from the phone's
+    current location, so nobody's starting point ever goes into a message."""
+    query = {
+        "api": "1",
+        "destination": f"{destination.lat:.5f},{destination.lng:.5f}",
+        "travelmode": GOOGLE_TRAVEL_MODE[mode],
+    }
+    return "https://www.google.com/maps/dir/?" + urlencode(query)
 
 
 def itinerary_text(
@@ -50,6 +72,7 @@ def itinerary_text(
     ]
     if assignment.mode != Mode.RIDESHARE:
         lines.extend(f"• {step.instruction}" for step in steps[:MAX_STEPS_SHOWN])
+    lines.append(copy.maps_line(directions_url(venue.location, assignment.mode)))
     food = _food_cost(plan, assignment)
     lines.append(copy.cost_line(arrive_local, food, assignment.fare_usd, assignment.mode.value))
     return "\n".join(lines)

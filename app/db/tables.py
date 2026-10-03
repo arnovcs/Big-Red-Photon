@@ -59,6 +59,9 @@ class PrivateProfileRow(Base):
     origin_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
     origin_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
     origin_label: Mapped[str | None] = mapped_column(String, nullable=True)
+    # When the person last TYPED their origin (None = it came from location sharing).
+    # A typed origin wins over live location for the plan it was typed in.
+    origin_typed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     modes_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
 

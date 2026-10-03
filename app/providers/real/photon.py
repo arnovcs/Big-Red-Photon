@@ -5,6 +5,7 @@ replaying a send would mean a message never reaches the phone.
 """
 
 import time
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from tenacity import (
@@ -15,6 +16,7 @@ from tenacity import (
 
 from app.logging import get_logger, kv, mask_handle
 from app.models.outbound import GroupSafeMessage, PrivateMessage
+from app.models.private import LatLng
 from app.settings import Settings
 
 log = get_logger(__name__)
@@ -38,6 +40,7 @@ class PhotonMessaging:
     def __init__(self, settings: Settings) -> None:
         self.bridge_url = settings.bridge_url.rstrip("/")
         self.timeout = settings.http_timeout_sec
+        self.max_location_age = timedelta(minutes=settings.shared_location_max_age_min)
 
     async def send_group(self, handles: list[str], msg: GroupSafeMessage) -> None:
         # msg.text already contains the rendered poll options (copy.poll_message).
@@ -50,6 +53,46 @@ class PhotonMessaging:
 
     async def send_private(self, handle: str, msg: PrivateMessage) -> None:
         await self._send_dm(handle, msg.text)
+
+    async def request_location(self, handle: str) -> bool:
+        """Sends Apple's Find My "share your location" card. Best effort: never raises."""
+        try:
+            response = await self._post("/request_location", {"handle": handle})
+            return response.status_code == 200 and response.json().get("status") == "sent"
+        except Exception:
+            log.warning(kv("photon_request_location_failed", handle=mask_handle(handle)))
+            return False
+
+    async def shared_location(self, handle: str) -> LatLng | None:
+        """The person's Find My location, if shared with the bot. Never logs coordinates."""
+        try:
+            response = await self._post("/location", {"handle": handle})
+            if response.status_code != 200:
+                return None
+            data = response.json()
+            if data.get("type") == "legacy" or self._is_stale(data.get("at")):
+                return None  # an old snapshot: they've probably stopped sharing
+            return LatLng(lat=float(data["lat"]), lng=float(data["lng"]))
+        except Exception:
+            log.warning(kv("photon_shared_location_failed", handle=mask_handle(handle)))
+            return None
+
+    def _is_stale(self, at: str | None) -> bool:
+        """True if the snapshot's timestamp is older than the max age. No or unreadable
+        timestamp → trust it (Photon says the time "may be absent")."""
+        if not at:
+            return False
+        try:
+            taken = datetime.fromisoformat(str(at).replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        if taken.tzinfo is None:
+            taken = taken.replace(tzinfo=UTC)
+        return datetime.now(UTC) - taken > self.max_location_age
+
+    async def _post(self, path: str, body: dict) -> httpx.Response:
+        async with httpx.AsyncClient(timeout=self.timeout) as client:
+            return await client.post(f"{self.bridge_url}{path}", json=body)
 
     async def _send_dm(self, handle: str, text: str) -> None:
         start = time.monotonic()

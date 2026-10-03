@@ -1,0 +1,212 @@
+{
+ "places": [
+  {
+   "id": "ChIJmoosewood",
+   "displayName": {
+    "text": "Moosewood",
+    "languageCode": "en"
+   },
+   "location": {
+    "latitude": 42.441,
+    "longitude": -76.4985
+   },
+   "formattedAddress": "215 N Cayuga St, Ithaca, NY 14850, USA",
+   "shortFormattedAddress": "215 N Cayuga St, Ithaca",
+   "types": [
+    "vegetarian_restaurant",
+    "restaurant",
+    "food",
+    "point_of_interest",
+    "establishment"
+   ],
+   "primaryType": "vegetarian_restaurant",
+   "priceLevel": "PRICE_LEVEL_MODERATE",
+   "rating": 4.4,
+   "utcOffsetMinutes": -240,
+   "regularOpeningHours": {
+    "openNow": true,
+    "periods": [
+     {
+      "open": {
+       "day": 0,
+       "hour": 11,
+       "minute": 0
+      },
+      "close": {
+       "day": 0,
+       "hour": 21,
+       "minute": 0
+      }
+     },
+     {
+      "open": {
+       "day": 6,
+       "hour": 11,
+       "minute": 0
+      },
+      "close": {
+       "day": 6,
+       "hour": 21,
+       "minute": 0
+      }
+     }
+    ]
+   },
+   "businessStatus": "OPERATIONAL",
+   "userRatingCount": 1200
+  },
+  {
+   "id": "ChIJgimme",
+   "displayName": {
+    "text": "Gimme! Coffee",
+    "languageCode": "en"
+   },
+   "location": {
+    "latitude": 42.4445,
+    "longitude": -76.4995
+   },
+   "shortFormattedAddress": "430 N Cayuga St, Ithaca",
+   "types": [
+    "coffee_shop",
+    "cafe",
+    "food",
+    "establishment"
+   ],
+   "primaryType": "coffee_shop",
+   "rating": 4.6,
+   "utcOffsetMinutes": -240,
+   "businessStatus": "OPERATIONAL",
+   "userRatingCount": 450
+  },
+  {
+   "id": "ChIJlatebar",
+   "displayName": {
+    "text": "Late Bar",
+    "languageCode": "en"
+   },
+   "location": {
+    "latitude": 42.4394,
+    "longitude": -76.4992
+   },
+   "shortFormattedAddress": "101 W State St, Ithaca",
+   "types": [
+    "bar",
+    "establishment"
+   ],
+   "primaryType": "bar",
+   "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+   "utcOffsetMinutes": -240,
+   "regularOpeningHours": {
+    "periods": [
+     {
+      "open": {
+       "day": 6,
+       "hour": 20,
+       "minute": 0
+      },
+      "close": {
+       "day": 0,
+       "hour": 2,
+       "minute": 0
+      }
+     }
+    ]
+   },
+   "businessStatus": "OPERATIONAL",
+   "userRatingCount": 85
+  },
+  {
+   "id": "ChIJdiner",
+   "displayName": {
+    "text": "Always Diner",
+    "languageCode": "en"
+   },
+   "location": {
+    "latitude": 42.44,
+    "longitude": -76.496
+   },
+   "shortFormattedAddress": "1 Main St, Ithaca",
+   "types": [
+    "diner",
+    "restaurant",
+    "establishment"
+   ],
+   "primaryType": "diner",
+   "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+   "utcOffsetMinutes": -240,
+   "regularOpeningHours": {
+    "periods": [
+     {
+      "open": {
+       "day": 0,
+       "hour": 0,
+       "minute": 0
+      }
+     }
+    ]
+   },
+   "businessStatus": "OPERATIONAL",
+   "userRatingCount": 300
+  },
+  {
+   "id": "ChIJghost",
+   "displayName": {
+    "text": "Home Bakery",
+    "languageCode": "en"
+   },
+   "location": {
+    "latitude": 42.45,
+    "longitude": -76.49
+   },
+   "shortFormattedAddress": "21 Some Pl, Ithaca",
+   "types": [
+    "bakery",
+    "establishment"
+   ],
+   "primaryType": "bakery",
+   "businessStatus": "OPERATIONAL",
+   "utcOffsetMinutes": -240
+  },
+  {
+   "id": "ChIJcaterer",
+   "displayName": {
+    "text": "Curry Catering",
+    "languageCode": "en"
+   },
+   "location": {
+    "latitude": 42.45,
+    "longitude": -76.49
+   },
+   "types": [
+    "restaurant",
+    "establishment"
+   ],
+   "primaryType": "indian_restaurant",
+   "businessStatus": "OPERATIONAL",
+   "pureServiceAreaBusiness": true,
+   "rating": 4.9,
+   "userRatingCount": 40,
+   "utcOffsetMinutes": -240
+  },
+  {
+   "id": "ChIJclosed",
+   "displayName": {
+    "text": "Shut Cafe",
+    "languageCode": "en"
+   },
+   "location": {
+    "latitude": 42.45,
+    "longitude": -76.49
+   },
+   "types": [
+    "cafe",
+    "establishment"
+   ],
+   "primaryType": "cafe",
+   "businessStatus": "CLOSED_TEMPORARILY",
+   "rating": 4.5,
+   "userRatingCount": 200,
+   "utcOffsetMinutes": -240
+  }
+ ]
+}

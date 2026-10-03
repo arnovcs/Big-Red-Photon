@@ -26,7 +26,7 @@ class RouteEstimate(BaseModel):
     walk_min: float  # equals duration for WALK; 0 for other modes
     # walk/bike: 0; drive: miles × rate + parking; rideshare: formula (status="estimated")
     fare_usd: Uncertain[Decimal]
-    source: Literal["ors", "mock"]
+    source: Literal["ors", "google", "mock"]
 
 
 class RouteStep(BaseModel):

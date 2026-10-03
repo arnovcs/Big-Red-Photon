@@ -41,9 +41,21 @@ def session_factory() -> async_sessionmaker[AsyncSession]:
     return _session_factory
 
 
+# Columns added after the first release: (table, column, SQL type). create_all() makes
+# new tables but never alters existing ones, so existing app.db files get these here.
+ADDED_COLUMNS = [("private_profiles", "origin_typed_at", "DATETIME")]
+
+
 async def init_db() -> None:
     async with get_engine().begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        if conn.dialect.name == "sqlite":
+            for table, column, sql_type in ADDED_COLUMNS:
+                rows = await conn.exec_driver_sql(f"PRAGMA table_info({table})")
+                if column not in {row[1] for row in rows}:
+                    await conn.exec_driver_sql(
+                        f"ALTER TABLE {table} ADD COLUMN {column} {sql_type}"
+                    )
 
 
 async def reset_db() -> None:

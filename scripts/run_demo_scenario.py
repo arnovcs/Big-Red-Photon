@@ -2,6 +2,13 @@
 
     uv run python scripts/run_demo_scenario.py           # mock places + mock routing
     uv run python scripts/run_demo_scenario.py --live    # OSM venues + OpenRouteService
+    uv run python scripts/run_demo_scenario.py --live --places google   # Google venues + ORS
+    uv run python scripts/run_demo_scenario.py --live --places google --routing google
+        # + Google Routes for every mode (live traffic for driving; ORS as fallback)
+    uv run python scripts/run_demo_scenario.py --live --places google \
+        --starts "Perrigo Park, Redmond WA" "Redmond Town Center" "Marymoor Park" \
+        --now 2026-10-04T12:00:00-07:00     # anywhere: 3 starts (Maya, Sam, Jordan)
+    (outside Eastern time, also set DEMO_TIMEZONE=America/Los_Angeles etc.)
 
 With --live, CACHE_MODE from .env decides the network use:
     CACHE_MODE=record  → real ORS (and Nominatim, if needed) calls, saved to fixtures/recorded/
@@ -17,6 +24,7 @@ Also the backup demo if iMessage fails.
 
 import argparse
 import json
+import random
 import re
 import sys
 import tempfile
@@ -77,17 +85,32 @@ def winning_plan(client: TestClient) -> tuple[Plan, dict[str, str]] | None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run the §18 demo through the simulator.")
-    parser.add_argument("--live", action="store_true", help="use OSM places + ORS routing")
+    parser.add_argument("--live", action="store_true", help="use real places + ORS routing")
+    parser.add_argument(
+        "--places", choices=["osm", "google"], default="osm", help="venue source with --live"
+    )
+    parser.add_argument(
+        "--routing", choices=["ors", "google"], default="ors", help="routing with --live"
+    )
     parser.add_argument("--now", default=DEFAULT_NOW, help="pinned local time (ISO 8601)")
+    parser.add_argument(
+        "--starts",
+        nargs=len(PERSONAS),
+        metavar="PLACE",
+        help="starting points for Maya, Sam, Jordan (any place Nominatim can find)",
+    )
     args = parser.parse_args()
+    starts = args.starts or [start for *_, start, _ in PERSONAS]
 
     now = datetime.fromisoformat(args.now)
+    # Same p1/p2/p3 shuffle every run, so the Gemini prompt (and its cache key) repeats.
+    random.seed(0)
     tmp = Path(tempfile.mkdtemp(prefix="demo-"))
     settings = get_settings().model_copy(
         update={
             "provider_messaging": "sim",
-            "provider_places": "osm" if args.live else "mock",
-            "provider_routing": "ors" if args.live else "mock",
+            "provider_places": args.places if args.live else "mock",
+            "provider_routing": args.routing if args.live else "mock",
             "nessie_api_key": "",
             "database_url": f"sqlite+aiosqlite:///{tmp / 'demo.db'}",
             "poll_timeout_sec": 3600,
@@ -101,15 +124,21 @@ def main() -> None:
 
     app = create_app(build_deps(settings, clock=lambda: now))
     with TestClient(app) as client:
-        for name, handle, code, start, modes in PERSONAS:
-            for text in ["start", name, code, "yes", start, "yes", modes]:
+        for (name, handle, code, _, _), start in zip(PERSONAS, starts, strict=True):
+            for text in ["start", name, code, "yes", start, "yes"]:
                 dm(client, handle, text)
+            got_it = [m["text"] for m in outbox(client, handle) if m["text"].startswith("Got it")]
+            print(f"{name} starts at: {got_it[-1] if got_it else 'NOT FOUND (check spelling)'}")
 
         dm(client, handles["Maya"], "@plan")
-        started = outbox(client, handles["Maya"])[-1]["text"]
-        code = re.search(r"join ([A-Z0-9]{4})", started).group(1)
+        sent = " ".join(m["text"] for m in outbox(client, handles["Maya"]))
+        code = re.findall(r"join ([A-Z0-9]{4})", sent)[-1]
         dm(client, handles["Sam"], f"join {code}")
         dm(client, handles["Jordan"], f"join {code}")
+        # Asked per plan, one at a time: how, then where from ("same" = setup's place).
+        for name, _, _, _, modes in PERSONAS:
+            dm(client, handles[name], modes)
+            dm(client, handles[name], "same")
         for name, text in PREFERENCES:
             dm(client, handles[name], text)
         dm(client, handles["Maya"], "@go")
@@ -139,7 +168,7 @@ def main() -> None:
 
         async def all_modes() -> list:
             origins = {}
-            for name, _, _, start, _ in PERSONAS:
+            for (name, *_), start in zip(PERSONAS, starts, strict=True):
                 found = await deps.places.geocode(start, center)
                 origins[name] = found[0]
             return await deps.routing.matrix(

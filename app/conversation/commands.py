@@ -83,6 +83,10 @@ def parse_modes(text: str) -> TravelModes | None:
     lowered = text.lower()
     no_rideshare = bool(re.search(r"no\s*(ride\s*-?\s*share|uber|lyft)", lowered))
     words = set(_words(lowered))
+    words |= {"car" for w in ("drive", "driving", "driven") if w in words}
+    words |= {"bike" for w in ("biking", "bicycle", "cycling", "bikes") if w in words}
+    if not words & {"car", "bike", "both"} and words & {"walk", "walking", "foot"}:
+        words.add("neither")
     if "both" in words:
         car, bike = True, True
     elif "neither" in words or "none" in words:

@@ -11,6 +11,7 @@ from app.models.conversation import (
 )
 from app.models.plans import BurdenBreakdown
 from app.models.routing import Mode
+from app.optimizer import cuisines
 from app.optimizer.feasibility import values_of
 from app.optimizer.params import OptimizerParams
 
@@ -37,7 +38,7 @@ def satisfies(c: ExtractedConstraint, candidate: Candidate) -> bool | None:
     """
     values = values_of(c)
     if c.field == ConstraintField.CUISINE:
-        return any(v in {x.lower() for x in candidate.cuisines} for v in values)
+        return cuisines.matches(values, candidate.cuisines)  # "asian" matches sushi
     if c.field == ConstraintField.CATEGORY:
         return candidate.category.lower() in values
     if c.field == ConstraintField.NOVELTY:

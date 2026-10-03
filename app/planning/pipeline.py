@@ -32,6 +32,7 @@ from app.models.conversation import (
 from app.models.plans import Plan
 from app.models.private import LatLng, PrivateConstraints
 from app.optimizer import OptimizerParams, facts
+from app.optimizer import cuisines as cuisine_families
 from app.optimizer.enumerate import EstimateIndex
 from app.optimizer.feasibility import allowed_modes
 from app.planning.explain import explain
@@ -131,10 +132,27 @@ def _centroid(constraints: dict[str, PrivateConstraints]) -> LatLng:
     )
 
 
-def _shortlist(candidates: list[Candidate]) -> list[Candidate]:
-    """Drop known-closed; keep the top MAX_CANDIDATES by rating (stable order)."""
+def _wanted_cuisines(preferences: GroupPreferences) -> list[str]:
+    """Cuisines someone asked for ("I want japanese"), not ones they ruled out."""
+    wanted: list[str] = []
+    for c in preferences.constraints:
+        if (
+            c.field == ConstraintField.CUISINE
+            and c.polarity == "want"
+            and c.kind != ConstraintKind.VETO
+        ):
+            values = c.value if isinstance(c.value, list) else [c.value]
+            wanted.extend(str(v).lower() for v in values if str(v).lower() not in wanted)
+    return wanted
+
+
+def _shortlist(candidates: list[Candidate], wanted_cuisines: list[str]) -> list[Candidate]:
+    """Drop known-closed; keep the top MAX_CANDIDATES, venues serving a wanted cuisine
+    first, then by rating (stable order)."""
     open_ = [c for c in candidates if c.open_at_target != "closed"]
-    open_.sort(key=lambda c: -(c.rating or 0))
+    open_.sort(
+        key=lambda c: (not cuisine_families.matches(wanted_cuisines, c.cuisines), -(c.rating or 0))
+    )
     return open_[:MAX_CANDIDATES]
 
 
@@ -164,6 +182,14 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
         if session is None:
             raise LookupError("session not found")
         members = await queries.group_members(db, group_id)
+        # Plan from where people are now: anyone sharing their location gets it refreshed.
+        await vault.refresh_shared_origins(
+            db,
+            {m.id: m.handle for m in members},
+            deps.messaging,
+            keep_typed_since=as_utc(session.started_at),  # a place typed this plan wins
+        )
+        await db.commit()
         pid_map = make_pid_map([m.id for m in members])
         constraints = await vault.constraints_for(db, pid_map)
         pid_map = {pid: uid for pid, uid in pid_map.items() if pid in constraints}
@@ -178,13 +204,15 @@ async def compute(deps: Deps, group_id: uuid.UUID, session_id: uuid.UUID) -> Pla
     preferences = await _extract(deps, transcript, now_local)
 
     # 3. Discover
+    wanted_cuisines = _wanted_cuisines(preferences)
     candidates = await deps.places.search_nearby(
         _centroid(constraints),
         SEARCH_RADIUS_M,
         _categories(preferences),
         open_at=now_local + timedelta(minutes=OPEN_AT_OFFSET_MIN),
+        cuisines=wanted_cuisines,
     )
-    candidates = _shortlist(candidates)
+    candidates = _shortlist(candidates, wanted_cuisines)
 
     # 4. Route
     estimates = await deps.routing.matrix(
