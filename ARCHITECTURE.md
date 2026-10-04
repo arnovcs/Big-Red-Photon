@@ -111,7 +111,7 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 | Finance | Capital One Nessie sandbox + deterministic estimator | LLM never sees balances. |
 | Optimizer | Exact enumeration, hard filters, min-max + mean burden | Small search space; fully explainable; no solver dependency. |
 | Demo reliability | Record/replay cache + simulator + mock routing (places have no in-app mock post-v3; tests use a stub) | Real data on stage without live-API risk, once the demo is recorded (§14.1). |
-| Hosting | One team laptop + phone hotspot backup | Spectrum holds an outgoing connection; no public URL needed. |
+| Hosting | One team laptop + phone hotspot backup | Spectrum holds an outgoing connection, so the bot needs no public URL. Post-v3, only the signup page is public: **https://tryhuddle.us/signup** (Cloudflare DNS) via the named Cloudflare Tunnel `huddle` running on that laptop (`cloudflared tunnel run --url http://localhost:8000 huddle`). Nothing auto-deploys: the site serves whatever the laptop's backend runs, so updating it means restarting the backend there. |
 | ML | None | No fake ML. |
 
 ---
@@ -742,7 +742,7 @@ An alternative to setting up by text. Free Photon lines can't message a number t
 3. **`start <TOKEN>` by text:** the token must exist, be unexpired and unclaimed, and the sender's handle must equal the signup's phone. Then the bank is linked through the vault (same Nessie estimate as text setup), the token is marked claimed, and the bot asks the person to confirm or override the budget. On "yes" or a number they become READY and get: "Hi <name>! You're set up. Start a plan with @plan, or join a friend's with join <code>." Any problem gets a short reply, then normal text setup carries on. A bare `start` is unchanged.
 4. **`PHOTON_CAN_INITIATE=true`** (off by default): also text the finish code right after the form. Nothing else depends on it.
 5. **No team dashboard:** who signed up, and their assigned line, is in Photon's dashboard (Users tab, "TEXTS ON" column), since signup registers every number there.
-6. **Exposure:** the form may be shared through a tunnel (cloudflared, ngrok). Requests carrying tunnel forwarding headers can only reach `/signup` and `/static` (`web/tunnel.py`): the bridge webhook trusts localhost, and a tunnel also connects from localhost, so without this anyone could post a fake DM "from" any phone.
+6. **Exposure:** the form may be shared through a tunnel (cloudflared, ngrok). Requests carrying tunnel forwarding headers can only reach `/signup` and `/static` (`web/tunnel.py`): the bridge webhook trusts localhost, and a tunnel also connects from localhost, so without this anyone could post a fake DM "from" any phone. In production that's tryhuddle.us (tunnel `huddle`); while the laptop, backend, or tunnel is down, Cloudflare shows error 1033.
 
 ---
 
@@ -765,7 +765,8 @@ class MessagingProvider(Protocol):
     async def send_link(self, handle: str, url: str) -> bool: ...  # post-v3: link preview card (Maps directions)
 
 class UserDirectoryProvider(Protocol):   # web signup (§7.5): Photon project users
-    async def register(self, phone: str, first_name: str, email: str | None = None) -> DirectoryUser | None: ...  # idempotent; their id + line
+    async def register(self, phone: str, first_name: str, email: str | None = None,
+                       last_name: str | None = None) -> DirectoryUser | None: ...  # idempotent; their id + line
     def opt_in_link(self, user_id: str, message: str) -> str | None: ...  # Photon's one-tap opt-in link (shared lines)
 
 class FinanceProvider(Protocol):

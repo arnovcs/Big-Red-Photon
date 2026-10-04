@@ -1,64 +1,202 @@
-# Big-Red-Photon
-## Photon spike (Stage 0b)
+# Huddle
 
-Bridge: `cd bridge && cp .env.example .env` (fill in Photon creds), `bun install`, `bun run src/index.ts`.
-SDK: `spectrum-ts` 12.10.1. Findings below come from the SDK's type definitions and Photon's docs. Items marked **LIVE?** still need to be confirmed with real phones.
+**The plan that actually happens.**
 
-| Question | Answer |
-|---|---|
-| Same handler for group + DM? How to tell apart? | Yes. Both arrive on `app.messages` as `[space, message]`. `imessage(space).type` is `"dm"` or `"group"`. **LIVE?** |
-| Can the bot initiate a DM to a handle that has only spoken in a group? | The API exists (`imessage(app).space.create(handle)`), but shared (free) lines only message recipients registered as **users** in the Photon project, and only after that number has texted the line first. Keep the "DM me start" flow. **LIVE?** |
-| Native polls in groups? Do votes arrive as events? | SDK supports `space.send(poll(title, options))` (iMessage, not as a reply). Votes arrive on `app.messages` as `content.type === "poll_option"` with `selected` and `option.title`; the bridge forwards selected votes to `/webhooks/photon/poll_vote`. **LIVE?** |
-| Shared location payload? | The SDK has no location content type. If anything arrives, it will be an `attachment` (the bridge logs its mime type). Default to typed landmarks. **LIVE?** |
-| Rate / allowlist limits? | Free/Pro = **shared line pool**: each user is routed through a number that may differ per person (confirmed: two teammates see different bot numbers). ~5,000 msgs/day, ~50 new conversations per line per day. Recipients must be registered as users. |
-| Do group chats work on the free tier, or does HACKWITHPHOTON unlock them? | Per Photon docs, shared pool: **no group creation and no group-change events**; only the Business plan (dedicated line, everyone texts one number) fully supports groups. A human-created group that includes one bot number *may* still deliver messages. Also, the bot can only send to a group it has received a message from since the bridge started. Ask Photon whether HACKWITHPHOTON gives a dedicated line. **LIVE?** |
-| Sender display name? | Not provided. `sender.id` is the handle (E.164 phone or email). Onboarding must ask for a name. |
+[Demo video](https://youtu.be/_h49PbVZYLw)
 
-## Web signup
+Built at **BigRed//Hacks 2026** (Cornell University), theme: **Navigation**.
 
-People can sign up on a web page instead of answering setup questions by text, then
-finish by texting the bot a short code. The site never sends the first text: Photon's
-free shared lines can't message a number that hasn't texted them, and texting the code
-proves the person owns the number. Details: ARCHITECTURE.md §7.5.
+![Three friends, three different routes, one arrival time](three-routes-one-arrival.png)
 
-**Settings** (in `.env`):
+---
 
-| Variable | What it does |
-|---|---|
-| `APP_NAME` | Product name shown on the pages |
-| `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET` | Same values as `bridge/.env`. The backend registers each signup as a user of your Photon project and reads the bot number Photon assigns them |
-| `BOT_PHONE_NUMBER` | Fallback number to show if Photon hasn't assigned one yet, e.g. `+16075550000` |
-| `PHOTON_CAN_INITIATE` | Leave `false` on the free plan. If `true`, the bot also texts the code right after signup |
+## The problem
 
-**Try it locally:** run the backend (`uv run uvicorn app.main:app --port 8000`) and the
-bridge, then:
+Group plans die in the group chat. Everyone has different preferences, budgets, and starting points, so the conversation stalls and nobody commits.
 
-1. Open http://localhost:8000/signup, enter your first and last name, phone, email, and
-   a demo bank. With `PHOTON_TOKEN` set (run `npx @photon-ai/cli login`, then put the
-   token in `.env`), Photon emails you its opt-in invite: accept it.
-   Your number is registered with the Photon project (you'll see it in the dashboard's
-   Users tab), and the page shows the bot number Photon assigned you.
-2. Tap **Text the bot to finish** (or scan the QR code with your phone). It's Photon's
-   opt-in link: it opens Messages to your number with `start <CODE>` filled in, and
-   sending it is what opts you in so the bot can text you back. Typing the number by
-   hand may not opt you in.
-3. Reply `yes` to the suggested budget (or type a number). You get the intro text.
-4. Check Photon's dashboard → **Users**: your number is listed with its **TEXTS ON** line.
+And someone usually ends up left out: the friend who lives far away and feels selfish asking to move the meetup, or the friend who can't afford the place everyone picked but doesn't want to say so in front of the group.
 
-**Share it with people off your laptop** using a tunnel, both free:
+Huddle is a forcing function for actually getting together, built so that nobody is priced out or left behind.
 
-```bash
-cloudflared tunnel --url http://localhost:8000   # prints https://<random>.trycloudflare.com
-# or
-ngrok http 8000                                  # prints https://<random>.ngrok-free.app
+## What Huddle does
+
+1. **Start a plan.** Text Huddle `plan` and get a 4-character join code to share with friends. They text `join <code>` to join.
+2. **Everyone answers privately.** Each person says how they're getting there (car, bike, walk, or rideshare), where they're starting from (a typed place or their live location), and what they want: "I'm starving," "no sushi," "I want to play pickleball," "back by 9."
+3. **Huddle finds real options.** Once more than half the group says go, Huddle searches real places on Google, filters them by everyone's budget, opening hours, and travel limits, and ranks them for fairness.
+4. **Vote.** Everyone replies A, B, or C. The majority wins.
+5. **Everyone gets their own route.** Each person gets a private itinerary: when to leave, turn-by-turn directions from their own starting point in their own travel mode, a Google Maps link, and their estimated cost. Leave times differ; **everyone arrives at the same time.**
+6. **On the day of.** A "heads up, leave in 5" nudge goes out before each person's leave time. If someone texts "running 10 min late," Huddle updates their arrival time and tells everyone else.
+
+If people want very different things, like pickleball and boba, Huddle builds **combo plans** with a stop for each request, within walking distance of each other.
+
+## See it in action
+
+A two-person example (pickleball + boba):
+
+```
+Cindy:  plan
+Huddle: let's do it 🎉 tell your friends to text me: join PUPG (say go when everyone's in)
+Huddle: how're you getting there? 🚗 car, 🚲 bike, 🚶 walk, 🚕 uber, or neither
+Cindy:  walk
+Huddle: I have your live location near Olin Library 📍 use that, or text a different spot?
+Cindy:  ya
+Cindy:  I want to play pickleball                        [❤️]
+
+Arnav (separately): join PUPG → bike → same → I want boba [👍]
+Arnav:  go
+Huddle → both: Arnav's ready ✅ (1/2 needed). say go when you're in too
+Cindy:  ok that's all, where do we go now?
+
+Huddle → both:
+  ok here's what works for everyone 👇
+  A: Teagle Hall + U Tea Bubble Tea — Pickleball + Boba · ≤11 min for everyone · $ · arrive together
+  B: Noyes Fitness Center + Kung Fu Tea — Pickleball + Boba · ≤9 min for everyone · $ · arrive together
+  reply A or B
+
+Cindy: A    Arnav: A
+Huddle → both: 🎉 it's A: Teagle Hall + U Tea Bubble Tea! everyone gets there around 2:50
+
+Huddle → Cindy (private): your plan today: Teagle Hall … 🚶 leave by 2:39, about an 11 min walk
+  then 🚶 ~4 min walk together to U Tea Bubble Tea
+  [Google Maps card] you'll get there ~2:50
 ```
 
-Share `https://<tunnel-host>/signup`. Through a tunnel only `/signup` and `/static` are
-reachable. The bot's webhook and
-the simulator answer "not found", so nobody on the internet can fake a text to the bot.
+## Built with
 
-**Photon free-plan notes:** the bot only talks to phones registered as users in the
-Photon project, and each person must text their bot line first. Signup handles both:
-it registers the number, then shows the line Photon assigned that person (on the shared
-pool, people can get different numbers). If Photon is unreachable, the page shows
-`BOT_PHONE_NUMBER` instead, or asks the person to refresh.
+| | |
+|---|---|
+| **[Photon](https://photon.codes) (Spectrum)** | The iMessage interface: messages, tapbacks, typing indicators, effects, and Find My live location. |
+| **Google Gemini** | Turns messages like "no sushi" or "back by 9" into structured preferences. |
+| **Google Places API** | Real venues near the group, and resolving typed starting points. |
+| **Google Routes API** | Walking, biking, and driving times, with live traffic. OpenRouteService is the fallback. |
+| **Capital One Nessie API** | Suggests a comfortable budget from a sandbox bank account's balance and spending. |
+| **Python, FastAPI, SQLite** | The backend: conversation state, planning, the optimizer, and the web signup page. |
+| **TypeScript on Bun** | A small bridge between Photon and the backend. |
+| **Jinja2 + Tailwind CSS** | The signup page. |
+
+## How it works
+
+```
+iPhone (iMessage) ⇄ Photon ⇄ Bridge (TypeScript/Bun)
+                                   │  HTTP (localhost)
+                                   ▼
+                        Backend (Python/FastAPI)
+   ├── conversation router    plain-word commands, onboarding
+   ├── planning session       join codes, majority "go", poll, delivery, nudges
+   ├── planning pipeline      extract → discover → route → optimize → poll
+   ├── private vault          the only code that reads budgets and locations
+   ├── privacy guard          checks every outgoing message
+   └── SQLite                 + web signup page
+```
+
+When the group says go, the pipeline runs: **Gemini** turns messages into structured preferences, **Google Places** finds real open venues, **Google Routes** times each person's trip, and a pure-Python **optimizer** drops plans that break anyone's limits and ranks the rest for fairness, weighting the worst-off person as much as the group average. Everyone arrives at the same time; each person's leave time is that arrival minus their own travel time. Every external call degrades gracefully, and a record/replay cache lets the demo run offline.
+
+Full design: [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Privacy
+
+Your budget, bank data, starting location, and requests are never shown to the group; they only see the plan, arrival time, and price tier. Gemini sees only pseudonymized preference messages, never names, numbers, budgets, or locations, and a privacy guard checks every outgoing message.
+
+## Running it yourself
+
+### Prerequisites
+
+- macOS or Linux, Python 3.12, [uv](https://docs.astral.sh/uv/), and [Bun](https://bun.sh)
+- API keys and accounts:
+  - **Photon** project ID and secret (from the Photon dashboard)
+  - **Google Cloud** API key with Places API (New) and Routes API enabled
+  - **Gemini** API key (from Google AI Studio)
+  - **Capital One Nessie** API key (from [nessieisreal.com](http://api.nessieisreal.com))
+- Optional, to share the signup page publicly: [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) or ngrok
+
+### Setup
+
+```bash
+git clone TODO-repo-url
+cd TODO-repo-folder
+uv sync
+cd bridge && bun install && cd ..
+cp .env.example .env
+```
+
+Create the demo bank customers in the Nessie sandbox (once):
+
+```bash
+uv run python scripts/seed_nessie.py
+```
+
+### Environment variables
+
+The essentials for the root `.env`:
+
+| Variable | Value |
+|---|---|
+| `PROVIDER_MESSAGING` | `photon` (or `sim` to run without phones) |
+| `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET` | From the Photon dashboard |
+| `PROVIDER_ROUTING` | `google` |
+| `GOOGLE_PLACES_API_KEY` | Also used for Routes unless `GOOGLE_ROUTES_API_KEY` is set |
+| `GEMINI_API_KEY` | From Google AI Studio |
+| `NESSIE_API_KEY` | From the Nessie site |
+| `CACHE_MODE` | `off`, `record`, or `replay` |
+
+`bridge/.env` needs the same `PHOTON_PROJECT_ID` and `PHOTON_PROJECT_SECRET`. The full list of settings (ride-share pricing, timeouts, demo area, and more) is in [ARCHITECTURE.md §5](ARCHITECTURE.md#5-configuration). Never commit `.env`.
+
+### Start it
+
+Run each in its own terminal:
+
+```bash
+# 1. Backend — wait for "messaging=photon" in the startup log
+uv run uvicorn app.main:app --port 8000
+
+# 2. Bridge — wait for "connected to Photon Spectrum"
+cd bridge && bun run src/index.ts
+
+# 3. (Optional) public signup page through a tunnel
+cloudflared tunnel --url http://localhost:8000
+```
+
+Then text the bot `hi` from a registered phone, or sign up at `http://localhost:8000/signup`. Only the signup pages are reachable through a tunnel; the webhook and other internal endpoints are blocked.
+
+### Tests
+
+```bash
+uv run pytest
+uv run ruff check .
+```
+
+The suite has about 450 tests, covering the optimizer and fairness scoring, synchronized arrival, budgets, preference extraction, the full conversation flow through the simulator, and privacy: attempted leaks through every kind of outgoing message, plus a check that only approved modules can read private data.
+
+## Project structure
+
+```
+app/
+├── api/            webhooks, simulator, health
+├── conversation/   message routing, commands, all bot copy
+├── onboarding/     setup questions, web signup claim
+├── planning/       sessions, the pipeline, combo plans
+├── optimizer/      feasibility, burden, fairness score, selection (pure Python)
+├── private/        the vault and budget estimation
+├── messaging/      outbound sending and the privacy guard
+├── providers/      Photon, Gemini, Google, Nessie, ORS, record/replay cache
+├── web/            signup pages (Jinja2 + Tailwind)
+├── models/         Pydantic data models
+└── db/             SQLite tables
+bridge/             TypeScript relay between Photon and the backend
+scripts/            Nessie seeding, demo scenario
+tests/              the test suite
+fixtures/           personas, test transcripts, recorded API responses
+```
+
+## Limits and what's next
+
+- **Huddle in the group chat itself**, using a Photon dedicated line instead of join codes and DMs.
+- **Public transit.** Bus routes aren't planned yet; Google already returns TCAT routes for Ithaca.
+- **Ratings and learning.** Use venue ratings in ranking, and learn what each group liked after past hangouts.
+- **Smarter running-late updates** that re-time everyone's routes, not just notify them.
+- Current limits: USD and miles only, one timezone per deployment, Google can't tell members-only facilities (like university gyms) from public ones, and the backend needs an always-on machine (not serverless).
+
+## Acknowledgments
+
+Built at BigRed//Hacks 2026. Thanks to the organizers and to Photon, Capital One, and Google for the APIs that made Huddle possible.
+
