@@ -2,7 +2,7 @@
 
 > An iMessage agent that turns a group's "where should we go?" into a plan everyone can afford and reach, and gets the whole group there at the same time.
 
-**Status:** v3 + post-v3 updates. Stages 0–6 (including 0.5, 0b, and 1.5) are complete; Stage 4 was later moved from OpenStreetMap to Google Places + Routes (see "Post-v3 changes"). Remaining: phase-2 scoring, Stage 7 (stretch), Stage 8.
+**Status:** v3 + post-v3 updates. Stages 0–6 (including 0.5, 0b, and 1.5) are complete; Stage 4 was later moved from OpenStreetMap to Google Places + Routes (see "Post-v3 changes"). Later additions (web signup, majority go, combo plans, running late, leave nudges, iMessage touches) are summarized under "Post-v3 changes". Remaining: phase-2 scoring, Stage 7 (stretch), Stage 8.
 
 ### v3 changes (summary) — DM-only "virtual group"
 The Stage 0b spike showed that Photon's free plan (the only plan available to us) uses a **shared line pool**: each person is assigned their own bot number, and **group chats are not supported**. Only the paid Business plan (one dedicated number) supports groups. DMs work both ways. So in v3 there is no iMessage group chat. The bot is the hub of a **virtual group** made of DMs:
@@ -25,6 +25,13 @@ These came after v3 and supersede the matching v2/v3 text below.
 - **Delivery:** each itinerary DM includes a Google Maps directions link from that person's own start. Venues with no price show "?" in the poll; typical-cost estimates are marked "est.".
 - **Data:** `private_profiles` gained `origin_typed_at` and `origin_place_id` (added to existing databases by `init_db`). Record/replay recordings were cleared with the provider change and need re-recording (§14.1).
 - **Web signup:** a one-page form; the person finishes by texting `start <TOKEN>` to the bot number Photon assigned them. Who signed up is visible in Photon's dashboard (Users tab); the app has no dashboard of its own. (§7.5)
+- **Plain-word commands:** `@` is optional. "plan", "go" / "let's go" / "we're ready", "cancel" / "nvm" work as commands, and yes/no understands casual replies ("ya", "nahh"). (§7.1)
+- **Majority go:** the search starts only when **more than half** the group has said go; each go is announced with progress ("Maya's ready ✅ (1/2 needed)"). (§7.3)
+- **Combo plans:** when no single venue covers very different asks ("pickleball" + "boba"), each option chains one walkable stop per ask (`planning/combos.py`, `Candidate.extra_stops`); if nothing chains within walking distance, the poll takes turns between the asks. This supersedes "Multi-stop plans" in §16. (§10, §13.6)
+- **After the plan:** "running 10 min late" updates that person's ETA and tells the others (no re-planning); a "heads up, leave in 5" DM goes out before each person's leave time (`LEAVE_NUDGE_MIN`). (§7.3)
+- **iMessage touches:** tapback reactions on preference messages (❤️ ‼️ 😂 👍, instead of a "got it" text), typing dots while planning, a confetti effect on the confirmation, Maps directions as a link card, a greeting reply to a plain "hi", and a live location described by its nearest named place. New interface methods in §8; bridge endpoints in §9.1.
+- **Poll:** options only, no one-line explanation each, so an `@go` costs **one** Gemini call (extraction). Prices show `$`–`$$$$`, `free` (parks, courts, trails), or `?` ("check website"). `planning/explain.py` is no longer called.
+- **Tone:** bot copy rewritten to be casual and lowercase (§7.4).
 
 ### v2 changes (summary)
 v1 used paid Google Maps and xAI Grok APIs. v2 uses only free services plus the team's Gemini key:
@@ -187,7 +194,8 @@ Navigation is the core, not a side feature: multi-origin, multi-modal routing to
 │   │   ├── session.py            # Group planning state machine (§7.3)
 │   │   ├── pipeline.py           # Orchestrates §10
 │   │   ├── extraction.py         # LLM output validation (§6.3)
-│   │   └── explain.py            # explanation phrasing + number check (§13.8)
+│   │   ├── combos.py             # multi-stop plans for very different asks (pure)
+│   │   └── explain.py            # explanation phrasing + number check (§13.8; not called since the poll dropped blurbs)
 │   │
 │   ├── optimizer/                # PURE PYTHON. No I/O.
 │   │   ├── enumerate.py          # venue × per-person mode combinations
@@ -317,6 +325,7 @@ All config through `app/settings.py` (pydantic-settings), loaded from `.env`.
 | `LLM_TIMEOUT_SEC` | `20` | |
 | `HTTP_TIMEOUT_SEC` | `10` | Default provider timeout |
 | `SHARED_LOCATION_MAX_AGE_MIN` | `120` | A Find My location older than this counts as "not sharing" |
+| `LEAVE_NUDGE_MIN` | `5` | "heads up, leave in N" DM before each person's leave time (0 = off) |
 | `APP_NAME` | `Huddle` | Product name on the web pages |
 | `BOT_PHONE_NUMBER` | `+16075550000` | Fallback number on the signup page when Photon hasn't assigned one (§7.5) |
 | `PHOTON_CAN_INITIATE` | `false` | Only if true, text new signups their finish code right after the form (free shared lines can't) |
@@ -468,6 +477,7 @@ class Candidate(BaseModel):
     typical_duration_min: int       # category default: food 60, cafe 45, dessert 30, bar 90, activity 90
     rating: float | None = None
     source: Literal["google", "event"]   # (post-v3: novelty_tags removed; "something new" isn't scored)
+    extra_stops: list["Candidate"] = []  # post-v3 combo plan: the next stops, walked in order
 ```
 
 ### 6.5 Routing
@@ -550,14 +560,15 @@ class GroupPlanOption(BaseModel):    # group-safe
     title: str                       # "Koko — Korean"
     max_travel_min: int              # "≤22 min for everyone"
     walking_level: Literal["low", "moderate", "high"]
-    price_tier: Literal["$", "$$", "$$$", "$$$$", "?"]   # post-v3: "?" = Google has no price
+    price_tier: Literal["$", "$$", "$$$", "$$$$", "free", "?"]   # post-v3: free = parks/courts/trails; "?" = no price ("check website")
     price_estimated: bool = False    # post-v3: typical cost for this kind of place, shown as "est."
     arrival_window_min: int
-    blurb: str                       # explanation from group-safe facts only
+    blurb: str                       # explanation from group-safe facts only (post-v3: empty; the poll is options only)
 
 class GroupSafeMessage(BaseModel):
     text: str
     poll: list[GroupPlanOption] | None = None
+    effect: str | None = None        # post-v3: iMessage screen effect, e.g. "confetti" (else plain text)
 
 class PersonalItinerary(BaseModel):  # DM only
     user_id: UUID
@@ -591,6 +602,8 @@ v3: "group" messages are delivered to each member's DM (§8), but the rule is un
 | `votes` | session_id, user_id, option_label, ts | One row per user per session (upsert) |
 | `processed_messages` | message_id (PK) | Idempotency for webhook retries |
 | `pending_signups` | id, token (unique), first_name, phone, bank_code, bot_phone, created_at, expires_at, claimed, claimed_at, claimed_user_id | Web signups waiting for `start <TOKEN>` (§7.5). No budget, balance, or location. |
+| `session_ready` | session_id, user_id, ts | Who has said go in a session; the search starts at more than half (§7.3) |
+| `late_updates` | session_id, user_id, minutes, ts | "running N min late" after delivery: their latest delay (§7.3) |
 
 Use `create_all()` on startup. No migration tool: columns added later are listed in `db/session.py` (`ADDED_COLUMNS`) and added to existing SQLite files by `init_db()`.
 
@@ -623,10 +636,11 @@ v3: **every inbound message is a DM.** (`is_group` is always false; if a group m
 4. If the user is READY, look up their **active group** (the one group with an active session they belong to, if any) and handle, in this order:
    - **Session commands:** `@plan`, `join <code>`, `@go`, `@cancel`, `@pick A|B|C`, and vote replies `A`/`B`/`C` (only while POLLING). See §7.3.
    - **Settings commands:** `budget <n>`, `location`, `car yes|no`, `help`.
-   - **Otherwise,** if their group's session is COLLECTING, store the text in `session_messages` (sender = this user). Reply `copy.NOTED` only to that member's **first** stored message in the session, to keep the DM quiet. Post-v3: a mode statement ("actually I'll drive") also replaces their travel mode for this plan.
+   - **Post-v3, then:** "done"/"shared it" after sharing their location switches them to the live location; "running N min late" after a delivered plan (§7.3); a plain greeting gets a hello with the next step.
+   - **Otherwise,** if their group's session is COLLECTING, store the text in `session_messages` (sender = this user). Every stored message gets a tapback that fits it (❤️ a craving, ‼️ a no-go, 😂 a joke, else 👍); if tapbacks don't work on the line, `copy.NOTED` ("got it 👍") goes out for the member's first message only. No tapback when a text reply was already sent (a mode change). Post-v3: a mode statement ("actually I'll drive") also replaces their travel mode for this plan.
    - **Otherwise** reply with `copy.HELP` (a short list of commands).
 
-Commands are case-insensitive and may appear with surrounding text ("ok @go"). Join codes are matched case-insensitively.
+Commands are case-insensitive and may appear with surrounding text ("ok @go"). Join codes are matched case-insensitively. Post-v3, `@` is optional: whole-message phrases count too ("plan", "start a plan"; "go", "let's go", "ready", "show options", "we're all in"; "cancel", "nvm"). A "start <TOKEN>" from a web signup is checked first of all (§7.5).
 
 ### 7.2 Onboarding FSM (DM only, `onboarding/fsm.py`)
 
@@ -673,40 +687,45 @@ any state ──@cancel (any member)──► CANCELLED
 - **`@plan`** (READY user, not in an active group): create a `Group` with a fresh join code and the sender as its first member, create a session in COLLECTING, and reply with `copy.PLAN_STARTED` (includes the code). Post-v3: then ask this member's travel mode for the plan (§7.2); `join` does the same for each joiner. If the user is already in an active group: "You're already in a plan (code K7QP). Say @cancel to start over."
 - **`join <code>`** (READY user): if the code matches a group whose session is COLLECTING, add the user and tell the group "✅ Sam joined (2 people)." If the session is past COLLECTING: "That plan already started. Ask them to @plan again." Unknown code: "I don't know that code. Check it and try again." Already in another active group: same reply as for `@plan`. Cap at 6 members.
 - **COLLECTING:** the bot only stores DMs sent **after** the member joined. (Photon cannot fetch chat history.) Nothing is relayed to other members.
-- **`@go`** (any member): require at least 2 members, else "I need at least 2 people. Share code K7QP first." Post-v3: members who never answered "how are you getting there?" are planned as walking (and told); members still answering "where from?" are re-asked, and the sender is told who the plan is waiting on. Then tell the group "🔎 Looking at options…" and run the pipeline (§10) as a background task. If a member turns out to have no starting point, they're asked and the session returns to COLLECTING.
+- **`@go`** (any member): require at least 2 members, else "I need at least 2 people. Share code K7QP first." Post-v3, the search starts only once **more than half** the members have said go (2 of 2, 2 of 3, 3 of 4; stored in `session_ready`); until then each new go is announced to the group with progress, and a repeat go tells the sender how many more are needed. Then: members who never answered "how are you getting there?" are planned as walking (and told); members still answering "where from?" are re-asked, and the sender is told who the plan is waiting on. Then tell the group "🔎 Looking at options…" and run the pipeline (§10) as a background task. If a member turns out to have no starting point, they're asked and the session returns to COLLECTING.
 - **POLLING:** text poll only; the same poll message goes to every member. Votes are DM replies `A`, `B`, or `C` (latest vote per user wins; upsert into `votes`). Winner = first option to reach ⌈N/2⌉ votes, or `@pick X` by any member, or the leader after `POLL_TIMEOUT_SEC` (ties → better score). Optionally tell the group "🗳️ 2 of 3 voted" (counts only, never who voted for what).
-- **DELIVERING:** compute detailed routes for the winner, send the group confirmation, then each person's itinerary DM (so the route lands right under the confirmation).
+- **DELIVERING:** compute detailed routes for the winner, send the group confirmation (post-v3: with a confetti effect), then each person's itinerary DM (so the route lands right under the confirmation), then their Google Maps directions as a link card. Typing dots show while the pipeline runs.
+- **After delivery (post-v3):** a "heads up, leave in N" DM is scheduled for each person at their own leave time (`LEAVE_NUDGE_MIN`; in-memory timers, so a backend restart drops them). Within 3 hours of the plan, "running 10 min late" (or just "running late") records the delay in `late_updates`, confirms the new ETA to that person, and sends the others a group-safe heads-up ("Sam's running ~10 min late, now around 6:42"). Nothing is re-planned.
 - **DONE / CANCELLED:** set `groups.active_session_id = null` and delete the session's `session_messages`. The join code is retired. A new `@plan` creates a new group and code.
 
 ### 7.4 Message copy (all in `conversation/copy.py`)
 
-Welcome (first DM from a new user, before onboarding):
-> Hi! I'm Huddle. I help friends pick a plan everyone can afford and reach, and I get you there at the same time. Let's set you up. It's private: I never share your money or location with anyone.
+Post-v3 the copy is casual and lowercase. Current examples (all in `copy.py`):
 
-`PLAN_STARTED` (reply to `@plan`):
-> Plan started! 🎉 Tell your friends to text me: **join K7QP**
-> Meanwhile, tell me what you're in the mood for. Only I see it. Say @go when everyone's in.
+Welcome (first DM from a new user, before onboarding):
+> hey! I'm Huddle 👋 I find a spot your whole group can afford and reach, and get everyone there at the same time. your money + location stay private, always.
+
+`plan_started` (reply to `@plan`):
+> let's do it 🎉 tell your friends to text me: join K7QP (say go when everyone's in)
 
 Join notice (to the group):
-> ✅ Sam joined (2 people).
+> Sam is in ✅ (2 of you)
 
-`NOTED` (first stored message from a member):
-> Got it 👍 Keep going, or say @go when everyone's ready.
+Go progress (to the group):
+> Maya's ready ✅ (1/2 needed). say go when you're in too
 
 Poll message (to the group):
-> Here are 3 plans that fit everyone's constraints:
-> **A** — Koko (Korean) · ≤22 min for everyone · $$ · arrive within 4 min
-> Keeps everyone within budget and the longest trip is 22 min.
-> **B** — …
-> Reply A, B, or C.
+> ok here's what works for everyone 👇
+> A: Koko — Korean · ≤22 min for everyone · $$ · arrive together
+> B: Viva — Mexican · ≤22 min for everyone · free · arrive together
+> reply A or B
 
-Confirmation (to the group):
-> 🎉 Plan A: Koko. Everyone arrives around 6:42. Your route is below 👇
+Confirmation (to the group, confetti effect):
+> 🎉 it's A: Koko! everyone gets there around 6:42. your route's coming 👇
 
-Personal DM:
-> Your plan for tonight: **Koko**, 123 College Ave.
-> 🚗 Request a ride by **6:29** (about 6 min pickup + 7 min drive).
-> Arrive ~6:42. Estimated total: $34 (food ~$25 + ride ~$9).
+Personal DM (then a Maps link card):
+> your plan today: Koko, 405 College Ave
+> 🚕 request a ride by 6:29 (~6 min pickup + 7 min drive)
+> you'll get there ~6:42. about ~$34 total (food ~$25 + ride ~$9)
+
+Leave nudge / running late:
+> heads up, leave in 5 if you're getting a ride 👀
+> heads up: Sam's running ~10 min late, now around 6:42 ⏰
 
 Keep copy short, warm, and free of jargon.
 
@@ -738,6 +757,9 @@ class MessagingProvider(Protocol):
     async def send_private(self, handle: str, msg: PrivateMessage) -> None: ...
     async def request_location(self, handle: str) -> bool: ...   # post-v3: send a Find My card; True if sent
     async def shared_location(self, handle: str) -> LatLng | None: ...  # post-v3: None if not sharing (or stale)
+    async def react(self, handle: str, message_id: str, emoji: str) -> bool: ...  # post-v3: tapback; False → caller texts instead
+    async def typing(self, handle: str, on: bool) -> None: ...  # post-v3: typing indicator, best effort
+    async def send_link(self, handle: str, url: str) -> bool: ...  # post-v3: link preview card (Maps directions)
 
 class UserDirectoryProvider(Protocol):   # web signup (§7.5): Photon project users
     async def register(self, phone: str, first_name: str) -> str | None: ...  # idempotent; the line they text, or None
@@ -751,6 +773,7 @@ class PlacesProvider(Protocol):
                             open_at: datetime, cuisines: list[str] | None = None,
                             activities: list[str] | None = None) -> list[Candidate]: ...  # post-v3: cuisines/activities
     async def text_search(self, query: str, near: LatLng) -> list[Candidate]: ...
+    async def nearest_place_name(self, location: LatLng) -> str | None: ...  # post-v3: describe a live location
     async def geocode(self, text: str, near: LatLng) -> ResolvedPlace | None: ...  # Google Text Search; None → ask to rephrase
 
 class RoutingProvider(Protocol):
@@ -803,7 +826,8 @@ Responsibilities, and nothing else:
    The SDK provides no sender display name (onboarding asks for it) and no location. `ts` is UTC ISO-8601.
 3. The bridge also forwards native poll votes to `/webhooks/photon/poll_vote`. **Unused in v3** (text polls only); the backend doesn't need this endpoint.
 4. HTTP server (`Bun.serve`) on port 3001:
-   - `POST /send_dm` `{handle, text}`: the only send endpoint v3 uses. **Verified working.**
+   - `POST /send_dm` `{handle, text, effect?}`: the main send endpoint. **Verified working.** Post-v3 optional `effect` ("confetti", "fireworks", ...) sends an iMessage screen effect.
+   - `POST /react` `{handle, message_id, emoji}`, `POST /typing` `{handle, on}`, `POST /send_link` `{handle, url}` (post-v3): tapback, typing indicator, link preview card.
    - `POST /send` `{chat_id, text}` and `POST /send_poll`: group-only, **unused in v3**.
    - `POST /send_image` returns 501 (stretch).
    - `POST /request_location` `{handle}` → `{status, reason}`: sends Apple's Find My "share your location" card (post-v3).
@@ -837,8 +861,8 @@ Original spike questions (answered above):
   - Definitions of HARD / SOFT / VETO / INFERRED with one example each.
   - The allowed `ConstraintField` and `CATEGORY` values.
   - "Only attribute a constraint to the person who said it. Cite message ids. Do not invent constraints. Do not output any prices, distances, or times other than those stated by a person."
-- **Explanation:** input is a list of group-safe fact dicts (§13.8). Output: one sentence (≤ 25 words) per plan. Then the number check (§13.8).
-- **Rate limits:** free-tier request limits can be low. Record/replay (§14.1) is mandatory during testing so repeated runs don't burn quota. One `@go` should cost exactly 2 Gemini calls (extract + explain).
+- **Explanation:** input is a list of group-safe fact dicts (§13.8). Output: one sentence (≤ 25 words) per plan. Then the number check (§13.8). *Post-v3: not called; the poll shows options only.*
+- **Rate limits:** free-tier request limits can be low. Record/replay (§14.1) is mandatory during testing so repeated runs don't burn quota. One `@go` costs exactly 1 Gemini call post-v3 (extraction; explanations were dropped).
 - **Stage 7 only:** `find_events` uses Gemini with Google Search grounding **if the key's tier supports it** (check the Gemini pricing/rate-limit page for your key). 20 s hard timeout. Results must be resolved to coordinates via `PlacesProvider.geocode`; unresolved events are dropped. If grounding is unavailable, use `fixtures/events_fallback.json`.
 
 ### 9.3 Google Places: venues + typed places (`providers/real/google_places.py`)
@@ -910,6 +934,9 @@ Triggered by `@go`. Target end-to-end latency: ≤ 15 s live, ≤ 3 s in replay.
    - categories from group_intent and CATEGORY constraints; wanted cuisines and activities from preferences
    - search_nearby(center, radius, categories, open_at = now + 30 min, cuisines=..., activities=...)
    - Shortlist: requested matches first, then the rest closest first, taking turns between kinds of place
+   - post-v3 combos: if no single venue covers every person's specific ask, build walkable chains
+     (one stop per ask, ≤ ~10 min walk between stops, things to do before food and drink);
+     if none chain, keep candidates for each ask and take turns between them in the poll
    - [Stage 7] ContextProvider.find_events in parallel (Gemini grounding or fallback list); resolved events added as candidates
 
 4. Route     (RoutingProvider.matrix — Google Routes, ORS fallback; one call per needed mode; drive/rideshare derived)
@@ -919,10 +946,11 @@ Triggered by `@go`. Target end-to-end latency: ≤ 15 s live, ≤ 3 s in replay.
 
 5. Optimize  (optimizer, pure)
    - plans = optimizer.rank(candidates, estimates, constraints, preferences, now, settings)
-   - top3 = optimizer.select(plans, k=3)
+   - top3 = optimizer.select(plans, k=3)   # post-v3: combos.pick_mixed(...) when taking turns between asks
    - If 0 feasible: send_group "Nothing fits everyone right now" + the most binding SOFT constraint suggestion; return to COLLECTING.
 
 6. Explain   (facts → LLMProvider.phrase_explanations → number check → template fallback)
+   - post-v3: skipped; facts are still built (privacy guard terms, nothing-fits hint) but the poll has no blurbs
 
 7. Guard + send
    - Build GroupSafeMessage with GroupPlanOption list
@@ -937,6 +965,8 @@ details = {pid: routing.route(origin, venue, mode, depart_at=leave_by)}   # Goog
 send_group(handles, confirmation with the shared arrival time, rounded to the minute)   # v3: sent first
 for each person in winner.assignments:
     send_private(handle, PrivateMessage(text=itinerary text))       # leave_by from the optimizer is exact
+    send_link(handle, maps directions url)                          # post-v3: link card
+    schedule "leave in N" nudge at leave_by − LEAVE_NUDGE_MIN       # post-v3
 ```
 If `route()` fails for someone, fall back to the screening estimate and a generic instruction ("Walk ~12 min via College Ave").
 
@@ -1054,6 +1084,7 @@ For each venue, the best mode assignment is the feasible combination with minimu
 2. Pick the best.
 3. Each next pick: the best remaining plan whose category or primary cuisine differs from all picked plans. If none, take the next best.
 4. If fewer than 3 feasible plans exist, return what exists. The pipeline tells the group how many fit.
+5. Post-v3: when the pipeline fell back to taking turns between very different asks (§10), `combos.pick_mixed` picks the best plan for each ask in turn instead, so no one's ask is crowded out.
 
 ### 13.7 Required unit tests (`tests/test_optimizer.py`, `tests/test_arrival.py`)
 - Budget filter removes a plan that exceeds one person's limit even if it's best for everyone else.
@@ -1066,6 +1097,8 @@ For each venue, the best mode assignment is the feasible combination with minimu
 - Determinism: same inputs → same output order.
 
 ### 13.8 Explanations (`facts.py` + LLM)
+
+*Post-v3: the poll no longer shows explanations, so the LLM phrasing below isn't called. Facts are still computed.*
 Facts per plan (group-safe only):
 ```json
 {"label": "A", "venue": "Koko", "category": "food", "cuisine": "korean",
@@ -1158,8 +1191,8 @@ Where the Stage 1 code depends on group chats (from a scan of `main`): `provider
 - Automatic location updates via `im.locations.watch()` (on the shared line it streams everyone sharing with that line). We read `locations.get(handle)` at onboarding and @go instead.
 - Supabase/Postgres, deployment, Docker, CI pipelines.
 - HMAC/auth between bridge and backend.
-- Live re-planning when someone is late; live location tracking.
-- Multi-stop plans.
+- Live re-planning when someone is late; live location tracking. (Post-v3 "running late" only tells the others the new ETA.)
+- Multi-stop plans in general. (Post-v3 exception: combo plans chain walkable stops only when no single venue covers very different asks, §10.)
 - Learned weights / any ML model.
 - Public transit. (Stretch only, after Stage 8: direct-trip routing from TCAT's GTFS schedule files.)
 - Any xAI API, and any Google Maps Platform API other than Places API (New) and the Routes API (post-v3 decisions: worldwide venues, Google routing with live traffic).
@@ -1227,6 +1260,8 @@ Match on `(pid, field, value, kind)`; ignore confidence.
 | Photon free plan: no group chats, a different bot number per person (confirmed in 0b) | v3 DM-only virtual group with join codes; text polls | Done (0b) |
 | Photon allowlist: bot only talks to registered phones that texted it first | Register all demo phones in the Photon project; each texts its bot line before judging | Stage 6, Stage 8 |
 | Inbound DMs stop arriving after a bridge restart (seen once in 0b, not yet explained) | Verify inbound with a "ping" DM after every bridge start; don't restart the bridge during judging | Stage 6 |
+| Leave nudges are in-memory timers (post-v3) | A backend restart after delivery drops pending "leave in N" DMs; don't restart mid-demo | Stage 8 |
+| iMessage extras (tapbacks, typing, effects, link cards) unsupported on a line | Each falls back silently (reactions fall back to a "got it" text) | Stage 8 |
 | Bot cannot see messages before `@plan` | Designed in: collection starts at `@plan` | — |
 | No transit mode | Ride-share replaces it in the story; GTFS transit is a post-freeze stretch | — |
 | Google Places gaps (no price, missing hours) | No price → "?" (activities) or a typical-cost estimate marked "est."; unknown hours treated as unknown, not guessed | Stage 4 |
