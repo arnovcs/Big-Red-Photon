@@ -26,6 +26,15 @@
   </div>
 
   <div>
+    <label for="last_name" class="mb-1.5 block font-medium">Last name</label>
+    <input id="last_name" name="last_name" autocomplete="family-name" required
+           value="{{ values.last_name or '' }}"
+           class="{{ field }} {{ bad if errors.last_name else ok }}"
+           {% if errors.last_name %}aria-invalid="true" aria-describedby="last_name_error"{% endif %}>
+    {% if errors.last_name %}<p id="last_name_error" class="mt-1.5 text-sm text-red-700">{{ errors.last_name }}</p>{% endif %}
+  </div>
+
+  <div>
     <label for="phone" class="mb-1.5 block font-medium">Phone number</label>
     <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required
            placeholder="(607) 555-0123" value="{{ values.phone or '' }}"
@@ -33,6 +42,17 @@
            {% if errors.phone %}aria-invalid="true" aria-describedby="phone_error"{% endif %}>
     {% if errors.phone %}<p id="phone_error" class="mt-1.5 text-sm text-red-700">{{ errors.phone }}</p>
     {% else %}<p class="mt-1.5 text-sm text-slate-500">The number you use for iMessage. You'll text the bot from it.</p>{% endif %}
+  </div>
+
+  <div>
+    <label for="email" class="mb-1.5 block font-medium">Email</label>
+    <input id="email" name="email" type="email" inputmode="email" autocomplete="email" required
+           autocapitalize="off" spellcheck="false" placeholder="you@example.com"
+           value="{{ values.email or '' }}"
+           class="{{ field }} {{ bad if errors.email else ok }}"
+           {% if errors.email %}aria-invalid="true" aria-describedby="email_error"{% endif %}>
+    {% if errors.email %}<p id="email_error" class="mt-1.5 text-sm text-red-700">{{ errors.email }}</p>
+    {% else %}<p class="mt-1.5 text-sm text-slate-500">Saved to your account. We never share it with your friends.</p>{% endif %}
   </div>
 
   <div>

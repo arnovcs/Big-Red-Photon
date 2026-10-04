@@ -1,0 +1,98 @@
+{
+ "method": "extract",
+ "provider": "gemini",
+ "request": {
+  "model": "gemini-3.5-flash-lite",
+  "prompt": "Current local time: Saturday 2026-10-03 20:00 (UTC-04:00).\n\nMessages:\n[m1] p1 at 20:00: my roommate says she hates thai food lol\n[m2] p2 at 20:00: honestly anything works for me\n[m3] p3 at 20:00: max 20 minutes of travel please\n[m4] p2 at 20:00: let's get dessert",
+  "schema": {
+   "properties": {
+    "constraints": {
+     "items": {
+      "properties": {
+       "confidence": {
+        "maximum": 1,
+        "minimum": 0,
+        "type": "number"
+       },
+       "evidence_msg_ids": {
+        "items": {
+         "type": "string"
+        },
+        "type": "array"
+       },
+       "field": {
+        "enum": [
+         "max_walking_minutes",
+         "max_travel_minutes",
+         "available_until",
+         "available_from",
+         "cuisine",
+         "category",
+         "activity",
+         "novelty",
+         "mode_preference"
+        ],
+        "type": "string"
+       },
+       "kind": {
+        "enum": [
+         "hard",
+         "soft",
+         "veto",
+         "inferred"
+        ],
+        "type": "string"
+       },
+       "pid": {
+        "type": "string"
+       },
+       "polarity": {
+        "enum": [
+         "want",
+         "avoid"
+        ],
+        "type": "string"
+       },
+       "value": {
+        "type": "string"
+       }
+      },
+      "required": [
+       "pid",
+       "field",
+       "value",
+       "polarity",
+       "kind",
+       "confidence",
+       "evidence_msg_ids"
+      ],
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "group_intent": {
+     "enum": [
+      "food",
+      "activity",
+      "either",
+      "unknown"
+     ],
+     "type": "string"
+    },
+    "unresolved": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    }
+   },
+   "required": [
+    "constraints",
+    "group_intent"
+   ],
+   "type": "object"
+  },
+  "system": "You extract outing preferences from a group's messages to a planning bot.\nEach message is from one person, identified only by a pseudonym like p1.\n\nKinds:\n- hard: a firm requirement. \"I have to be back by 9\" \u2192 available_until 21:00, hard.\n- soft: a preference. \"I'd prefer Korean\" \u2192 cuisine korean, soft.\n- veto: something to rule out. \"no sushi\" \u2192 cuisine sushi, polarity avoid, veto.\n- inferred: implied, not stated. \"I'm starving\" \u2192 category food, inferred.\n\nFields and their value format (value is always a string):\n- max_walking_minutes, max_travel_minutes: a number of minutes, e.g. \"15\".\n  \"nothing too far\" with no number \u2192 max_travel_minutes is unknown: put it in unresolved.\n- available_until, available_from: 24-hour local \"HH:MM\". Use the current local time\n  to resolve \"by 9\" (9 PM in the evening, 9 AM only if that is still ahead and fits).\n- cuisine: one lowercase word, e.g. \"korean\", \"sushi\", \"pizza\".\n- category: one of food, bar, cafe, dessert, activity, sports, event. \"sports\" for anything athletic (\"something sporty\",\n  \"let's play a game of basketball\"); \"activity\" for things to do that aren't food or drink.\n- activity: the specific thing to do, as a short lowercase phrase, e.g. \"pickleball\",\n  \"bowling\", \"karaoke\", \"rock climbing\", \"mini golf\". Also give its category.\n- novelty: \"1\" for wanting something new or untried, \"0\" for wanting somewhere familiar.\n- mode_preference: walk, bike, drive, or rideshare. Use polarity avoid for \"no driving\".\n\nRules:\n- Only attribute a constraint to the person who said it. Cite the message ids it comes from.\n- Only extract what the speaker wants for themselves. Ignore what they report about\n  people who are not in this chat (\"my roommate hates thai\" is not a constraint).\n- Do not invent constraints. If nothing applies, return an empty list.\n- Do not output any prices, distances, or times other than those stated by a person.\n- group_intent: food, activity, either, or unknown, from the conversation as a whole.\n  Anything to do that isn't eating or drinking is \"activity\", including sports and vague\n  asks like \"something fun\" (then category activity, soft). Never turn an activity\n  request into food.\n"
+ },
+ "response": "{\n  \"constraints\": [\n    {\n      \"pid\": \"p3\",\n      \"field\": \"max_travel_minutes\",\n      \"value\": \"20\",\n      \"polarity\": \"want\",\n      \"kind\": \"hard\",\n      \"confidence\": 1,\n      \"evidence_msg_ids\": [\"m3\"]\n    },\n    {\n      \"pid\": \"p2\",\n      \"field\": \"category\",\n      \"value\": \"dessert\",\n      \"polarity\": \"want\",\n      \"kind\": \"soft\",\n      \"confidence\": 1,\n      \"evidence_msg_ids\": [\"m4\"]\n    }\n  ],\n  \"group_intent\": \"food\"\n}"
+}

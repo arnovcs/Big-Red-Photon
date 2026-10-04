@@ -14,6 +14,7 @@ from app.db import queries
 from app.db.session import session_factory
 from app.deps import build_deps
 from app.main import create_app
+from app.models.identity import DirectoryUser
 from app.onboarding.web_claim import normalize_phone, parse_start_token
 from app.settings import Settings
 from tests.places_stub import StubPlaces
@@ -53,9 +54,21 @@ def web(tmp_path):
         yield client, clock
 
 
-def sign_up(client: TestClient, name="Sam", phone="(607) 555-0102", bank="SAM1") -> str:
+SAM_EMAIL = "sam@example.com"
+
+
+def sign_up(
+    client: TestClient, name="Sam", phone="(607) 555-0102", bank="SAM1", email=SAM_EMAIL
+) -> str:
     """Submit the form and return the token from the done page."""
-    resp = client.post("/signup", data={"first_name": name, "phone": phone, "bank_code": bank})
+    data = {
+        "first_name": name,
+        "last_name": "Rivera",
+        "phone": phone,
+        "email": email,
+        "bank_code": bank,
+    }
+    resp = client.post("/signup", data=data)
     assert resp.status_code == 200, resp.text  # after the 303 redirect
     return re.search(r"data-token>([A-Z0-9]{4})<", resp.text).group(1)
 
@@ -121,14 +134,28 @@ def test_signup_page_lists_demo_banks_without_private_data(web) -> None:
 @pytest.mark.parametrize(
     ("data", "field_error"),
     [
-        ({"first_name": "Sam", "phone": "555-0102", "bank_code": "SAM1"}, "phone number you use"),
-        ({"first_name": "Sam", "phone": "sam@example.com", "bank_code": "SAM1"}, "phone number"),
-        ({"first_name": "", "phone": "6075550102", "bank_code": "SAM1"}, "enter your first name"),
-        ({"first_name": "Sam", "phone": "6075550102", "bank_code": "NOPE"}, "Choose one of"),
+        ({"phone": "555-0102"}, "phone number you use"),
+        ({"phone": "sam@example.com"}, "phone number"),
+        ({"first_name": ""}, "enter your first name"),
+        ({"last_name": ""}, "enter your last name"),
+        ({"last_name": "R2D2"}, "letters only"),
+        ({"bank_code": "NOPE"}, "Choose one of"),
+        ({"email": ""}, "send your invite"),
+        ({"email": "sam@example"}, "look right"),
+        ({"email": "sam..x@example.com"}, "look right"),  # Photon's pattern rejects ".."
+        ({"email": "not an email"}, "look right"),
     ],
 )
 def test_signup_rejects_bad_input_and_keeps_what_was_typed(web, data, field_error) -> None:
     client, _ = web
+    good = {
+        "first_name": "Sam",
+        "last_name": "Rivera",
+        "phone": "6075550102",
+        "email": SAM_EMAIL,
+        "bank_code": "SAM1",
+    }
+    data = good | data
     resp = client.post("/signup", data=data)
     assert resp.status_code == 422
     assert field_error in resp.text
@@ -141,7 +168,14 @@ def test_signup_for_a_phone_that_is_already_set_up(web) -> None:
     client, _ = web
     onboard(client, MAYA)  # set up by text
     resp = client.post(
-        "/signup", data={"first_name": "Maya", "phone": "(607) 555-0101", "bank_code": "MAYA1"}
+        "/signup",
+        data={
+            "first_name": "Maya",
+            "last_name": "Lopez",
+            "phone": "(607) 555-0101",
+            "email": "maya@example.com",
+            "bank_code": "MAYA1",
+        },
     )
     assert resp.status_code == 409
     assert "already set up" in resp.text
@@ -155,9 +189,10 @@ def test_done_page_shows_only_the_token_and_how_to_send_it(web) -> None:
     assert f'start <span class="tracking-[0.15em]" data-token>{token}</span>' in html
     assert "data-bot-number>(607) 555-0000<" in html
     assert f'href="sms:{BOT_NUMBER}?&amp;body=start%20{token}"' in html
+    assert "invite" not in html.lower()  # Photon's API sends no invite email
     assert "<svg" in html  # QR code of the same link
     # Never the name, phone, or bank on this page.
-    for private in ("Sam", "555-0102", "6075550102", "SAM1"):
+    for private in ("Sam", "Rivera", "555-0102", "6075550102", "SAM1", SAM_EMAIL, "example.com"):
         assert private not in html
 
 
@@ -305,15 +340,25 @@ def test_there_is_no_team_dashboard(web) -> None:
 
 
 class FakeUsers:
-    """Stands in for Photon: assigns a line, or (line=None) has none yet."""
+    """Stands in for Photon: assigns a line (or none yet), with an opt-in link."""
 
-    def __init__(self, line: str | None) -> None:
+    def __init__(self, line: str | None, user_id: str | None = "u-1") -> None:
         self.line = line
-        self.calls: list[tuple[str, str]] = []
+        self.user_id = user_id
+        self.calls: list[tuple[str, str, str | None]] = []
 
-    async def register(self, phone: str, first_name: str) -> str | None:
-        self.calls.append((phone, first_name))
-        return self.line
+    async def register(
+        self,
+        phone: str,
+        first_name: str,
+        email: str | None = None,
+        last_name: str | None = None,
+    ) -> DirectoryUser | None:
+        self.calls.append((phone, first_name, email, last_name))
+        return DirectoryUser(user_id=self.user_id, line=self.line) if self.user_id else None
+
+    def opt_in_link(self, user_id: str, message: str) -> str | None:
+        return f"https://photon.test/users/{user_id}/redirect?msg={message.replace(' ', '%20')}"
 
 
 def test_signup_registers_the_phone_and_shows_its_assigned_line(tmp_path) -> None:
@@ -322,28 +367,43 @@ def test_signup_registers_the_phone_and_shows_its_assigned_line(tmp_path) -> Non
     with client:
         token = sign_up(client, name="Sam", phone="607-555-0102")
         html = client.get(f"/signup/done/{token}").text
-    assert users.calls[0] == (SAM_PHONE, "Sam")  # registered with Photon at signup
+    assert users.calls[0] == (SAM_PHONE, "Sam", SAM_EMAIL, "Rivera")  # registered at signup
     assert "data-bot-number>(415) 555-0123<" in html
-    assert f'href="sms:+14155550123?&amp;body=start%20{token}"' in html
+    # The button is Photon's opt-in link, not a plain sms: link.
+    assert f'href="https://photon.test/users/u-1/redirect?msg=start%20{token}"' in html
+    assert "sms:" not in html
     assert BOT_NUMBER not in html and "(607) 555-0000" not in html  # not the fallback
+
+
+def test_without_a_photon_user_id_the_button_is_a_plain_sms_link(tmp_path) -> None:
+    client, _ = make_client(tmp_path, users=FakeUsers("+14155550123", user_id=None))
+    with client:
+        token = sign_up(client)
+        html = client.get(f"/signup/done/{token}").text
+    assert f'href="sms:{BOT_NUMBER}?&amp;body=start%20{token}"' in html  # fallback number
 
 
 def test_no_assigned_line_falls_back_to_bot_phone_number(tmp_path) -> None:
     client, _ = make_client(tmp_path, users=FakeUsers(None))
     with client:
-        html = client.get(f"/signup/done/{sign_up(client)}").text
+        token = sign_up(client)
+        html = client.get(f"/signup/done/{token}").text
     assert "data-bot-number>(607) 555-0000<" in html
+    # Photon knows the user, so the opt-in link still works without a line yet.
+    assert f'href="https://photon.test/users/u-1/redirect?msg=start%20{token}"' in html
 
 
 def test_no_number_at_all_asks_to_refresh_and_retries(tmp_path) -> None:
-    users = FakeUsers(None)
+    users = FakeUsers(None, user_id=None)
     client, _ = make_client(tmp_path, users=users, bot_phone_number="")
     with client:
         token = sign_up(client)
         html = client.get(f"/signup/done/{token}").text
         assert "still getting your number" in html
-        assert "sms:" not in html
+        assert "sms:" not in html and "redirect?msg" not in html
+        users.user_id = "u-2"
         users.line = "+14155550124"  # Photon catches up
         html = client.get(f"/signup/done/{token}").text
     assert "data-bot-number>(415) 555-0124<" in html
+    assert "users/u-2/redirect" in html
     assert len(users.calls) == 4  # signup, its redirect to the done page, two more views

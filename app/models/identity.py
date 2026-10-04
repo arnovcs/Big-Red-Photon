@@ -23,6 +23,13 @@ class User(BaseModel):
     onboarding_state: OnboardingState
 
 
+class DirectoryUser(BaseModel):
+    """A person registered with the messaging platform (Photon project user)."""
+
+    user_id: str  # the platform's id for them (used for their opt-in link)
+    line: str | None = None  # the number they text the bot on (E.164), once assigned
+
+
 class Group(BaseModel):
     """A virtual group, created by one @plan (v3: DMs only)."""
 

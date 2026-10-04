@@ -303,6 +303,8 @@ All config through `app/settings.py` (pydantic-settings), loaded from `.env`.
 | `BACKEND_URL` | `http://localhost:8000` | Bridge → backend (bridge's own env) |
 | `PHOTON_PROJECT_ID`, `PHOTON_PROJECT_SECRET` | | Bridge; also the backend, to register web signups as Photon users (§7.5) |
 | `PHOTON_API_URL` | `https://spectrum.photon.codes` | Spectrum API host for user registration |
+| `PHOTON_TOKEN` | | Photon account token (`npx @photon-ai/cli login`) so signups get Photon's opt-in invite; expires, re-login to refresh |
+| `PHOTON_DASHBOARD_URL` | `https://app.photon.codes` | Photon dashboard API host (invites) |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./app.db` | |
 | `PROVIDER_MESSAGING` | `photon` \| `sim` | |
 | `PROVIDER_PLACES` | `google` | Only option (post-v3); tests inject a stub via `build_deps(places=...)` |
@@ -601,7 +603,7 @@ v3: "group" messages are delivered to each member's DM (§8), but the rule is un
 | `session_messages` | id, session_id, message_id (unique), sender_user_id, text, ts | Only messages during COLLECTING. Deleted when session reaches DONE or CANCELLED. |
 | `votes` | session_id, user_id, option_label, ts | One row per user per session (upsert) |
 | `processed_messages` | message_id (PK) | Idempotency for webhook retries |
-| `pending_signups` | id, token (unique), first_name, phone, bank_code, bot_phone, created_at, expires_at, claimed, claimed_at, claimed_user_id | Web signups waiting for `start <TOKEN>` (§7.5). No budget, balance, or location. |
+| `pending_signups` | id, token (unique), first_name, last_name, phone, email, bank_code, bot_phone, photon_user_id, created_at, expires_at, claimed, claimed_at, claimed_user_id | Web signups waiting for `start <TOKEN>` (§7.5). No budget, balance, or location. |
 | `session_ready` | session_id, user_id, ts | Who has said go in a session; the search starts at more than half (§7.3) |
 | `late_updates` | session_id, user_id, minutes, ts | "running N min late" after delivery: their latest delay (§7.3) |
 
@@ -733,9 +735,10 @@ Keep copy short, warm, and free of jargon.
 
 An alternative to setting up by text. Free Photon lines can't message a number that hasn't texted them, so **the website never sends the first text**: the person texts the bot, which also proves they own the number.
 
-1. **`/signup`:** first name, phone, demo bank (dropdown of `fixtures/personas.json` names via `vault.bank_choices()`). The phone is normalized to the iMessage handle form (`+` and digits; 10 digits → `+1`). A phone that already belongs to a READY user gets "already set up". Otherwise a `pending_signups` row is saved with a 4-character token (join-code alphabet, never reused) that expires after `SIGNUP_TOKEN_TTL_HOURS`; an older unclaimed code for that phone stops working. No location and no travel modes: both are asked per plan (§7.2).
-   On submit the phone is also **registered as a user of the Photon project** (`UserDirectoryProvider.register`, `providers/real/photon_users.py`): `GET /projects/{id}/users/?search=<phone>`, else `POST /projects/{id}/users/` with `{"type": "shared", "phoneNumber", "firstName"}`, Basic auth with the project id/secret (shapes from `spectrum.photon.codes/openapi/json`). On the free shared pool this is what lets the bot talk to the number at all, and the user's `assignedPhoneNumber` is the line they text; it is saved as `pending_signups.bot_phone`.
-2. **`/signup/done/{token}`:** "1. Text this number" (the assigned line, else `BOT_PHONE_NUMBER`; if neither, "refresh in a minute", and each refresh retries the lookup), "2. Send this message: start <TOKEN>", a "Text the bot to finish" `sms:` link with both filled in, and a QR code of the same link for laptops. It never shows the name, the person's own phone, or the bank.
+1. **`/signup`:** first name, last name, phone, email, demo bank (dropdown of `fixtures/personas.json` names via `vault.bank_choices()`). The email is checked against Photon's own email pattern; it's stored only to send to Photon and is never shown. The phone is normalized to the iMessage handle form (`+` and digits; 10 digits → `+1`). A phone that already belongs to a READY user gets "already set up". Otherwise a `pending_signups` row is saved with a 4-character token (join-code alphabet, never reused) that expires after `SIGNUP_TOKEN_TTL_HOURS`; an older unclaimed code for that phone stops working. No location and no travel modes: both are asked per plan (§7.2).
+   On submit the phone is also **registered as a user of the Photon project** (`UserDirectoryProvider.register`, `providers/real/photon_users.py`): `GET /projects/{id}/users/?search=<phone>`, else `POST /projects/{id}/users/` with `{"type": "shared", "phoneNumber", "firstName", "email"}`, Basic auth with the project id/secret (shapes from `spectrum.photon.codes/openapi/json`). On the free shared pool this is what lets the bot talk to the number at all, and the user's `assignedPhoneNumber` is the line they text; it is saved as `pending_signups.bot_phone`. The API stores the email but sends **no invite** (tested 2026-10-04). Shared-line recipients must **opt in** before the bot can text them: the opt-in is Photon's public per-user link `GET /users/{userId}/redirect?msg=<text>` (302 → `sms:<their line>&body=<text>`), so the user id is saved as `pending_signups.photon_user_id`.
+   **Opt-in invite (preferred):** with `PHOTON_TOKEN` (a Photon *account* token from `npx @photon-ai/cli login`), the user is added through Photon's dashboard API instead: `POST https://app.photon.codes/api/projects/{id}/spectrum/users` with `{"firstName", "lastName", "email", "phoneNumber", "sendInvite": true}` and `Authorization: Bearer <token>` (the call `photon spectrum users add --invite` makes; all four fields are required, a missing `lastName` is a 422). Photon emails the opt-in invite. For an existing user who hasn't opted in (`meta.opt_in` not true) the same call updates them and re-sends the invite. No token, an expired one (401), or a failure → logged `photon_invite_failed`, and the user is created without an invite (the one-tap link below still opts them in).
+2. **`/signup/done/{token}`:** "1. Text this number" (the assigned line, else `BOT_PHONE_NUMBER`; if neither, "refresh in a minute", and each refresh retries the registration), "2. Send this message: start <TOKEN>", and a **"Text the bot to finish"** button plus a QR code for laptops. Both use **Photon's opt-in link** with `start <TOKEN>` as the message, so tapping and sending is the opt-in; a plain `sms:` link is only the fallback when there's no Photon user id (or in the simulator), and texting by hand may not opt in. It never shows the name, the person's own phone, the email, or the bank.
 3. **`start <TOKEN>` by text:** the token must exist, be unexpired and unclaimed, and the sender's handle must equal the signup's phone. Then the bank is linked through the vault (same Nessie estimate as text setup), the token is marked claimed, and the bot asks the person to confirm or override the budget. On "yes" or a number they become READY and get: "Hi <name>! You're set up. Start a plan with @plan, or join a friend's with join <code>." Any problem gets a short reply, then normal text setup carries on. A bare `start` is unchanged.
 4. **`PHOTON_CAN_INITIATE=true`** (off by default): also text the finish code right after the form. Nothing else depends on it.
 5. **No team dashboard:** who signed up, and their assigned line, is in Photon's dashboard (Users tab, "TEXTS ON" column), since signup registers every number there.
@@ -762,7 +765,8 @@ class MessagingProvider(Protocol):
     async def send_link(self, handle: str, url: str) -> bool: ...  # post-v3: link preview card (Maps directions)
 
 class UserDirectoryProvider(Protocol):   # web signup (§7.5): Photon project users
-    async def register(self, phone: str, first_name: str) -> str | None: ...  # idempotent; the line they text, or None
+    async def register(self, phone: str, first_name: str, email: str | None = None) -> DirectoryUser | None: ...  # idempotent; their id + line
+    def opt_in_link(self, user_id: str, message: str) -> str | None: ...  # Photon's one-tap opt-in link (shared lines)
 
 class FinanceProvider(Protocol):
     async def get_customer(self, customer_id: str) -> dict: ...

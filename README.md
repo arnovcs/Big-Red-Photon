@@ -33,11 +33,15 @@ proves the person owns the number. Details: ARCHITECTURE.md §7.5.
 **Try it locally:** run the backend (`uv run uvicorn app.main:app --port 8000`) and the
 bridge, then:
 
-1. Open http://localhost:8000/signup, enter your name, phone, and a demo bank. Your
-   number is registered with the Photon project (you'll see it in the dashboard's
+1. Open http://localhost:8000/signup, enter your first and last name, phone, email, and
+   a demo bank. With `PHOTON_TOKEN` set (run `npx @photon-ai/cli login`, then put the
+   token in `.env`), Photon emails you its opt-in invite: accept it.
+   Your number is registered with the Photon project (you'll see it in the dashboard's
    Users tab), and the page shows the bot number Photon assigned you.
-2. Tap **Text the bot to finish** (or scan the QR code with your phone). It opens
-   Messages to that number with `start <CODE>` filled in. Send it.
+2. Tap **Text the bot to finish** (or scan the QR code with your phone). It's Photon's
+   opt-in link: it opens Messages to your number with `start <CODE>` filled in, and
+   sending it is what opts you in so the bot can text you back. Typing the number by
+   hand may not opt you in.
 3. Reply `yes` to the suggested budget (or type a number). You get the intro text.
 4. Check Photon's dashboard → **Users**: your number is listed with its **TEXTS ON** line.
 

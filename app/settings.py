@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     photon_project_id: str = ""
     photon_project_secret: str = ""
     photon_api_url: str = "https://spectrum.photon.codes"
+    # Photon account token (from `photon login`; the Photon CLI reads the same variable).
+    # With it, new signups are added through Photon's dashboard API with an opt-in invite.
+    photon_token: str = ""
+    photon_dashboard_url: str = "https://app.photon.codes"
 
     # Bridge <-> backend
     bridge_url: str = "http://localhost:3001"

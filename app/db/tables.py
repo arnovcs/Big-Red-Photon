@@ -146,10 +146,15 @@ class PendingSignupRow(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     token: Mapped[str] = mapped_column(String(8), unique=True, index=True)
     first_name: Mapped[str] = mapped_column(String)
+    last_name: Mapped[str | None] = mapped_column(String, nullable=True)  # for Photon only
     phone: Mapped[str] = mapped_column(String, index=True)  # canonical form, e.g. +16075551234
+    # Sent to Photon when the user is created (Photon emails them an invite). Never shown.
+    email: Mapped[str | None] = mapped_column(String, nullable=True)
     bank_code: Mapped[str] = mapped_column(String)  # demo persona code, e.g. MAYA1
     # The bot line Photon assigned this person (their "TEXTS ON" number); None until known.
     bot_phone: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Their Photon user id: builds the one-tap opt-in link. None until registered.
+    photon_user_id: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     claimed: Mapped[bool] = mapped_column(Boolean, default=False)

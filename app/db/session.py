@@ -47,6 +47,9 @@ ADDED_COLUMNS = [
     ("private_profiles", "origin_typed_at", "DATETIME"),
     ("private_profiles", "origin_place_id", "VARCHAR"),
     ("pending_signups", "bot_phone", "VARCHAR"),
+    ("pending_signups", "email", "VARCHAR"),
+    ("pending_signups", "photon_user_id", "VARCHAR"),
+    ("pending_signups", "last_name", "VARCHAR"),
 ]
 
 

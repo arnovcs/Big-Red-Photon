@@ -5,6 +5,7 @@ from typing import Protocol
 
 from app.models.candidates import Candidate, EventFinding, ResolvedPlace
 from app.models.conversation import GroupPreferences, PseudonymousMessage
+from app.models.identity import DirectoryUser
 from app.models.outbound import GroupSafeMessage, PrivateMessage
 from app.models.private import FinancialSnapshot, LatLng
 from app.models.routing import Mode, RouteDetail, RouteEstimate
@@ -46,11 +47,24 @@ class UserDirectoryProvider(Protocol):
     user of the project before the bot can talk to it, and each user is assigned the line
     (bot number) they text."""
 
-    async def register(self, phone: str, first_name: str) -> str | None:
-        """Make sure `phone` (E.164) is a user; return the number they should text.
+    async def register(
+        self,
+        phone: str,
+        first_name: str,
+        email: str | None = None,
+        last_name: str | None = None,
+    ) -> DirectoryUser | None:
+        """Make sure `phone` (E.164) is a user; return their id and the line they text.
 
-        Idempotent. None if the number isn't known (yet) or the call failed: never raises.
+        `email` is stored on the platform (the API doesn't send invites). Idempotent.
+        None if the call failed: never raises.
         """
+        ...
+
+    def opt_in_link(self, user_id: str, message: str) -> str | None:
+        """A link that opens Messages to this user's line with `message` typed in. On
+        Photon's shared lines, sending through it is how a person opts in to being
+        texted. None if the platform has no such link (then use a plain sms: link)."""
         ...
 
 

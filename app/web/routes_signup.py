@@ -45,15 +45,20 @@ def display_phone(phone: str) -> str:
     return phone
 
 
-async def _assigned_line(deps: Deps, signup: PendingSignupRow) -> str | None:
-    """Register this phone with Photon (idempotent) and return the line they should text."""
+async def _register(deps: Deps, signup: PendingSignupRow) -> None:
+    """Register this phone with Photon (idempotent); save their user id and line."""
     if deps.users is None:
-        return None
+        return
     try:
-        return await deps.users.register(signup.phone, signup.first_name)
+        user = await deps.users.register(
+            signup.phone, signup.first_name, signup.email, signup.last_name
+        )
     except Exception:
-        log.warning(kv("assigned_line_failed"), exc_info=True)
-        return None
+        log.warning(kv("register_failed"), exc_info=True)
+        return
+    if user is not None:
+        signup.photon_user_id = user.user_id
+        signup.bot_phone = user.line or signup.bot_phone
 
 
 def sms_link(bot_number: str, token: str) -> str:
@@ -96,11 +101,19 @@ async def signup_page(request: Request) -> HTMLResponse:
 async def signup_submit(
     request: Request,
     first_name: str = Form(""),
+    last_name: str = Form(""),
     phone: str = Form(""),
+    email: str = Form(""),
     bank_code: str = Form(""),
 ) -> HTMLResponse | RedirectResponse:
     deps: Deps = request.app.state.deps
-    values = {"first_name": first_name, "phone": phone, "bank_code": bank_code}
+    values = {
+        "first_name": first_name,
+        "last_name": last_name,
+        "phone": phone,
+        "email": email,
+        "bank_code": bank_code,
+    }
     codes = {code for code, _ in vault.bank_choices()}
     form, errors = parse_signup(values, codes)
     if form is None:
@@ -126,18 +139,26 @@ async def signup_submit(
         signup = PendingSignupRow(
             token=token,
             first_name=form.first_name,
+            last_name=form.last_name,
             phone=form.phone,
+            email=form.email,
             bank_code=form.bank_code,
             created_at=now,
             expires_at=now + timedelta(hours=deps.settings.signup_token_ttl_hours),
         )
         db.add(signup)
         await db.commit()
-        # Photon only lets the bot talk to registered numbers, and assigns each one the
-        # line to text. If this fails, the done page falls back and retries on refresh.
-        signup.bot_phone = await _assigned_line(deps, signup)
+        # Photon only lets the bot talk to registered numbers that opted in, and assigns
+        # each one the line to text. If this fails, the done page retries on refresh.
+        await _register(deps, signup)
         await db.commit()
-    log.info(kv("web_signup_created", has_line=signup.bot_phone is not None))
+    log.info(
+        kv(
+            "web_signup_created",
+            registered=signup.photon_user_id is not None,
+            has_line=signup.bot_phone is not None,
+        )
+    )
 
     if deps.settings.photon_can_initiate:
         nudge = PrivateMessage(text=copy.web_signup_nudge(form.first_name, token))
@@ -151,6 +172,7 @@ async def signup_done(request: Request, token: str) -> HTMLResponse:
     person's own phone."""
     deps: Deps = request.app.state.deps
     bot_number = None
+    photon_user_id = None
     async with session_factory()() as db:
         signup = await queries.signup_by_token(db, token)
         if signup is None:
@@ -161,12 +183,20 @@ async def signup_done(request: Request, token: str) -> HTMLResponse:
             state = "expired"
         else:
             state = "pending"
-            if signup.bot_phone is None:  # Photon didn't answer at signup: try again
-                signup.bot_phone = await _assigned_line(deps, signup)
+            if signup.photon_user_id is None or signup.bot_phone is None:
+                await _register(deps, signup)  # Photon didn't answer at signup: try again
                 await db.commit()
             bot_number = signup.bot_phone or deps.settings.bot_phone_number or None
+            photon_user_id = signup.photon_user_id
 
-    link = sms_link(bot_number, token.upper()) if bot_number else None
+    # Photon's opt-in link when we have their user id (sending through it is how they
+    # opt in to being texted); otherwise a plain sms: link (works only once opted in).
+    message = f"start {token.upper()}"
+    link = None
+    if state == "pending" and photon_user_id and deps.users is not None:
+        link = deps.users.opt_in_link(photon_user_id, message)
+    if link is None and bot_number:
+        link = sms_link(bot_number, token.upper())
     return templates.TemplateResponse(
         request,
         "signup_done.html",
